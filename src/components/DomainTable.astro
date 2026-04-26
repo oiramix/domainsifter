@@ -1,0 +1,386 @@
+---
+import sampleDomains from '../data/sample-domains.json';
+
+type Verdict = 'Clean' | 'Promising' | 'Caution';
+
+interface Domain {
+  domain: string;
+  tld: string;
+  ageYears: number;
+  waybackSnapshots: number;
+  openPageRank: number;
+  verdict: Verdict;
+}
+
+const domains = sampleDomains as Domain[];
+
+const tldsInData = Array.from(new Set(domains.map((d) => d.tld))).sort();
+
+const registerUrl = (name: string) =>
+  `https://namecheap.com/domains/registration/results/?domain=${encodeURIComponent(name)}`;
+
+const tldClass = (tld: string) => {
+  switch (tld) {
+    case 'com':
+      return 'bg-emerald-50 text-emerald-800 ring-emerald-200';
+    case 'net':
+      return 'bg-sky-50 text-sky-800 ring-sky-200';
+    case 'org':
+      return 'bg-violet-50 text-violet-800 ring-violet-200';
+    case 'io':
+      return 'bg-amber-50 text-amber-800 ring-amber-200';
+    default:
+      return 'bg-stone-100 text-stone-700 ring-stone-200';
+  }
+};
+
+const verdictClass = (verdict: Verdict) => {
+  switch (verdict) {
+    case 'Clean':
+      return 'bg-emerald-50 text-emerald-800 ring-emerald-200';
+    case 'Promising':
+      return 'bg-sky-50 text-sky-800 ring-sky-200';
+    case 'Caution':
+      return 'bg-amber-50 text-amber-900 ring-amber-200';
+  }
+};
+---
+
+<section id="today" class="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+    <div>
+      <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">Preview list</h2>
+      <p class="mt-2 text-sm text-stone-600">
+        <span data-result-count>Showing {domains.length} of {domains.length} domains</span>
+        <span class="text-stone-400"> • </span>
+        <span>
+          Last updated: <span data-last-updated>Preview data</span>
+        </span>
+      </p>
+    </div>
+
+    <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+      <label class="sr-only" for="domain-search">Search domains</label>
+      <div class="relative">
+        <input
+          id="domain-search"
+          type="search"
+          inputmode="search"
+          autocomplete="off"
+          placeholder="Search domains…"
+          class="w-full sm:w-64 rounded-md border border-stone-300 bg-white pl-9 pr-3 py-2 text-sm text-ink placeholder:text-stone-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+        />
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="9" cy="9" r="6" />
+          <path d="m14 14 4 4" stroke-linecap="round" />
+        </svg>
+      </div>
+
+      <label class="sr-only" for="tld-filter">Filter by TLD</label>
+      <select
+        id="tld-filter"
+        class="rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+      >
+        <option value="all">All TLDs</option>
+        {tldsInData.map((t) => <option value={t}>.{t} only</option>)}
+      </select>
+    </div>
+  </div>
+
+  <!-- Desktop / tablet table -->
+  <div class="hidden md:block overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+    <table class="w-full text-sm" data-domain-table>
+      <thead class="bg-stone-50 text-stone-600">
+        <tr>
+          <th scope="col" class="text-left font-medium">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="domain">
+              Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col" class="text-left font-medium">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="tld">
+              TLD <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col" class="text-right font-medium">
+            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="ageYears">
+              Age <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col" class="text-right font-medium">
+            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="waybackSnapshots">
+              Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col" class="text-left font-medium">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="openPageRank">
+              OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col" class="text-left font-medium">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="verdict">
+              Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            </button>
+          </th>
+          <th scope="col" class="text-right font-medium px-4 py-3">Register</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100" data-table-body>
+        {
+          domains.map((d) => (
+            <tr
+              data-row
+              data-domain={d.domain.toLowerCase()}
+              data-tld={d.tld}
+              data-age={d.ageYears}
+              data-wayback={d.waybackSnapshots}
+              data-opr={d.openPageRank}
+              data-verdict={d.verdict}
+            >
+              <td class="px-4 py-3">
+                <a
+                  href={`/domain/${d.domain}`}
+                  class="font-medium text-ink hover:text-accent hover:underline underline-offset-2"
+                >
+                  {d.domain}
+                </a>
+              </td>
+              <td class="px-4 py-3">
+                <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
+                  .{d.tld}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right tabular-nums text-stone-700">{d.ageYears} yrs</td>
+              <td class="px-4 py-3 text-right tabular-nums text-stone-700">{d.waybackSnapshots.toLocaleString('en-US')}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                    <div class="h-full bg-accent" style={`width: ${(d.openPageRank / 10) * 100}%`}></div>
+                  </div>
+                  <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{d.openPageRank.toFixed(1)}</span>
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(d.verdict)}`}>
+                  {d.verdict}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <a
+                  href={registerUrl(d.domain)}
+                  rel="nofollow sponsored noopener"
+                  target="_blank"
+                  class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+                >
+                  Register →
+                </a>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+
+    <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state>
+      No domains match your filters.
+    </p>
+  </div>
+
+  <!-- Mobile card layout -->
+  <ul class="md:hidden space-y-3" data-card-list>
+    {
+      domains.map((d) => (
+        <li
+          data-card
+          data-domain={d.domain.toLowerCase()}
+          data-tld={d.tld}
+          data-age={d.ageYears}
+          data-wayback={d.waybackSnapshots}
+          data-opr={d.openPageRank}
+          data-verdict={d.verdict}
+          class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <a
+              href={`/domain/${d.domain}`}
+              class="font-medium text-ink hover:text-accent hover:underline underline-offset-2 break-all"
+            >
+              {d.domain}
+            </a>
+            <span class={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(d.verdict)}`}>
+              {d.verdict}
+            </span>
+          </div>
+
+          <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <div class="flex items-center justify-between col-span-2">
+              <dt class="text-stone-500">TLD</dt>
+              <dd>
+                <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
+                  .{d.tld}
+                </span>
+              </dd>
+            </div>
+            <div class="flex items-center justify-between col-span-2">
+              <dt class="text-stone-500">Age</dt>
+              <dd class="text-stone-800 tabular-nums">{d.ageYears} yrs</dd>
+            </div>
+            <div class="flex items-center justify-between col-span-2">
+              <dt class="text-stone-500">Wayback snapshots</dt>
+              <dd class="text-stone-800 tabular-nums">{d.waybackSnapshots.toLocaleString('en-US')}</dd>
+            </div>
+            <div class="flex items-center justify-between col-span-2">
+              <dt class="text-stone-500">OpenPageRank</dt>
+              <dd class="flex items-center gap-2">
+                <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                  <div class="h-full bg-accent" style={`width: ${(d.openPageRank / 10) * 100}%`}></div>
+                </div>
+                <span class="text-stone-800 tabular-nums text-xs">{d.openPageRank.toFixed(1)}</span>
+              </dd>
+            </div>
+          </dl>
+
+          <a
+            href={registerUrl(d.domain)}
+            rel="nofollow sponsored noopener"
+            target="_blank"
+            class="mt-4 block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+          >
+            Register →
+          </a>
+        </li>
+      ))
+    }
+    <li class="hidden text-center text-sm text-stone-500 py-6" data-empty-card>
+      No domains match your filters.
+    </li>
+  </ul>
+</section>
+
+<script>
+  type SortKey = 'domain' | 'tld' | 'ageYears' | 'waybackSnapshots' | 'openPageRank' | 'verdict';
+  type SortDir = 'asc' | 'desc';
+
+  const totalCount = document.querySelectorAll<HTMLElement>('[data-row]').length;
+  const search = document.querySelector<HTMLInputElement>('#domain-search');
+  const tldFilter = document.querySelector<HTMLSelectElement>('#tld-filter');
+  const tableBody = document.querySelector<HTMLElement>('[data-table-body]');
+  const cardList = document.querySelector<HTMLElement>('[data-card-list]');
+  const resultCount = document.querySelector<HTMLElement>('[data-result-count]');
+  const emptyTable = document.querySelector<HTMLElement>('[data-empty-state]');
+  const emptyCards = document.querySelector<HTMLElement>('[data-empty-card]');
+
+  let sortKey: SortKey | null = null;
+  let sortDir: SortDir = 'asc';
+
+  const verdictRank: Record<string, number> = { Clean: 0, Promising: 1, Caution: 2 };
+
+  const readValue = (el: HTMLElement, key: SortKey): string | number => {
+    switch (key) {
+      case 'domain':
+        return el.getAttribute('data-domain') ?? '';
+      case 'tld':
+        return el.getAttribute('data-tld') ?? '';
+      case 'ageYears':
+        return Number(el.getAttribute('data-age') ?? 0);
+      case 'waybackSnapshots':
+        return Number(el.getAttribute('data-wayback') ?? 0);
+      case 'openPageRank':
+        return Number(el.getAttribute('data-opr') ?? 0);
+      case 'verdict':
+        return verdictRank[el.getAttribute('data-verdict') ?? ''] ?? 99;
+    }
+  };
+
+  const sortContainer = (container: HTMLElement | null, selector: string) => {
+    if (!container || !sortKey) return;
+    const items = Array.from(container.querySelectorAll<HTMLElement>(selector));
+    items.sort((a, b) => {
+      const va = readValue(a, sortKey!);
+      const vb = readValue(b, sortKey!);
+      let cmp: number;
+      if (typeof va === 'number' && typeof vb === 'number') {
+        cmp = va - vb;
+      } else {
+        cmp = String(va).localeCompare(String(vb));
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    items.forEach((el) => container.appendChild(el));
+  };
+
+  const updateIndicators = () => {
+    document.querySelectorAll<HTMLButtonElement>('[data-sort-key]').forEach((btn) => {
+      const indicator = btn.querySelector<HTMLElement>('.sort-indicator');
+      if (!indicator) return;
+      if (btn.dataset.sortKey === sortKey) {
+        indicator.textContent = sortDir === 'asc' ? '↑' : '↓';
+        indicator.classList.remove('text-stone-300');
+        indicator.classList.add('text-accent');
+      } else {
+        indicator.textContent = '↕';
+        indicator.classList.add('text-stone-300');
+        indicator.classList.remove('text-accent');
+      }
+    });
+  };
+
+  const applyFilters = () => {
+    const q = (search?.value ?? '').trim().toLowerCase();
+    const tld = tldFilter?.value ?? 'all';
+
+    let visible = 0;
+    const matches = (el: HTMLElement) => {
+      const domain = el.getAttribute('data-domain') ?? '';
+      const elTld = el.getAttribute('data-tld') ?? '';
+      const matchesQuery = q === '' || domain.includes(q);
+      const matchesTld = tld === 'all' || elTld === tld;
+      return matchesQuery && matchesTld;
+    };
+
+    document.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => {
+      const show = matches(row);
+      row.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+
+    document.querySelectorAll<HTMLElement>('[data-card]').forEach((card) => {
+      card.classList.toggle('hidden', !matches(card));
+    });
+
+    if (resultCount) {
+      resultCount.textContent = `Showing ${visible} of ${totalCount} domains`;
+    }
+    emptyTable?.classList.toggle('hidden', visible !== 0);
+    emptyCards?.classList.toggle('hidden', visible !== 0);
+  };
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortKey = key;
+      sortDir = 'asc';
+    }
+    sortContainer(tableBody, '[data-row]');
+    sortContainer(cardList, '[data-card]');
+    updateIndicators();
+  };
+
+  document.querySelectorAll<HTMLButtonElement>('[data-sort-key]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.sortKey as SortKey | undefined;
+      if (key) handleSort(key);
+    });
+  });
+
+  search?.addEventListener('input', applyFilters);
+  tldFilter?.addEventListener('change', applyFilters);
+</script>

@@ -1,0 +1,75 @@
+---
+---
+
+<section id="signup" class="border-t border-stone-200">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 py-16 sm:py-24 text-center">
+    <h2 class="text-3xl sm:text-4xl font-semibold tracking-tight">
+      Get the daily list in your inbox
+    </h2>
+    <p class="mt-4 text-stone-600 max-w-xl mx-auto">
+      One short email per weekday with the top 20 domains that passed our filter.
+      No spam — that's literally what we filter out.
+    </p>
+
+    <form
+      action="#"
+      method="post"
+      novalidate
+      class="mt-8 flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+      data-signup-form
+    >
+      <label for="email" class="sr-only">Email address</label>
+      <input
+        id="email"
+        name="email"
+        type="email"
+        required
+        autocomplete="email"
+        placeholder="your@email.com"
+        class="flex-1 rounded-md border border-stone-300 bg-white px-4 py-3 text-sm text-ink placeholder:text-stone-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+      />
+      <button
+        type="submit"
+        class="inline-flex items-center justify-center rounded-md bg-accent px-5 py-3 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+      >
+        Subscribe
+      </button>
+    </form>
+
+    <p
+      class="mt-6 text-sm text-stone-500"
+      data-signup-status
+      role="status"
+      aria-live="polite"
+    >
+      Privacy-respecting. Single opt-in. Unsubscribe in one click.
+    </p>
+  </div>
+</section>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('[data-signup-form]');
+  const status = document.querySelector<HTMLElement>('[data-signup-status]');
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = form.querySelector<HTMLInputElement>('input[type="email"]');
+    if (!input || !input.value || !input.checkValidity()) {
+      if (status) {
+        status.textContent = 'Please enter a valid email address.';
+        status.classList.remove('text-stone-500');
+        status.classList.add('text-amber-700');
+      }
+      input?.focus();
+      return;
+    }
+    form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach((el) => {
+      el.disabled = true;
+    });
+    if (status) {
+      status.textContent = "Thanks! We'll be in touch when we launch.";
+      status.classList.remove('text-stone-500', 'text-amber-700');
+      status.classList.add('text-accent', 'font-medium');
+    }
+  });
+</script>

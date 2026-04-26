@@ -1,0 +1,30 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout
+  title="Page not found — DomainSifter"
+  description="We couldn't find what you were looking for."
+  noindex={true}
+>
+  <Header />
+  <main id="main" class="mx-auto max-w-3xl px-4 sm:px-6 py-24 sm:py-32 text-center">
+    <p class="text-sm font-medium text-accent uppercase tracking-wide">404</p>
+    <h1 class="mt-3 text-4xl sm:text-5xl font-semibold tracking-tight">
+      This page got filtered out.
+    </h1>
+    <p class="mt-5 text-lg text-stone-600 max-w-xl mx-auto">
+      We couldn't find what you were looking for. Maybe it didn't pass the filter.
+    </p>
+    <a
+      href="/"
+      class="mt-8 inline-flex items-center gap-2 px-5 py-3 rounded-md bg-accent text-white font-medium hover:bg-accent-hover transition-colors"
+    >
+      Back to the daily list
+      <span aria-hidden="true">→</span>
+    </a>
+  </main>
+  <Footer />
+</Layout>

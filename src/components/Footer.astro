@@ -1,0 +1,23 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="border-t border-stone-200 bg-paper">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 py-10 grid gap-6 sm:grid-cols-3 text-sm text-stone-600">
+    <div class="space-y-1">
+      <p class="text-ink font-medium">© {year} DomainSifter</p>
+      <p class="text-stone-500">Built in Estonia 🇪🇪</p>
+    </div>
+
+    <nav class="flex flex-wrap items-center sm:justify-center gap-x-5 gap-y-2">
+      <a href="#methodology" class="hover:text-ink">Methodology</a>
+      <a href="#about" class="hover:text-ink">About</a>
+      <a href="#privacy" class="hover:text-ink">Privacy</a>
+      <a href="mailto:hello@domainsifter.com" class="hover:text-ink">hello@domainsifter.com</a>
+    </nav>
+
+    <p class="text-xs text-stone-500 sm:text-right leading-relaxed">
+      Not affiliated with ICANN. Zone data used under the CZDS agreement.
+    </p>
+  </div>
+</footer>

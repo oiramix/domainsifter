@@ -1,0 +1,64 @@
+---
+const steps = [
+  {
+    title: 'Catch the drop',
+    body: 'We monitor ICANN zone files daily to catch every domain the moment it expires. No middlemen, no delays.',
+    icon: 'antenna',
+  },
+  {
+    title: 'Filter the noise',
+    body: 'Each candidate is scored against Wayback Machine history, Google Safe Browsing, content language, and 12+ spam signals. 95% get rejected.',
+    icon: 'sift',
+  },
+  {
+    title: 'Publish what’s left',
+    body: 'The survivors land here. Clean, register-ready, no surprises.',
+    icon: 'check',
+  },
+];
+---
+
+<section id="methodology" class="border-t border-stone-200 bg-white">
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 py-16 sm:py-24">
+    <div class="max-w-2xl">
+      <p class="text-sm font-medium text-accent uppercase tracking-wide">How it works</p>
+      <h2 class="mt-2 text-3xl sm:text-4xl font-semibold tracking-tight">
+        From raw drop to register-ready, in one pass.
+      </h2>
+    </div>
+
+    <ol class="mt-12 grid gap-8 sm:grid-cols-3 sm:gap-6">
+      {
+        steps.map((step, idx) => (
+          <li class="relative rounded-lg border border-stone-200 bg-paper p-6">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent">
+                {step.icon === 'antenna' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12a7 7 0 0 1 14 0" />
+                    <path d="M8.5 12a3.5 3.5 0 0 1 7 0" />
+                    <circle cx="12" cy="12" r="1" />
+                    <path d="M12 13v8" />
+                  </svg>
+                )}
+                {step.icon === 'sift' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18l-7 8v6l-4-2v-4Z" />
+                  </svg>
+                )}
+                {step.icon === 'check' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                )}
+              </span>
+              <span class="text-xs font-medium text-stone-500">Step {idx + 1}</span>
+            </div>
+            <h3 class="mt-4 text-lg font-semibold tracking-tight">{step.title}</h3>
+            <p class="mt-2 text-stone-600 leading-relaxed text-sm">{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
