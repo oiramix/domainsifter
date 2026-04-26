@@ -44,3 +44,10 @@ venv/
 *.zone
 *.zone.gz
 *.zone.txt
+
+# state files — yesterday snapshots live in Cloudflare R2, not in the repo.
+# Per-TLD snapshots can exceed 200 MB and break GitHub's 100 MB file limit.
+# Only the .gitkeep stays tracked so the directory still exists for any
+# future local runs that materialise state on disk.
+scripts/state/*
+!scripts/state/.gitkeep

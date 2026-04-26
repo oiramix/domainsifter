@@ -54,6 +54,5 @@
   "request_timeout_seconds": 10,
   "download_timeout_seconds": 120,
   "max_concurrent_enrichments": 10,
-  "state_dir": "scripts/state",
   "output_path": "src/data/daily-domains.json"
 }

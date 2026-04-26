@@ -76,13 +76,27 @@ def _filename_to_tld(url: str) -> str:
     return tail.split(".", 1)[0].lower()
 
 
-def collect_drops(config: dict, access_token: str, today: date) -> list[dict]:
-    """Download every approved-TLD zone, diff vs yesterday, commit today's
-    snapshot, and return a flat list of candidate dicts."""
+def collect_drops(
+    config: dict,
+    access_token: str,
+    today: date,
+    *,
+    r2_client=None,
+    r2_bucket: str | None = None,
+) -> list[dict]:
+    """Download every approved-TLD zone, diff vs yesterday's R2 snapshot,
+    overwrite that snapshot with today's set, and return a flat list of
+    candidate dicts.
+
+    Yesterday's snapshots live in Cloudflare R2 (see scripts/diff.py header
+    for why). The R2 client + bucket name are resolved once and reused across
+    all TLDs; tests inject mocks via `r2_client=` / `r2_bucket=`.
+    """
     api_base = config.get("api_endpoints", {}).get("czds_api_base")
     download_timeout = config.get("download_timeout_seconds", 120)
-    state_dir = config.get("state_dir", "scripts/state")
     approved = _approved_tlds(config)
+    s3 = r2_client if r2_client is not None else diff._r2_client()
+    bucket = r2_bucket if r2_bucket is not None else diff._bucket()
 
     all_links = czds_client.list_zone_links(access_token, api_base) if api_base else czds_client.list_zone_links(access_token)
     targeted = [u for u in all_links if _filename_to_tld(u) in approved]
@@ -105,9 +119,9 @@ def collect_drops(config: dict, access_token: str, today: date) -> list[dict]:
                 logger.warning(".%s zone parse failed, skipping: %s", tld, exc)
                 continue
 
-        yesterday_set = diff.load_yesterday(state_dir, tld)
+        yesterday_set = diff.load_yesterday(tld, client=s3, bucket=bucket)
         drops = diff.compute_drops(yesterday_set, today_set)
-        diff.commit_today(state_dir, tld, today_set)
+        diff.commit_today(tld, today_set, client=s3, bucket=bucket)
         logger.info(".%s: %d in zone today, %d dropped since yesterday", tld, len(today_set), len(drops))
 
         for name in drops:

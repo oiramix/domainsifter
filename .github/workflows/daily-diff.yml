@@ -41,20 +41,27 @@ jobs:
           CZDS_PASSWORD: ${{ secrets.CZDS_PASSWORD }}
           OPENPAGERANK_KEY: ${{ secrets.OPENPAGERANK_KEY }}
           SAFE_BROWSING_KEY: ${{ secrets.SAFE_BROWSING_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
           PYTHONUNBUFFERED: "1"
         run: |
           python -m scripts.pipeline --config scripts/config.json
 
-      - name: Commit refreshed state and output
+      - name: Commit refreshed daily output
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add scripts/state src/data/daily-domains.json
+          # State files (yesterday snapshots) live in Cloudflare R2 — they
+          # are NOT committed to the repo. Per-TLD .org alone exceeds 200 MB
+          # and blew past GitHub's 100 MB per-file limit on first run.
+          git add src/data/daily-domains.json
 
           if git diff --cached --quiet; then
-            echo "No changes to commit (zone diffs and output unchanged)."
+            echo "No changes to commit (daily output unchanged)."
             exit 0
           fi
 

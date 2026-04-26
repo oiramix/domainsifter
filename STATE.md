@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: April 26, 2026 (V1 PIPELINE — first manual run attempted, import-path fix applied; awaiting re-run)
+Last updated: April 26, 2026 (V1 PIPELINE — state migrated to Cloudflare R2 to unblock first run; awaiting R2 setup + re-run)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -70,8 +70,8 @@ This document captures the current snapshot of the project. Update it whenever a
 - tests/test_czds_client.py: BUILT — 12 tests, all passing locally (Python 3.10.7 + pytest 8.3.3 + responses 0.25.3). Covers happy paths, 401/403/404, malformed JSON, missing token, connection errors, bearer-header propagation.
 - scripts/zone_parser.py: BUILT — `iter_apex_names` (streaming, may emit dups) + `parse_zone` (dedup set). Streams gz via `gzip.open(..., "rt")`, splits on whitespace (handles spaces and tabs), lowercases, strips trailing dot. Skips blank/`;`/`$` lines.
 - tests/test_zone_parser.py: BUILT — 9 tests, all passing. Covers dedup across record types, lowercase normalization, trailing-dot strip, comment/directive skipping, tab-separated records, empty zone, missing file.
-- scripts/diff.py: BUILT — `load_yesterday`, `compute_drops`, `commit_today`, `diff_and_commit`. State files at `{state_dir}/{tld}_yesterday.txt`, sorted, one per line. Cold start returns empty drops and writes today's snapshot for tomorrow.
-- tests/test_diff.py: BUILT — 12 tests, all passing. Covers cold start, warm run, sorted output, dir creation, roundtrip, blank-line tolerance, TLD-case normalization.
+- scripts/diff.py: BUILT — `load_yesterday`, `compute_drops`, `commit_today`, `diff_and_commit`. State lives in Cloudflare R2 (S3-compatible) at `s3://$R2_BUCKET_NAME/state/{tld}_yesterday.txt`, sorted, one per line. Cold start (no R2 object) returns empty drops and writes today's snapshot for tomorrow. **Migrated from on-disk state during v1 first-run** because per-TLD files exceeded GitHub's 100 MB limit (.org=228 MB, .xyz=136 MB, .info=100.88 MB). PLAN.md Principle 4 originally targeted v2; brought forward to v1.
+- tests/test_diff.py: BUILT — covers cold start, warm run, sorted output, blank-line tolerance, TLD-case lowercase, non-404 ClientError propagation, raw '404' code handling, R2 endpoint construction. R2 client mocked via `unittest.mock.MagicMock` and injected through `client=` kwarg (CLAUDE.md rule #13: tests never hit live APIs).
 - scripts/enrichment/__init__.py: BUILT — documents the plugin contract (`enrich(domain, config) -> dict`, never raises, empty dict on failure)
 - scripts/enrichment/wayback.py: BUILT — Wayback CDX API. Returns `wayback_snapshots` (int) and `wayback_last_snapshot` ("YYYY-MM-DD" | None). Empty dict on 5xx, malformed JSON, connection errors.
 - tests/enrichment/test_wayback.py: BUILT — 7 tests, all passing. Covers happy path, no snapshots, header-only response, 5xx, invalid JSON, connection error, missing-config defaults.
@@ -87,8 +87,8 @@ This document captures the current snapshot of the project. Update it whenever a
 - tests/enrichment/test_crtsh.py: BUILT — 7 tests, all passing. Covers happy path with dedup, empty list, wildcard query encoding, 5xx, HTML response, non-list payload, connection error.
 - scripts/enrichment/rdap.py: BUILT — Loads IANA bootstrap once via module-level `@lru_cache(maxsize=8)` on `_fetch_bootstrap(url, timeout)`; cache cleared on failure so retries can succeed. Looks up TLD's RDAP server, fetches `/domain/{name}`, extracts registrar from `entities[].vcardArray.fn`. Returns `previous_registrar` + `rdap_status`. Empty dict on bootstrap fail or unknown TLD; null fields on 404.
 - tests/enrichment/test_rdap.py: BUILT — 9 tests, all passing. Autouse fixture clears the lru_cache between tests. Covers happy path, lru_cache reuse across calls, bootstrap 503, unknown TLD, 404 → null fields, 5xx → empty, no registrar entity, missing status field, connection error.
-- scripts/env_check.py: BUILT — `validate_env()` raises `MissingEnvVarsError` listing every missing required var (CZDS_USERNAME, CZDS_PASSWORD, SAFE_BROWSING_KEY). OPENPAGERANK_KEY is optional → warning. Empty strings count as missing. Pipeline.py will call this first thing.
-- tests/test_env_check.py: BUILT — 7 tests, all passing.
+- scripts/env_check.py: BUILT — `validate_env()` raises `MissingEnvVarsError` listing every missing required var (CZDS_USERNAME, CZDS_PASSWORD, SAFE_BROWSING_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME). OPENPAGERANK_KEY is optional → warning. Empty strings count as missing. Pipeline.py calls this first thing.
+- tests/test_env_check.py: BUILT — covers all-required, partial-missing (multi), empty-string-as-missing, optional warning, fallback to os.environ.
 - scripts/enrichment/spam_check.py (UPDATED): missing `SAFE_BROWSING_KEY` now raises `SpamCheckConfigError` (was: silent empty dict). Per-domain network/5xx still returns empty dict — those are transient. Reasoning: spam_check is a CORE filter rule; degraded malware filtering is worse than no daily run. env_check is the first line of defence; the raise here is defence-in-depth.
 - scripts/filter.py: BUILT — `keep(candidate, config, *, strict_spam_check=True)` returns `(bool, reason|None)`. Rules: punycode, length, all-numeric, keyword, spam_flagged, surbl_listed, spamhaus_listed, min wayback (only enforced when field present). `strict_spam_check=True` rejects when spam_flagged field is missing. `filter_candidates(...)` logs per-reason rejection counts.
 - tests/test_filter.py: BUILT — 16 tests, all passing.
@@ -98,11 +98,11 @@ This document captures the current snapshot of the project. Update it whenever a
 - tests/test_output.py: BUILT — 12 tests, all passing.
 - scripts/pipeline.py: BUILT — Orchestrator. Order: `env_check.validate_env()` → CZDS auth → list links → per-TLD download/parse/diff/commit (tempdir + per-zone failure tolerance) → `ThreadPoolExecutor` enrichment with `max_workers = config.max_concurrent_enrichments` (each candidate runs all 7 sources sequentially within one worker; candidates run in parallel across the pool) → filter (strict_spam_check=True) → score → atomic write. Per-enricher exceptions logged & continued; `SpamCheckConfigError` re-raised to abort run. CLI: `python scripts/pipeline.py [--config path] [--output path]`.
 - tests/test_pipeline.py: BUILT — 9 tests, all passing.
-- .github/workflows/daily-diff.yml: BUILT — Triggers `cron: "0 6 * * *"` + `workflow_dispatch`. `permissions: contents: write`. Concurrency group prevents overlap. Steps: checkout → setup-python 3.11 (pip cache) → install requirements.txt → run pipeline (secrets passed as env) → commit `scripts/state/` and `src/data/daily-domains.json` as `github-actions[bot]` with message `data: daily refresh YYYY-MM-DD`. Skips commit when nothing changed.
-- scripts/state/.gitkeep: BUILT.
-- Full suite: 135/135 passing.
-- requirements.txt + requirements-dev.txt: BUILT
-- .gitignore: BUILT — blocks *.zone, *.zone.gz, .env, __pycache__, .venv
+- .github/workflows/daily-diff.yml: BUILT — Triggers `cron: "0 6 * * *"` + `workflow_dispatch`. `permissions: contents: write`. Concurrency group prevents overlap. Steps: checkout → setup-python 3.11 (pip cache) → install requirements.txt → run pipeline (CZDS + Safe Browsing + OpenPageRank + R2 secrets passed as env) → commit ONLY `src/data/daily-domains.json` as `github-actions[bot]` with message `data: daily refresh YYYY-MM-DD`. State files (yesterday snapshots) are written to Cloudflare R2 by the pipeline itself, not committed. Skips commit when nothing changed.
+- scripts/state/.gitkeep: BUILT (directory now ignored except for .gitkeep — state lives in R2).
+- Full suite: passing locally (test counts updated for new R2 tests).
+- requirements.txt + requirements-dev.txt: BUILT — `requests==2.32.3`, `boto3==1.35.71` (R2 client). Dev: `pytest==8.3.3`, `responses==0.25.3`. R2 mocked via `unittest.mock` (no `moto` dep needed).
+- .gitignore: BUILT — blocks *.zone, *.zone.gz, .env, __pycache__, .venv, AND `scripts/state/*` (except `.gitkeep`).
 
 ### External API keys needed
 
@@ -110,6 +110,7 @@ This document captures the current snapshot of the project. Update it whenever a
 - Google Safe Browsing API key (free, 10k/day): NOT YET SIGNED UP — Google Cloud Console → enable Safe Browsing API
 - Both keys must be added to GitHub Secrets as OPENPAGERANK_KEY and SAFE_BROWSING_KEY
 - CZDS credentials must be added to GitHub Secrets as CZDS_USERNAME and CZDS_PASSWORD
+- Cloudflare R2 (free tier, 10 GB storage + 1M Class A ops/month): bucket `domainsifter-state`, API token with R2 read/write scope. Four secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME.
 
 ### Affiliate programs
 
@@ -148,6 +149,10 @@ GitHub Secrets to be added (currently empty):
 - CZDS_PASSWORD
 - OPENPAGERANK_KEY
 - SAFE_BROWSING_KEY
+- R2_ACCOUNT_ID         (Cloudflare account ID, visible in any R2 bucket page sidebar)
+- R2_ACCESS_KEY_ID      (from "Manage R2 API Tokens" → create token with read+write on the bucket)
+- R2_SECRET_ACCESS_KEY  (shown once at token creation — save it before closing the dialog)
+- R2_BUCKET_NAME        (set to `domainsifter-state`)
 
 ---
 
@@ -187,15 +192,47 @@ output.
 
 CZDS credentials already exist (Mario-Martin individual account).
 
-### Step 2 — Add four GitHub Actions secrets
+### Step 1b — Set up Cloudflare R2 for state storage
+
+Yesterday's per-TLD zone snapshots live in Cloudflare R2 (S3-compatible
+object storage), not in the repo. They were originally planned for the
+repo (PLAN.md Principle 4) but the .org snapshot alone is 228 MB and
+GitHub rejects files over 100 MB.
+
+1. Cloudflare dashboard → **R2 Object Storage** → "Create bucket"
+   - Name: **`domainsifter-state`**
+   - Location hint: leave "Automatic" (free tier, no charge)
+   - Click Create.
+2. Stay on the R2 landing page → click **"Manage R2 API Tokens"** (top right) → **Create API Token**.
+   - Token name: `domainsifter-pipeline`
+   - Permissions: **Object Read & Write**
+   - Specify buckets: select **only** `domainsifter-state`
+   - TTL: leave "Forever" (or set a reminder; rotate annually)
+   - Click Create API Token. Copy:
+     - **Access Key ID** → goes into `R2_ACCESS_KEY_ID`
+     - **Secret Access Key** → goes into `R2_SECRET_ACCESS_KEY` (shown ONCE — copy now)
+3. R2_ACCOUNT_ID is visible in any R2 bucket detail page sidebar
+   ("Account ID"). Copy that into `R2_ACCOUNT_ID`.
+4. `R2_BUCKET_NAME` is the literal string `domainsifter-state`.
+
+Free tier limits (well under our usage):
+- Storage: 10 GB/month — we'll use ~500 MB total across 11 TLDs
+- Class A ops (writes): 1M/month — we do 11/day = 330/month
+- Class B ops (reads): 10M/month — same scale
+
+### Step 2 — Add eight GitHub Actions secrets
 
 Repo → **Settings → Secrets and variables → Actions → New repository secret**.
-Add these four (names are case-sensitive):
+Add these eight (names are case-sensitive):
 
 - `CZDS_USERNAME`
 - `CZDS_PASSWORD`
 - `SAFE_BROWSING_KEY`
 - `OPENPAGERANK_KEY`
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_NAME`
 
 ### Step 3 — Commit and push the pipeline code
 
@@ -240,8 +277,9 @@ INFO scripts.czds_client CZDS returned NN zone links
 INFO scripts.pipeline CZDS approved NN zones; 11 match our TLD list
 INFO scripts.czds_client Downloaded NNNNN bytes from .../app.zone to ...   (×11)
 INFO scripts.zone_parser Parsed NNNNNN unique apex names from ...           (×11)
-INFO scripts.pipeline .app: NNNNNN in zone today, 0 dropped since yesterday  (×11 — "0 dropped" is correct on day 1)
-INFO scripts.diff Wrote NNNNNN names to scripts/state/app_yesterday.txt     (×11)
+INFO scripts.diff No prior R2 snapshot for .app — cold start                (×11 on day 1; absent on day 2+)
+INFO scripts.diff Wrote NNNNNN names to r2://domainsifter-state/state/app_yesterday.txt (×11)
+INFO scripts.pipeline .app: NNNNNN in zone today, 0 dropped since yesterday (×11 — "0 dropped" is correct on day 1)
 INFO scripts.pipeline Collected 0 total drops across 11 TLDs                (day 1 only — day 2+ will be hundreds to thousands)
 INFO scripts.pipeline Enriching 0 candidates with 10 concurrent workers     (day 1 only)
 INFO scripts.filter Filter kept 0 / 0 candidates                            (day 1 only)
@@ -252,22 +290,47 @@ INFO scripts.pipeline Pipeline complete: 0 domains in output                (day
 Final workflow steps:
 
 ```
-Commit refreshed state and output → "data: daily refresh YYYY-MM-DD"
+Commit refreshed daily output → "data: daily refresh YYYY-MM-DD"
 [main XXXXXXX] data: daily refresh 2026-MM-DD
- 12 files changed, ...
+ 1 file changed, ...
 ```
 
-If you see "No changes to commit", that's a problem on day 1 — the
-state files should be brand new. Check whether `scripts/state/` was
-committed empty earlier or whether the pipeline crashed before writing.
+The bot commit now touches a single file: `src/data/daily-domains.json`.
+State files no longer hit the repo (they go to R2). If you see "No
+changes to commit" on day 1, that's expected when the file content
+hasn't actually changed (e.g., the previous run already wrote a
+0-domain payload with the same `generated_at` timestamp). Verify R2
+contents instead — see "Step 6 alt".
 
 ### Step 6 — Verify the bot commit landed
 
 Refresh the repo's main page on github.com. You should see:
 
 - Latest commit: `data: daily refresh YYYY-MM-DD` by `github-actions[bot]`
-- `scripts/state/` now contains 11 new files: `app_yesterday.txt`, `dev_yesterday.txt`, etc.
 - `src/data/daily-domains.json` exists (0 domains on day 1, hundreds on day 2+)
+- `scripts/state/` is still empty except for `.gitkeep` (state lives in R2 now)
+
+### Step 6 alt — Verify R2 received the snapshots
+
+In the Cloudflare dashboard → R2 → `domainsifter-state` you should see
+a `state/` prefix containing 11 objects on day 1 (one per approved TLD):
+
+```
+state/app_yesterday.txt
+state/dev_yesterday.txt
+state/info_yesterday.txt
+state/live_yesterday.txt
+state/online_yesterday.txt
+state/org_yesterday.txt
+state/site_yesterday.txt
+state/store_yesterday.txt
+state/studio_yesterday.txt
+state/tech_yesterday.txt
+state/xyz_yesterday.txt
+```
+
+Click any one — file size should match the TLD's apex count
+(.org ≈ 228 MB, .xyz ≈ 136 MB, etc.).
 
 ### Step 7 — Verify Cloudflare Pages auto-rebuilds
 
@@ -286,6 +349,23 @@ as the "yesterday" baseline.
 ### Fixes applied after first manual run
 
 - **Import path (commit applied):** the workflow originally invoked the pipeline as `python scripts/pipeline.py`, which sets `sys.path[0]` to `scripts/` and breaks the absolute `from scripts import …` imports inside `pipeline.py` (line 41). Changed `.github/workflows/daily-diff.yml` to run `python -m scripts.pipeline --config scripts/config.json`. Verified locally: imports succeed, run gets as far as `env_check.validate_env()` and exits cleanly with `MissingEnvVarsError` for the unset CZDS/Safe Browsing secrets — exactly as expected outside CI. `scripts/__init__.py` and `scripts/enrichment/__init__.py` already exist (both empty/docstring-only) and were already tracked, so no new files needed.
+- **State storage migrated to Cloudflare R2 (commit applied):** the second manual run completed the pipeline successfully (38.9M domain entries processed across 11 TLDs) but the commit step was rejected by GitHub:
+
+      remote: error: File scripts/state/info_yesterday.txt is 100.88 MB
+      remote: error: File scripts/state/org_yesterday.txt is 228.30 MB
+      remote: error: File scripts/state/xyz_yesterday.txt is 136.08 MB
+      remote: error: GH001: Large files detected.
+
+  GitHub's hard 100 MB per-file limit broke the repo-storage plan
+  immediately. R2 was already planned for v2 (PLAN.md Phase 2,
+  scripts/historical.py) — pulled forward to v1. Changes:
+  - `scripts/diff.py` now reads/writes via `boto3` against R2 endpoint `https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com`. Cold-start = `NoSuchKey` ClientError → empty set, then writes today's snapshot for tomorrow. Same set-difference semantics as before.
+  - `scripts/env_check.py` validates four new R2 vars (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME).
+  - `scripts/pipeline.py.collect_drops` constructs the R2 client once and reuses it across TLDs (one auth per run, not 11).
+  - `.github/workflows/daily-diff.yml` no longer commits `scripts/state/` — only `src/data/daily-domains.json`. R2 secrets are passed to the pipeline run step.
+  - `.gitignore` now excludes `scripts/state/*` (except `.gitkeep`) so a local manual run can't accidentally commit state files.
+  - `requirements.txt` adds `boto3==1.35.71`.
+  - Tests for `diff.py` and `pipeline.py.collect_drops` use `unittest.mock.MagicMock` for the S3 client; `ClientError` with `Code: "NoSuchKey"` simulates cold start.
 
 ### Common failure modes
 
@@ -296,8 +376,10 @@ as the "yesterday" baseline.
 | `CzdsAuthError: HTTP 401` | Wrong CZDS username/password | Verify in https://czds.icann.org login, update secret |
 | `CzdsAuthError: HTTP 403 ... must accept terms` | One or more zones have ToS pending | Log into czds.icann.org, accept any pending T&Cs |
 | `SpamCheckConfigError` mid-run | `SAFE_BROWSING_KEY` set but invalid | Re-generate key in Google Cloud Console; whitelist the API |
-| Workflow fails at "Commit refreshed state" with `Permission denied` | `permissions: contents: write` not honored | Repo Settings → Actions → General → Workflow permissions: select "Read and write permissions" |
-| `No changes to commit` on day 1 | Pipeline crashed before writing state | Read earlier log lines for the actual error |
+| Workflow fails at "Commit refreshed daily output" with `Permission denied` | `permissions: contents: write` not honored | Repo Settings → Actions → General → Workflow permissions: select "Read and write permissions" |
+| `remote: error: File scripts/state/*.txt is NNN MB ... GH001: Large files detected` | RESOLVED — repo-storage plan replaced by Cloudflare R2 in this commit. State files no longer hit the repo. If this resurfaces, the workflow is staging state files again — re-check `git add` line in `daily-diff.yml`. |
+| `botocore.exceptions.EndpointConnectionError` or `SignatureDoesNotMatch` from R2 | Wrong account ID or token, or token lacks the bucket | Verify R2_ACCOUNT_ID matches the dashboard "Account ID" exactly. Re-issue the R2 API token with **Object Read & Write** scoped to `domainsifter-state`. |
+| `botocore.exceptions.ClientError ... NoSuchBucket` | Bucket doesn't exist or `R2_BUCKET_NAME` typo | Create the `domainsifter-state` bucket in R2 dashboard; verify the secret literal matches. |
 
 ---
 

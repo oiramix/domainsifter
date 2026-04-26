@@ -1,12 +1,13 @@
 """Unit tests for scripts/pipeline.py — the orchestrator.
 
-Heavy mocking: we do NOT exercise the real CZDS, enrichment, or filesystem
-output paths here (those modules have their own tests). We verify that the
-orchestrator wires the pieces together correctly:
+Heavy mocking: we do NOT exercise the real CZDS, enrichment, R2, or
+filesystem output paths here (those modules have their own tests). We
+verify that the orchestrator wires the pieces together correctly:
     - env_check called first
     - CZDS auth uses env vars + the auth_base from config
     - only approved TLDs are downloaded
     - per-zone failures don't abort the run
+    - R2 client is shared across TLDs (one auth, many objects)
     - enrichers are applied to every candidate
     - SpamCheckConfigError aborts the run
     - the final output is written via output.write_output
@@ -16,10 +17,33 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from io import BytesIO
+from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 
 from scripts import pipeline
+
+
+R2_ENV = {
+    "R2_ACCOUNT_ID": "acct",
+    "R2_ACCESS_KEY_ID": "ak",
+    "R2_SECRET_ACCESS_KEY": "sk",
+    "R2_BUCKET_NAME": "domainsifter-state",
+}
+
+
+def _set_r2_env(monkeypatch):
+    for k, v in R2_ENV.items():
+        monkeypatch.setenv(k, v)
+
+
+def _no_such_key():
+    return ClientError(
+        {"Error": {"Code": "NoSuchKey", "Message": "Not found"}},
+        "GetObject",
+    )
 
 
 @pytest.fixture
@@ -34,7 +58,6 @@ def cfg(tmp_path):
         "max_concurrent_enrichments": 4,
         "max_candidates_per_day": 100,
         "affiliate_link_template": "https://aff.example/?d={name}",
-        "state_dir": str(tmp_path / "state"),
         "output_path": str(tmp_path / "daily.json"),
         "filter_thresholds": {
             "min_domain_length": 2,
@@ -61,15 +84,19 @@ def test_filename_to_tld_extracts_correctly():
     ) == "store"
 
 
-def test_collect_drops_filters_to_approved_and_handles_failed_zone(monkeypatch, cfg, tmp_path):
-    state_dir = tmp_path / "state"
-    state_dir.mkdir()
-    (state_dir / "com_yesterday.txt").write_text(
-        "keep.com\ndropping.com\n", encoding="utf-8"
-    )
-    (state_dir / "app_yesterday.txt").write_text(
-        "keep.app\ngoner.app\n", encoding="utf-8"
-    )
+def test_collect_drops_filters_to_approved_and_handles_failed_zone(monkeypatch, cfg):
+    # Pre-populate R2: com has yesterday data; app would too but its zone
+    # download fails so we never read it.
+    r2 = MagicMock()
+
+    def fake_get_object(Bucket, Key):
+        if Key == "state/com_yesterday.txt":
+            return {"Body": BytesIO(b"keep.com\ndropping.com\n")}
+        if Key == "state/app_yesterday.txt":
+            return {"Body": BytesIO(b"keep.app\ngoner.app\n")}
+        raise _no_such_key()
+
+    r2.get_object.side_effect = fake_get_object
 
     links = [
         "https://x/com.zone",
@@ -89,11 +116,37 @@ def test_collect_drops_filters_to_approved_and_handles_failed_zone(monkeypatch, 
     monkeypatch.setattr(pipeline.czds_client, "download_zone", fake_download)
     monkeypatch.setattr(pipeline.zone_parser, "parse_zone", lambda _p: {"keep.com", "newcomer.com"})
 
-    drops = pipeline.collect_drops(cfg, "tok", today=date(2026, 4, 27))
+    drops = pipeline.collect_drops(
+        cfg, "tok", today=date(2026, 4, 27), r2_client=r2, r2_bucket="test-bucket",
+    )
     names = {d["name"] for d in drops}
     assert names == {"dropping.com"}  # only com processed; net not approved; app failed
     assert all(d["dropped_date"] == "2026-04-27" for d in drops)
     assert all(d["tld"] == "com" for d in drops)
+
+    # Today's snapshot was committed for com only (app failed before R2 reads).
+    written_keys = [c.kwargs["Key"] for c in r2.put_object.call_args_list]
+    assert written_keys == ["state/com_yesterday.txt"]
+    # And it landed in the bucket the caller specified.
+    assert r2.put_object.call_args.kwargs["Bucket"] == "test-bucket"
+
+
+def test_collect_drops_constructs_r2_client_when_none_supplied(monkeypatch, cfg):
+    """If the caller doesn't pass r2_client, the function calls diff._r2_client()
+    once and reuses that client across TLDs (one auth per run, not 11)."""
+    monkeypatch.setattr(pipeline.czds_client, "list_zone_links", lambda *_a, **_k: [])
+
+    sentinel = MagicMock()
+    calls = []
+
+    def fake_factory():
+        calls.append(1)
+        return sentinel
+
+    monkeypatch.setattr(pipeline.diff, "_r2_client", fake_factory)
+    monkeypatch.setattr(pipeline.diff, "_bucket", lambda: "domainsifter-state")
+    pipeline.collect_drops(cfg, "tok", today=date(2026, 4, 27))
+    assert len(calls) == 1
 
 
 def test_enrich_one_merges_results_from_all_enrichers(cfg):
@@ -142,9 +195,12 @@ def test_enrich_all_returns_empty_when_no_candidates(cfg):
 def test_main_aborts_when_required_env_missing(monkeypatch, cfg, tmp_path):
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
-    monkeypatch.delenv("CZDS_USERNAME", raising=False)
-    monkeypatch.delenv("CZDS_PASSWORD", raising=False)
-    monkeypatch.delenv("SAFE_BROWSING_KEY", raising=False)
+    for var in (
+        "CZDS_USERNAME", "CZDS_PASSWORD", "SAFE_BROWSING_KEY",
+        "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
+        "R2_BUCKET_NAME",
+    ):
+        monkeypatch.delenv(var, raising=False)
     from scripts.env_check import MissingEnvVarsError
 
     with pytest.raises(MissingEnvVarsError):
@@ -159,6 +215,7 @@ def test_main_happy_path_writes_output(monkeypatch, cfg, tmp_path):
     monkeypatch.setenv("CZDS_PASSWORD", "p")
     monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
     monkeypatch.setenv("OPENPAGERANK_KEY", "o")
+    _set_r2_env(monkeypatch)
 
     monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
     monkeypatch.setattr(
@@ -203,6 +260,7 @@ def test_main_propagates_spam_check_config_error(monkeypatch, cfg, tmp_path):
     monkeypatch.setenv("CZDS_USERNAME", "u")
     monkeypatch.setenv("CZDS_PASSWORD", "p")
     monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
 
     monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
     monkeypatch.setattr(
