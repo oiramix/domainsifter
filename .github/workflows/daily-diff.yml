@@ -43,7 +43,7 @@ jobs:
           SAFE_BROWSING_KEY: ${{ secrets.SAFE_BROWSING_KEY }}
           PYTHONUNBUFFERED: "1"
         run: |
-          python scripts/pipeline.py --config scripts/config.json
+          python -m scripts.pipeline --config scripts/config.json
 
       - name: Commit refreshed state and output
         run: |

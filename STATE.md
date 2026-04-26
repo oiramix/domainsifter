@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: April 26, 2026 (V1 PIPELINE COMPLETE — ready for first manual run)
+Last updated: April 26, 2026 (V1 PIPELINE — first manual run attempted, import-path fix applied; awaiting re-run)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -283,10 +283,15 @@ Cron is already set to `0 6 * * *` (06:00 UTC daily) in
 06:00 UTC tick produces the first real list using day 1's seeded snapshots
 as the "yesterday" baseline.
 
+### Fixes applied after first manual run
+
+- **Import path (commit applied):** the workflow originally invoked the pipeline as `python scripts/pipeline.py`, which sets `sys.path[0]` to `scripts/` and breaks the absolute `from scripts import …` imports inside `pipeline.py` (line 41). Changed `.github/workflows/daily-diff.yml` to run `python -m scripts.pipeline --config scripts/config.json`. Verified locally: imports succeed, run gets as far as `env_check.validate_env()` and exits cleanly with `MissingEnvVarsError` for the unset CZDS/Safe Browsing secrets — exactly as expected outside CI. `scripts/__init__.py` and `scripts/enrichment/__init__.py` already exist (both empty/docstring-only) and were already tracked, so no new files needed.
+
 ### Common failure modes
 
 | Symptom in log | Cause | Fix |
 |---|---|---|
+| `ModuleNotFoundError: No module named 'scripts'` | Pipeline launched as a script (`python scripts/pipeline.py`) instead of a module | Run as a module: `python -m scripts.pipeline --config scripts/config.json`. Already fixed in `daily-diff.yml`; only resurfaces if someone reverts that line. |
 | `MissingEnvVarsError: ...` | A repo secret is missing or empty | Re-check Settings → Secrets, names are case-sensitive |
 | `CzdsAuthError: HTTP 401` | Wrong CZDS username/password | Verify in https://czds.icann.org login, update secret |
 | `CzdsAuthError: HTTP 403 ... must accept terms` | One or more zones have ToS pending | Log into czds.icann.org, accept any pending T&Cs |
