@@ -1,34 +1,91 @@
 ---
-import sampleDomains from '../data/sample-domains.json';
+import samplePayload from '../data/sample-domains.json';
+
+// Pipeline output (locked schema — PLAN.md Principle 5).
+// `affiliate_link` is fully composed by the pipeline using the configured
+// template; the site uses it verbatim, never re-derives it.
+interface PipelineDomain {
+  name: string;
+  tld: string;
+  dropped_date: string;            // ISO YYYY-MM-DD
+  wayback_snapshots: number;
+  wayback_last_snapshot: string | null;
+  open_page_rank: number;
+  cert_history: boolean;
+  previous_registrar: string | null;
+  score: number;                   // 0–100
+  affiliate_link: string;
+}
+
+interface PipelinePayload {
+  generated_at: string;            // ISO 8601
+  domain_count: number;
+  domains: PipelineDomain[];
+}
 
 type Verdict = 'Clean' | 'Promising' | 'Caution';
 
-interface Domain {
-  domain: string;
-  tld: string;
-  ageYears: number;
-  waybackSnapshots: number;
-  openPageRank: number;
-  verdict: Verdict;
-}
+// --- Data source resolution ---------------------------------------------------
+// The pipeline writes src/data/daily-domains.json daily via GitHub Actions.
+// On cold start (day 1) it produces an empty domains array; if the workflow
+// fails entirely the file may be absent. Either way, fall back to the sample
+// preview so the page always renders.
+//
+// import.meta.glob handles the missing-file case gracefully (eager-loaded
+// matches yield {} when the path doesn't exist), unlike a static import.
+const dailyMatches = import.meta.glob<{ default: PipelinePayload }>(
+  '../data/daily-domains.json',
+  { eager: true },
+);
+const dailyPayload = Object.values(dailyMatches)[0]?.default;
 
-const domains = sampleDomains as Domain[];
+const isPreview = !dailyPayload || !dailyPayload.domains || dailyPayload.domains.length === 0;
+const payload: PipelinePayload = isPreview
+  ? (samplePayload as PipelinePayload)
+  : (dailyPayload as PipelinePayload);
+const domains = payload.domains;
+
+const lastUpdatedLabel = isPreview
+  ? 'Preview data'
+  : new Date(payload.generated_at).toUTCString().replace('GMT', 'UTC');
 
 const tldsInData = Array.from(new Set(domains.map((d) => d.tld))).sort();
 
-const registerUrl = (name: string) =>
-  `https://namecheap.com/domains/registration/results/?domain=${encodeURIComponent(name)}`;
+// --- Display helpers ----------------------------------------------------------
+
+const verdictFromScore = (score: number): Verdict => {
+  if (score >= 70) return 'Clean';
+  if (score >= 40) return 'Promising';
+  return 'Caution';
+};
+
+// Build-time relative-date label. Cloudflare Pages rebuilds when the pipeline
+// commits the daily JSON, so this stays accurate to the daily refresh.
+const droppedDaysAgo = (isoDate: string): string => {
+  const dropped = new Date(`${isoDate}T00:00:00Z`);
+  const now = new Date();
+  const ms = now.getTime() - dropped.getTime();
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  if (days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  return `${days} days ago`;
+};
 
 const tldClass = (tld: string) => {
   switch (tld) {
-    case 'com':
-      return 'bg-emerald-50 text-emerald-800 ring-emerald-200';
-    case 'net':
-      return 'bg-sky-50 text-sky-800 ring-sky-200';
     case 'org':
       return 'bg-violet-50 text-violet-800 ring-violet-200';
-    case 'io':
+    case 'info':
+      return 'bg-emerald-50 text-emerald-800 ring-emerald-200';
+    case 'dev':
+      return 'bg-sky-50 text-sky-800 ring-sky-200';
+    case 'app':
       return 'bg-amber-50 text-amber-800 ring-amber-200';
+    case 'tech':
+    case 'studio':
+      return 'bg-indigo-50 text-indigo-800 ring-indigo-200';
+    case 'xyz':
+      return 'bg-rose-50 text-rose-800 ring-rose-200';
     default:
       return 'bg-stone-100 text-stone-700 ring-stone-200';
   }
@@ -39,9 +96,9 @@ const verdictClass = (verdict: Verdict) => {
     case 'Clean':
       return 'bg-emerald-50 text-emerald-800 ring-emerald-200';
     case 'Promising':
-      return 'bg-sky-50 text-sky-800 ring-sky-200';
-    case 'Caution':
       return 'bg-amber-50 text-amber-900 ring-amber-200';
+    case 'Caution':
+      return 'bg-rose-50 text-rose-800 ring-rose-200';
   }
 };
 ---
@@ -49,12 +106,19 @@ const verdictClass = (verdict: Verdict) => {
 <section id="today" class="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
   <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
     <div>
-      <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">Preview list</h2>
+      <div class="flex items-center gap-2">
+        <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">Today's drops</h2>
+        {isPreview && (
+          <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-200">
+            Preview data
+          </span>
+        )}
+      </div>
       <p class="mt-2 text-sm text-stone-600">
         <span data-result-count>Showing {domains.length} of {domains.length} domains</span>
         <span class="text-stone-400"> • </span>
         <span>
-          Last updated: <span data-last-updated>Preview data</span>
+          Last updated: <span data-last-updated>{lastUpdatedLabel}</span>
         </span>
       </p>
     </div>
@@ -100,7 +164,7 @@ const verdictClass = (verdict: Verdict) => {
       <thead class="bg-stone-50 text-stone-600">
         <tr>
           <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="domain">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
               Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
             </button>
           </th>
@@ -110,22 +174,22 @@ const verdictClass = (verdict: Verdict) => {
             </button>
           </th>
           <th scope="col" class="text-right font-medium">
-            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="ageYears">
-              Age <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
+              Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
             </button>
           </th>
           <th scope="col" class="text-right font-medium">
-            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="waybackSnapshots">
+            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
               Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
             </button>
           </th>
           <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="openPageRank">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
               OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
             </button>
           </th>
           <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="verdict">
+            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
               Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
             </button>
           </th>
@@ -134,56 +198,54 @@ const verdictClass = (verdict: Verdict) => {
       </thead>
       <tbody class="divide-y divide-stone-100" data-table-body>
         {
-          domains.map((d) => (
-            <tr
-              data-row
-              data-domain={d.domain.toLowerCase()}
-              data-tld={d.tld}
-              data-age={d.ageYears}
-              data-wayback={d.waybackSnapshots}
-              data-opr={d.openPageRank}
-              data-verdict={d.verdict}
-            >
-              <td class="px-4 py-3">
-                <a
-                  href={`/domain/${d.domain}`}
-                  class="font-medium text-ink hover:text-accent hover:underline underline-offset-2"
-                >
-                  {d.domain}
-                </a>
-              </td>
-              <td class="px-4 py-3">
-                <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
-                  .{d.tld}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right tabular-nums text-stone-700">{d.ageYears} yrs</td>
-              <td class="px-4 py-3 text-right tabular-nums text-stone-700">{d.waybackSnapshots.toLocaleString('en-US')}</td>
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
-                    <div class="h-full bg-accent" style={`width: ${(d.openPageRank / 10) * 100}%`}></div>
+          domains.map((d) => {
+            const verdict = verdictFromScore(d.score);
+            return (
+              <tr
+                data-row
+                data-name={d.name.toLowerCase()}
+                data-tld={d.tld}
+                data-dropped={d.dropped_date}
+                data-wayback={d.wayback_snapshots}
+                data-opr={d.open_page_rank}
+                data-score={d.score}
+              >
+                <td class="px-4 py-3">
+                  <span class="font-medium text-ink">{d.name}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
+                    .{d.tld}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
+                <td class="px-4 py-3 text-right tabular-nums text-stone-700">{d.wayback_snapshots.toLocaleString('en-US')}</td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                      <div class="h-full bg-accent" style={`width: ${(d.open_page_rank / 10) * 100}%`}></div>
+                    </div>
+                    <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{d.open_page_rank.toFixed(1)}</span>
                   </div>
-                  <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{d.openPageRank.toFixed(1)}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(d.verdict)}`}>
-                  {d.verdict}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <a
-                  href={registerUrl(d.domain)}
-                  rel="nofollow sponsored noopener"
-                  target="_blank"
-                  class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
-                >
-                  Register →
-                </a>
-              </td>
-            </tr>
-          ))
+                </td>
+                <td class="px-4 py-3">
+                  <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>
+                    {verdict}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <a
+                    href={d.affiliate_link}
+                    rel="nofollow sponsored noopener"
+                    target="_blank"
+                    class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+                  >
+                    Register →
+                  </a>
+                </td>
+              </tr>
+            );
+          })
         }
       </tbody>
     </table>
@@ -196,67 +258,65 @@ const verdictClass = (verdict: Verdict) => {
   <!-- Mobile card layout -->
   <ul class="md:hidden space-y-3" data-card-list>
     {
-      domains.map((d) => (
-        <li
-          data-card
-          data-domain={d.domain.toLowerCase()}
-          data-tld={d.tld}
-          data-age={d.ageYears}
-          data-wayback={d.waybackSnapshots}
-          data-opr={d.openPageRank}
-          data-verdict={d.verdict}
-          class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-        >
-          <div class="flex items-start justify-between gap-3">
-            <a
-              href={`/domain/${d.domain}`}
-              class="font-medium text-ink hover:text-accent hover:underline underline-offset-2 break-all"
-            >
-              {d.domain}
-            </a>
-            <span class={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(d.verdict)}`}>
-              {d.verdict}
-            </span>
-          </div>
-
-          <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <div class="flex items-center justify-between col-span-2">
-              <dt class="text-stone-500">TLD</dt>
-              <dd>
-                <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
-                  .{d.tld}
-                </span>
-              </dd>
-            </div>
-            <div class="flex items-center justify-between col-span-2">
-              <dt class="text-stone-500">Age</dt>
-              <dd class="text-stone-800 tabular-nums">{d.ageYears} yrs</dd>
-            </div>
-            <div class="flex items-center justify-between col-span-2">
-              <dt class="text-stone-500">Wayback snapshots</dt>
-              <dd class="text-stone-800 tabular-nums">{d.waybackSnapshots.toLocaleString('en-US')}</dd>
-            </div>
-            <div class="flex items-center justify-between col-span-2">
-              <dt class="text-stone-500">OpenPageRank</dt>
-              <dd class="flex items-center gap-2">
-                <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
-                  <div class="h-full bg-accent" style={`width: ${(d.openPageRank / 10) * 100}%`}></div>
-                </div>
-                <span class="text-stone-800 tabular-nums text-xs">{d.openPageRank.toFixed(1)}</span>
-              </dd>
-            </div>
-          </dl>
-
-          <a
-            href={registerUrl(d.domain)}
-            rel="nofollow sponsored noopener"
-            target="_blank"
-            class="mt-4 block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+      domains.map((d) => {
+        const verdict = verdictFromScore(d.score);
+        return (
+          <li
+            data-card
+            data-name={d.name.toLowerCase()}
+            data-tld={d.tld}
+            data-dropped={d.dropped_date}
+            data-wayback={d.wayback_snapshots}
+            data-opr={d.open_page_rank}
+            data-score={d.score}
+            class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
           >
-            Register →
-          </a>
-        </li>
-      ))
+            <div class="flex items-start justify-between gap-3">
+              <span class="font-medium text-ink break-all">{d.name}</span>
+              <span class={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>
+                {verdict}
+              </span>
+            </div>
+
+            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+              <div class="flex items-center justify-between col-span-2">
+                <dt class="text-stone-500">TLD</dt>
+                <dd>
+                  <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
+                    .{d.tld}
+                  </span>
+                </dd>
+              </div>
+              <div class="flex items-center justify-between col-span-2">
+                <dt class="text-stone-500">Dropped</dt>
+                <dd class="text-stone-800 tabular-nums">{droppedDaysAgo(d.dropped_date)}</dd>
+              </div>
+              <div class="flex items-center justify-between col-span-2">
+                <dt class="text-stone-500">Wayback snapshots</dt>
+                <dd class="text-stone-800 tabular-nums">{d.wayback_snapshots.toLocaleString('en-US')}</dd>
+              </div>
+              <div class="flex items-center justify-between col-span-2">
+                <dt class="text-stone-500">OpenPageRank</dt>
+                <dd class="flex items-center gap-2">
+                  <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                    <div class="h-full bg-accent" style={`width: ${(d.open_page_rank / 10) * 100}%`}></div>
+                  </div>
+                  <span class="text-stone-800 tabular-nums text-xs">{d.open_page_rank.toFixed(1)}</span>
+                </dd>
+              </div>
+            </dl>
+
+            <a
+              href={d.affiliate_link}
+              rel="nofollow sponsored noopener"
+              target="_blank"
+              class="mt-4 block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+            >
+              Register →
+            </a>
+          </li>
+        );
+      })
     }
     <li class="hidden text-center text-sm text-stone-500 py-6" data-empty-card>
       No domains match your filters.
@@ -265,7 +325,7 @@ const verdictClass = (verdict: Verdict) => {
 </section>
 
 <script>
-  type SortKey = 'domain' | 'tld' | 'ageYears' | 'waybackSnapshots' | 'openPageRank' | 'verdict';
+  type SortKey = 'name' | 'tld' | 'dropped' | 'wayback' | 'opr' | 'score';
   type SortDir = 'asc' | 'desc';
 
   const totalCount = document.querySelectorAll<HTMLElement>('[data-row]').length;
@@ -280,22 +340,21 @@ const verdictClass = (verdict: Verdict) => {
   let sortKey: SortKey | null = null;
   let sortDir: SortDir = 'asc';
 
-  const verdictRank: Record<string, number> = { Clean: 0, Promising: 1, Caution: 2 };
-
   const readValue = (el: HTMLElement, key: SortKey): string | number => {
     switch (key) {
-      case 'domain':
-        return el.getAttribute('data-domain') ?? '';
+      case 'name':
+        return el.getAttribute('data-name') ?? '';
       case 'tld':
         return el.getAttribute('data-tld') ?? '';
-      case 'ageYears':
-        return Number(el.getAttribute('data-age') ?? 0);
-      case 'waybackSnapshots':
+      case 'dropped':
+        // ISO YYYY-MM-DD sorts lexicographically the same as chronologically.
+        return el.getAttribute('data-dropped') ?? '';
+      case 'wayback':
         return Number(el.getAttribute('data-wayback') ?? 0);
-      case 'openPageRank':
+      case 'opr':
         return Number(el.getAttribute('data-opr') ?? 0);
-      case 'verdict':
-        return verdictRank[el.getAttribute('data-verdict') ?? ''] ?? 99;
+      case 'score':
+        return Number(el.getAttribute('data-score') ?? 0);
     }
   };
 
@@ -338,9 +397,9 @@ const verdictClass = (verdict: Verdict) => {
 
     let visible = 0;
     const matches = (el: HTMLElement) => {
-      const domain = el.getAttribute('data-domain') ?? '';
+      const name = el.getAttribute('data-name') ?? '';
       const elTld = el.getAttribute('data-tld') ?? '';
-      const matchesQuery = q === '' || domain.includes(q);
+      const matchesQuery = q === '' || name.includes(q);
       const matchesTld = tld === 'all' || elTld === tld;
       return matchesQuery && matchesTld;
     };

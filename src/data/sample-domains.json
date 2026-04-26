@@ -1,162 +1,246 @@
-[
-  {
-    "domain": "marketglow.com",
-    "tld": "com",
-    "ageYears": 17,
-    "waybackSnapshots": 1284,
-    "openPageRank": 5.2,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "tideblock.io",
-    "tld": "io",
-    "ageYears": 6,
-    "waybackSnapshots": 312,
-    "openPageRank": 4.1,
-    "verdict": "Promising"
-  },
-  {
-    "domain": "coppernest.org",
-    "tld": "org",
-    "ageYears": 21,
-    "waybackSnapshots": 2470,
-    "openPageRank": 6.4,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "lumenpath.com",
-    "tld": "com",
-    "ageYears": 9,
-    "waybackSnapshots": 188,
-    "openPageRank": 3.8,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "northvane.net",
-    "tld": "net",
-    "ageYears": 14,
-    "waybackSnapshots": 921,
-    "openPageRank": 4.7,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "sablequill.com",
-    "tld": "com",
-    "ageYears": 11,
-    "waybackSnapshots": 504,
-    "openPageRank": 4.3,
-    "verdict": "Promising"
-  },
-  {
-    "domain": "harborjune.io",
-    "tld": "io",
-    "ageYears": 4,
-    "waybackSnapshots": 96,
-    "openPageRank": 2.9,
-    "verdict": "Caution"
-  },
-  {
-    "domain": "ferrokind.com",
-    "tld": "com",
-    "ageYears": 19,
-    "waybackSnapshots": 1731,
-    "openPageRank": 6.0,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "glassbarrow.org",
-    "tld": "org",
-    "ageYears": 13,
-    "waybackSnapshots": 612,
-    "openPageRank": 4.5,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "midwayfern.co",
-    "tld": "co",
-    "ageYears": 7,
-    "waybackSnapshots": 248,
-    "openPageRank": 3.4,
-    "verdict": "Promising"
-  },
-  {
-    "domain": "pinegrade.com",
-    "tld": "com",
-    "ageYears": 25,
-    "waybackSnapshots": 2986,
-    "openPageRank": 7.0,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "warblerstack.net",
-    "tld": "net",
-    "ageYears": 10,
-    "waybackSnapshots": 387,
-    "openPageRank": 3.7,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "anvilminute.com",
-    "tld": "com",
-    "ageYears": 8,
-    "waybackSnapshots": 274,
-    "openPageRank": 3.1,
-    "verdict": "Promising"
-  },
-  {
-    "domain": "petrichor-lab.io",
-    "tld": "io",
-    "ageYears": 5,
-    "waybackSnapshots": 142,
-    "openPageRank": 3.5,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "kettleridge.com",
-    "tld": "com",
-    "ageYears": 16,
-    "waybackSnapshots": 1098,
-    "openPageRank": 5.6,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "owlmoor.org",
-    "tld": "org",
-    "ageYears": 22,
-    "waybackSnapshots": 2104,
-    "openPageRank": 6.2,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "drift-and-co.com",
-    "tld": "com",
-    "ageYears": 3,
-    "waybackSnapshots": 41,
-    "openPageRank": 1.8,
-    "verdict": "Caution"
-  },
-  {
-    "domain": "quartzbloom.net",
-    "tld": "net",
-    "ageYears": 12,
-    "waybackSnapshots": 698,
-    "openPageRank": 4.9,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "ravinekey.io",
-    "tld": "io",
-    "ageYears": 6,
-    "waybackSnapshots": 215,
-    "openPageRank": 3.6,
-    "verdict": "Clean"
-  },
-  {
-    "domain": "lanterncreek.com",
-    "tld": "com",
-    "ageYears": 18,
-    "waybackSnapshots": 1442,
-    "openPageRank": 5.4,
-    "verdict": "Promising"
-  }
-]
+{
+  "generated_at": "2026-04-26T06:00:00Z",
+  "domain_count": 20,
+  "domains": [
+    {
+      "name": "marketglow.org",
+      "tld": "org",
+      "dropped_date": "2026-04-25",
+      "wayback_snapshots": 1284,
+      "wayback_last_snapshot": "2024-08-15",
+      "open_page_rank": 5.2,
+      "cert_history": true,
+      "previous_registrar": "GoDaddy",
+      "score": 78,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=marketglow.org"
+    },
+    {
+      "name": "tideblock.studio",
+      "tld": "studio",
+      "dropped_date": "2026-04-24",
+      "wayback_snapshots": 312,
+      "wayback_last_snapshot": "2023-11-02",
+      "open_page_rank": 4.1,
+      "cert_history": true,
+      "previous_registrar": "Namecheap",
+      "score": 62,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=tideblock.studio"
+    },
+    {
+      "name": "coppernest.org",
+      "tld": "org",
+      "dropped_date": "2026-04-26",
+      "wayback_snapshots": 2470,
+      "wayback_last_snapshot": "2025-01-10",
+      "open_page_rank": 6.4,
+      "cert_history": true,
+      "previous_registrar": "Tucows",
+      "score": 88,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=coppernest.org"
+    },
+    {
+      "name": "lumenpath.dev",
+      "tld": "dev",
+      "dropped_date": "2026-04-25",
+      "wayback_snapshots": 188,
+      "wayback_last_snapshot": "2024-03-20",
+      "open_page_rank": 3.8,
+      "cert_history": true,
+      "previous_registrar": "Google Domains",
+      "score": 71,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=lumenpath.dev"
+    },
+    {
+      "name": "northvane.tech",
+      "tld": "tech",
+      "dropped_date": "2026-04-23",
+      "wayback_snapshots": 921,
+      "wayback_last_snapshot": "2024-09-30",
+      "open_page_rank": 4.7,
+      "cert_history": true,
+      "previous_registrar": "Porkbun",
+      "score": 75,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=northvane.tech"
+    },
+    {
+      "name": "sablequill.online",
+      "tld": "online",
+      "dropped_date": "2026-04-24",
+      "wayback_snapshots": 504,
+      "wayback_last_snapshot": "2024-06-11",
+      "open_page_rank": 4.3,
+      "cert_history": true,
+      "previous_registrar": "Dynadot",
+      "score": 64,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=sablequill.online"
+    },
+    {
+      "name": "harborjune.app",
+      "tld": "app",
+      "dropped_date": "2026-04-22",
+      "wayback_snapshots": 96,
+      "wayback_last_snapshot": "2023-04-18",
+      "open_page_rank": 2.9,
+      "cert_history": false,
+      "previous_registrar": "Namecheap",
+      "score": 38,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=harborjune.app"
+    },
+    {
+      "name": "ferrokind.org",
+      "tld": "org",
+      "dropped_date": "2026-04-26",
+      "wayback_snapshots": 1731,
+      "wayback_last_snapshot": "2025-02-08",
+      "open_page_rank": 6.0,
+      "cert_history": true,
+      "previous_registrar": "GoDaddy",
+      "score": 84,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=ferrokind.org"
+    },
+    {
+      "name": "glassbarrow.info",
+      "tld": "info",
+      "dropped_date": "2026-04-23",
+      "wayback_snapshots": 612,
+      "wayback_last_snapshot": "2024-07-22",
+      "open_page_rank": 4.5,
+      "cert_history": true,
+      "previous_registrar": "Tucows",
+      "score": 73,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=glassbarrow.info"
+    },
+    {
+      "name": "midwayfern.site",
+      "tld": "site",
+      "dropped_date": "2026-04-25",
+      "wayback_snapshots": 248,
+      "wayback_last_snapshot": "2024-01-04",
+      "open_page_rank": 3.4,
+      "cert_history": true,
+      "previous_registrar": "Sav",
+      "score": 55,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=midwayfern.site"
+    },
+    {
+      "name": "pinegrade.org",
+      "tld": "org",
+      "dropped_date": "2026-04-22",
+      "wayback_snapshots": 2986,
+      "wayback_last_snapshot": "2025-03-01",
+      "open_page_rank": 7.0,
+      "cert_history": true,
+      "previous_registrar": "MarkMonitor",
+      "score": 92,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=pinegrade.org"
+    },
+    {
+      "name": "warblerstack.dev",
+      "tld": "dev",
+      "dropped_date": "2026-04-24",
+      "wayback_snapshots": 387,
+      "wayback_last_snapshot": "2024-05-19",
+      "open_page_rank": 3.7,
+      "cert_history": true,
+      "previous_registrar": "Google Domains",
+      "score": 68,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=warblerstack.dev"
+    },
+    {
+      "name": "anvilminute.live",
+      "tld": "live",
+      "dropped_date": "2026-04-25",
+      "wayback_snapshots": 274,
+      "wayback_last_snapshot": "2024-02-14",
+      "open_page_rank": 3.1,
+      "cert_history": true,
+      "previous_registrar": "Namecheap",
+      "score": 51,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=anvilminute.live"
+    },
+    {
+      "name": "petrichorlab.tech",
+      "tld": "tech",
+      "dropped_date": "2026-04-23",
+      "wayback_snapshots": 142,
+      "wayback_last_snapshot": "2023-12-09",
+      "open_page_rank": 3.5,
+      "cert_history": true,
+      "previous_registrar": "Porkbun",
+      "score": 58,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=petrichorlab.tech"
+    },
+    {
+      "name": "kettleridge.store",
+      "tld": "store",
+      "dropped_date": "2026-04-26",
+      "wayback_snapshots": 1098,
+      "wayback_last_snapshot": "2024-10-27",
+      "open_page_rank": 5.6,
+      "cert_history": true,
+      "previous_registrar": "Dynadot",
+      "score": 80,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=kettleridge.store"
+    },
+    {
+      "name": "owlmoor.org",
+      "tld": "org",
+      "dropped_date": "2026-04-21",
+      "wayback_snapshots": 2104,
+      "wayback_last_snapshot": "2025-01-23",
+      "open_page_rank": 6.2,
+      "cert_history": true,
+      "previous_registrar": "Tucows",
+      "score": 86,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=owlmoor.org"
+    },
+    {
+      "name": "driftandco.xyz",
+      "tld": "xyz",
+      "dropped_date": "2026-04-22",
+      "wayback_snapshots": 41,
+      "wayback_last_snapshot": "2022-08-30",
+      "open_page_rank": 1.8,
+      "cert_history": false,
+      "previous_registrar": "Namecheap",
+      "score": 28,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=driftandco.xyz"
+    },
+    {
+      "name": "quartzbloom.info",
+      "tld": "info",
+      "dropped_date": "2026-04-24",
+      "wayback_snapshots": 698,
+      "wayback_last_snapshot": "2024-08-04",
+      "open_page_rank": 4.9,
+      "cert_history": true,
+      "previous_registrar": "GoDaddy",
+      "score": 76,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=quartzbloom.info"
+    },
+    {
+      "name": "ravinekey.app",
+      "tld": "app",
+      "dropped_date": "2026-04-23",
+      "wayback_snapshots": 215,
+      "wayback_last_snapshot": "2024-04-07",
+      "open_page_rank": 3.6,
+      "cert_history": true,
+      "previous_registrar": "Google Domains",
+      "score": 60,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=ravinekey.app"
+    },
+    {
+      "name": "lanterncreek.org",
+      "tld": "org",
+      "dropped_date": "2026-04-25",
+      "wayback_snapshots": 1442,
+      "wayback_last_snapshot": "2024-11-18",
+      "open_page_rank": 5.4,
+      "cert_history": true,
+      "previous_registrar": "MarkMonitor",
+      "score": 81,
+      "affiliate_link": "https://www.namecheap.com/domains/registration/results/?domain=lanterncreek.org"
+    }
+  ]
+}
