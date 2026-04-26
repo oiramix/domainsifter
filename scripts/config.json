@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "tlds": {
+    "approved": [
+      "app",
+      "dev",
+      "live",
+      "studio",
+      "tech",
+      "online",
+      "site",
+      "store",
+      "xyz",
+      "info",
+      "org"
+    ],
+    "pending": ["com", "net", "shop", "biz"]
+  },
+  "filter_thresholds": {
+    "min_wayback_snapshots": 1,
+    "max_domain_length": 30,
+    "min_domain_length": 2,
+    "min_open_page_rank": 0
+  },
+  "scoring_weights": {
+    "wayback_snapshots": 0.3,
+    "open_page_rank": 0.4,
+    "cert_history": 0.2,
+    "domain_length": 0.1
+  },
+  "rejected_keywords": [
+    "porn",
+    "casino",
+    "viagra",
+    "pharma",
+    "xxx",
+    "adult",
+    "gambling",
+    "betting",
+    "escort",
+    "cialis"
+  ],
+  "max_candidates_per_day": 500,
+  "affiliate_link_template": "https://www.namecheap.com/domains/registration/results/?domain={name}",
+  "api_endpoints": {
+    "czds_auth_base": "https://account-api.icann.org",
+    "czds_api_base": "https://czds-api.icann.org",
+    "wayback_cdx": "https://web.archive.org/cdx/search/cdx",
+    "open_page_rank": "https://openpagerank.com/api/v1.0/getPageRank",
+    "safe_browsing": "https://safebrowsing.googleapis.com/v4/threatMatches:find",
+    "crtsh": "https://crt.sh",
+    "rdap_bootstrap": "https://data.iana.org/rdap/dns.json"
+  },
+  "request_timeout_seconds": 10,
+  "download_timeout_seconds": 120,
+  "max_concurrent_enrichments": 10,
+  "state_dir": "scripts/state",
+  "output_path": "src/data/daily-domains.json"
+}

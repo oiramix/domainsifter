@@ -31,4 +31,16 @@ Thumbs.db
 
 # local audits / one-off artifacts
 *.report.html
-claude.md
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# zone files — never commit, regardless of compression
+*.zone
+*.zone.gz
+*.zone.txt
