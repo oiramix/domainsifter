@@ -1,8 +1,8 @@
 """Write the daily JSON contract consumed by the Astro frontend.
 
 The site reads `src/data/daily-domains.json`. The shape is locked in
-PLAN.md Principle 5 — pipeline produces it, site consumes it. If you
-need to change the schema, update both sides in lockstep.
+PLAN.md Principle 5 with one schema migration applied 2026-04-27 evening:
+the single `affiliate_link` string was replaced by a `registrars` array.
 
 Output shape:
     {
@@ -19,16 +19,25 @@ Output shape:
                 "cert_history": true,
                 "previous_registrar": "GoDaddy",
                 "score": 78,
-                "affiliate_link": "https://..."
+                "registrars": [
+                    {"name": "Namecheap", "url": "https://namecheap.pxf.io/..."},
+                    {"name": "NameSilo",  "url": "https://www.namesilo.com/..."}
+                ]
             }
         ]
     }
+
+The registrars list comes from config.registrars and preserves order.
+The {name} placeholder in each `link_template` is substituted with the
+apex domain via plain str.replace — NOT str.format. The current Namecheap
+URL contains literal `%3D` (`=`) and similar percent-encoded characters
+that `.format()` would either error on or mishandle as positional refs.
 
 `write_output(...)` takes already-scored, already-sorted candidates and:
 - caps at config.max_candidates_for_publication (CEILING, not a quota — if
   fewer survived, we publish all of them; we never pad the list to hit the
   cap with weak candidates).
-- builds an affiliate_link from config.affiliate_link_template
+- builds each candidate's registrars list from config.registrars
 - projects each candidate to ONLY the contract fields (no internal
   enrichment metadata leaks into the public JSON)
 - writes atomically (temp file + os.replace) so partial writes never
@@ -56,13 +65,31 @@ CONTRACT_FIELDS = (
     "cert_history",
     "previous_registrar",
     "score",
-    "affiliate_link",
+    "registrars",
 )
 
 
-def _project(candidate: dict, template: str) -> dict:
+def _build_registrars(name: str, configured: list[dict]) -> list[dict]:
+    """Substitute {name} in every configured registrar's link_template.
+
+    Order is preserved from config — that's the order the popover renders.
+    Plain str.replace, NOT str.format: the templates contain literal
+    percent-encoded characters that confuse .format().
+    """
+    out: list[dict] = []
+    for entry in configured:
+        if not isinstance(entry, dict):
+            continue
+        reg_name = entry.get("name")
+        template = entry.get("link_template")
+        if not reg_name or not template:
+            continue
+        out.append({"name": reg_name, "url": template.replace("{name}", name)})
+    return out
+
+
+def _project(candidate: dict, registrars_config: list[dict]) -> dict:
     name = candidate.get("name", "")
-    affiliate = template.format(name=name) if template else ""
     return {
         "name": name,
         "tld": candidate.get("tld", name.rsplit(".", 1)[-1] if "." in name else ""),
@@ -73,7 +100,7 @@ def _project(candidate: dict, template: str) -> dict:
         "cert_history": candidate.get("cert_history"),
         "previous_registrar": candidate.get("previous_registrar"),
         "score": candidate.get("score", 0),
-        "affiliate_link": affiliate,
+        "registrars": _build_registrars(name, registrars_config),
     }
 
 
@@ -93,9 +120,9 @@ def build_payload(
         config.get("max_candidates_for_publication")
         or config.get("max_candidates_per_day", 500)
     )
-    template = config.get("affiliate_link_template", "")
+    registrars_config = config.get("registrars") or []
     capped = candidates[:cap]
-    domains = [_project(c, template) for c in capped]
+    domains = [_project(c, registrars_config) for c in capped]
     when = (generated_at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
         "generated_at": when,

@@ -1,9 +1,15 @@
 ---
 import samplePayload from '../data/sample-domains.json';
 
-// Pipeline output (locked schema — PLAN.md Principle 5).
-// `affiliate_link` is fully composed by the pipeline using the configured
-// template; the site uses it verbatim, never re-derives it.
+// Pipeline output (locked schema — PLAN.md Principle 5, with the
+// 2026-04-27-evening migration: single affiliate_link → registrars[]).
+// The pipeline composes each registrar URL using the configured template;
+// the site uses them verbatim, never re-derives or URL-encodes.
+interface RegistrarLink {
+  name: string;                    // "Namecheap", "NameSilo", ...
+  url: string;                     // affiliate URL with {name} substituted
+}
+
 interface PipelineDomain {
   name: string;
   tld: string;
@@ -14,7 +20,7 @@ interface PipelineDomain {
   cert_history: boolean;
   previous_registrar: string | null;
   score: number;                   // 0–100
-  affiliate_link: string;
+  registrars: RegistrarLink[];     // popover render order = config order
 }
 
 interface PipelinePayload {
@@ -198,8 +204,9 @@ const verdictClass = (verdict: Verdict) => {
       </thead>
       <tbody class="divide-y divide-stone-100" data-table-body>
         {
-          domains.map((d) => {
+          domains.map((d, i) => {
             const verdict = verdictFromScore(d.score);
+            const popoverId = `pop-row-${i}`;
             return (
               <tr
                 data-row
@@ -233,15 +240,44 @@ const verdictClass = (verdict: Verdict) => {
                     {verdict}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-right">
-                  <a
-                    href={d.affiliate_link}
-                    rel="nofollow sponsored noopener"
-                    target="_blank"
+                <td class="px-4 py-3 text-right relative">
+                  <button
+                    type="button"
+                    data-popover-trigger={popoverId}
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-controls={popoverId}
                     class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
                   >
                     Register →
-                  </a>
+                  </button>
+                  <div
+                    id={popoverId}
+                    data-popover={popoverId}
+                    role="menu"
+                    aria-label={`Register ${d.name} at`}
+                    hidden
+                    class="absolute right-4 top-full z-10 mt-1 w-44 origin-top-right rounded-md border border-stone-200 bg-white shadow-lg"
+                  >
+                    <p class="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+                      Register at:
+                    </p>
+                    <ul class="py-1">
+                      {d.registrars.map((r) => (
+                        <li>
+                          <a
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener sponsored"
+                            role="menuitem"
+                            class="block px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-accent"
+                          >
+                            {r.name}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </td>
               </tr>
             );
@@ -258,8 +294,9 @@ const verdictClass = (verdict: Verdict) => {
   <!-- Mobile card layout -->
   <ul class="md:hidden space-y-3" data-card-list>
     {
-      domains.map((d) => {
+      domains.map((d, i) => {
         const verdict = verdictFromScore(d.score);
+        const popoverId = `pop-card-${i}`;
         return (
           <li
             data-card
@@ -306,14 +343,45 @@ const verdictClass = (verdict: Verdict) => {
               </div>
             </dl>
 
-            <a
-              href={d.affiliate_link}
-              rel="nofollow sponsored noopener"
-              target="_blank"
-              class="mt-4 block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
-            >
-              Register →
-            </a>
+            <div class="relative mt-4">
+              <button
+                type="button"
+                data-popover-trigger={popoverId}
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls={popoverId}
+                class="block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+              >
+                Register →
+              </button>
+              <div
+                id={popoverId}
+                data-popover={popoverId}
+                role="menu"
+                aria-label={`Register ${d.name} at`}
+                hidden
+                class="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-1 w-44 rounded-md border border-stone-200 bg-white shadow-lg"
+              >
+                <p class="px-3 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+                  Register at:
+                </p>
+                <ul class="py-1">
+                  {d.registrars.map((r) => (
+                    <li>
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener sponsored"
+                        role="menuitem"
+                        class="block px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-accent"
+                      >
+                        {r.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </li>
         );
       })
@@ -442,4 +510,45 @@ const verdictClass = (verdict: Verdict) => {
 
   search?.addEventListener('input', applyFilters);
   tldFilter?.addEventListener('change', applyFilters);
+
+  // --- Register popover ---------------------------------------------------
+  // Click a Register button → its popover opens (and any other open one
+  // closes). Click outside any trigger/popover → close. Escape → close.
+  // Tap-friendly on touch devices (no hover behaviour).
+  const triggers = document.querySelectorAll<HTMLButtonElement>('[data-popover-trigger]');
+  const popovers = document.querySelectorAll<HTMLElement>('[data-popover]');
+
+  const closeAllPopovers = () => {
+    popovers.forEach((p) => {
+      p.hidden = true;
+    });
+    triggers.forEach((t) => t.setAttribute('aria-expanded', 'false'));
+  };
+
+  triggers.forEach((trigger) => {
+    trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = trigger.getAttribute('data-popover-trigger');
+      if (!id) return;
+      const target = document.querySelector<HTMLElement>(`[data-popover="${id}"]`);
+      if (!target) return;
+      const wasOpen = trigger.getAttribute('aria-expanded') === 'true';
+      closeAllPopovers();
+      if (!wasOpen) {
+        target.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    const inside = (e.target as Element | null)?.closest(
+      '[data-popover-trigger], [data-popover]'
+    );
+    if (!inside) closeAllPopovers();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllPopovers();
+  });
 </script>

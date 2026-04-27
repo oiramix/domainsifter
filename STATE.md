@@ -475,3 +475,64 @@ write_output   (cap to max_candidates_for_publication; cap is a CEILING)
 
 - Enrichment time budget exhausted → log warns, partial output published (NOT a failure mode any more).
 - Source circuit opens → that source's fields are absent from candidates; `filter_candidates_post_enrichment` tolerates absent fields (R9 wayback floor only fires when the field is present; R10 spam_check still rejects under strict mode if `spam_flagged` is missing).
+
+---
+
+## Multi-registrar architecture and website honesty pass (2026-04-27 evening)
+
+### JSON output schema migration
+
+Per-domain shape changed in this commit. The single `affiliate_link` string is gone; replaced by an ordered `registrars[]` array:
+
+```jsonc
+// before
+{ "name": "...", "...": "...", "affiliate_link": "https://..." }
+
+// after
+{
+  "name": "...",
+  "...": "...",
+  "registrars": [
+    { "name": "Namecheap", "url": "https://namecheap.pxf.io/..." },
+    { "name": "NameSilo",  "url": "https://www.namesilo.com/..." }
+  ]
+}
+```
+
+Schema is still locked (PLAN.md Principle 5) — this is a coordinated migration touching pipeline + site + sample data in one commit.
+
+### Reasoning
+
+- Gives users registrar choice. Clicking "Register →" now opens a small popover; users see both Namecheap and NameSilo and pick whichever has the best price or whichever they already have an account with.
+- Adding a new affiliate is a config-only change: append a new entry to `config.registrars` and the JSON / popover update on the next pipeline run. No code changes, no site redeploy beyond the daily refresh.
+- Order in config = order in the popover. Highest-converting affiliate first.
+
+### Active and pending affiliate programs
+
+- **Active in this commit:** Namecheap (via impact.com network, link includes `WO655J` partner ID), NameSilo (direct, auto-approved on signup, `rid=36a0644du`).
+- **Pending:** Dynadot Ambassador application is in review. When it lands, append `{"name":"Dynadot","link_template":"..."}` to `config.registrars` — no other code changes.
+- **Removed from copy:** Porkbun (program closed) and the specific "Namecheap/Dynadot/Porkbun" list in About were replaced with generic "affiliate registrars" phrasing so the marketing copy doesn't drift every time the affiliate roster changes.
+
+### Files changed
+
+- `scripts/config.json` — `affiliate_link_template` removed; `registrars[]` added with the two live affiliate templates. The `{name}` placeholder is plain string substitution (NOT `str.format`) because the URL contains literal `%3D` etc.
+- `scripts/output.py` — `_build_registrars()` substitutes `{name}` per entry, preserves config order, silently skips malformed entries; `CONTRACT_FIELDS` swapped `affiliate_link` for `registrars`.
+- `tests/test_output.py` — schema updated; new tests cover order preservation, two-registrar substitution for both templates, malformed-entry skip, empty-config graceful default, no URL-encoding of dots.
+- `tests/test_pipeline.py` — happy-path now asserts the registrars array shape, not a single string.
+- `src/data/sample-domains.json` — fully regenerated. 20 invented domains across all 11 approved TLDs, distribution: org×3, xyz×3, info×3, online×2, store×2, site×2, app×1, dev×1, tech×1, live×1, studio×1. Each entry has both registrars pre-populated using the same templates the pipeline will use.
+- `src/components/DomainTable.astro` — `Register →` link replaced with a click-triggered popover (vanilla JS, no framework). Behavior: tap-to-open, tap-outside-to-close, Escape-to-close, only one open at a time across the whole page. Anchored `right-4 top-full` on desktop, `left-1/2 -translate-x-1/2 top-full` on mobile cards. Each link uses `target="_blank" rel="noopener sponsored"` (sponsored per Google's affiliate-link guidance).
+- `src/components/Hero.astro` — "thousands of fresh domain drops every day" → "every fresh domain drop across 11 TLDs". The first wording was a present-tense overclaim; we have one successful run, not a track record.
+- `src/components/About.astro` — "independent operators" → "an independent operator" (solo founder); specific affiliate list ("Namecheap, Dynadot, Porkbun") → "affiliate registrars".
+- `src/components/Footer.astro` — "Built in Estonia 🇪🇪" line removed entirely. Footer now: copyright, nav links, ICANN disclaimer.
+
+### Frontend popover decisions
+
+- **Width 44 (w-44 = 11rem):** narrow enough to feel like a contextual menu, wide enough for "Namecheap" + "NameSilo" labels with comfortable click targets.
+- **Mobile centers via `left-1/2 -translate-x-1/2`** rather than right-anchored, because the mobile Register button spans full card width.
+- **`hidden` attribute, not `class="hidden"`:** the Tailwind `hidden` class would mean the inline `class={...}` toggling, which is messier. The HTML `hidden` attribute is read by the JS as `el.hidden = true/false` and respects `display: none` natively.
+- **No `nofollow` on registrar links:** Google's recent guidance says `rel="sponsored"` is the correct signal for paid/affiliate links; `nofollow` is the older fallback. We use `sponsored` alone.
+- **State lives in the DOM, not in JS variables:** the `aria-expanded` attribute on each trigger is the source of truth. Cheap, accessible, and survives event-handler re-attachment.
+
+### Sample data domain-name plausibility
+
+The 20 invented names are creative compounds (color/material + nature noun) chosen to be plausibly unregistered. Examples: amberkite, frostledge, paperhalo, brassflint, silverbrook, jadeloom, lichenpath, thistlecove, opalstride, vellumstone, duskforge. CLAUDE.md rule #1 was the constraint: never use real registered domains in sample/test data. Quick spot-checks during selection — these aren't household names and don't show up in obvious commercial contexts.

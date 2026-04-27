@@ -51,7 +51,16 @@
   "max_candidates_for_enrichment": 1000,
   "max_candidates_for_publication": 300,
   "enrichment_time_budget_seconds": 2100,
-  "affiliate_link_template": "https://www.namecheap.com/domains/registration/results/?domain={name}",
+  "registrars": [
+    {
+      "name": "Namecheap",
+      "link_template": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3D{name}"
+    },
+    {
+      "name": "NameSilo",
+      "link_template": "https://www.namesilo.com/domain/search-domains?query={name}&rid=36a0644du"
+    }
+  ],
   "api_endpoints": {
     "czds_auth_base": "https://account-api.icann.org",
     "czds_api_base": "https://czds-api.icann.org",

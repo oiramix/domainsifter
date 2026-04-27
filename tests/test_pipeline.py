@@ -59,7 +59,10 @@ def cfg(tmp_path):
         "max_candidates_for_enrichment": 1000,
         "max_candidates_for_publication": 100,
         "enrichment_time_budget_seconds": 60,  # tests don't actually wait — short keeps the wait() ceilings small
-        "affiliate_link_template": "https://aff.example/?d={name}",
+        "registrars": [
+            {"name": "Namecheap", "link_template": "https://aff.example/?d={name}"},
+            {"name": "NameSilo", "link_template": "https://ns.example/?q={name}"},
+        ],
         "output_path": str(tmp_path / "daily.json"),
         "filter_thresholds": {
             "min_domain_length": 2,
@@ -355,7 +358,11 @@ def test_main_happy_path_writes_output(monkeypatch, cfg, tmp_path):
     assert written["domain_count"] == 2
     names = sorted(d["name"] for d in written["domains"])
     assert names == ["alsogood.com", "great.com"]
-    assert all(d["affiliate_link"].startswith("https://aff.example/?d=") for d in written["domains"])
+    # Each emitted domain has both registrars wired up with substituted URLs.
+    for d in written["domains"]:
+        reg_names = [r["name"] for r in d["registrars"]]
+        assert reg_names == ["Namecheap", "NameSilo"]
+        assert any(d["name"] in r["url"] for r in d["registrars"])
 
 
 def test_main_propagates_spam_check_config_error(monkeypatch, cfg, tmp_path):
