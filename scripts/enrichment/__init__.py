@@ -13,4 +13,8 @@ field. Adding a new source = drop a new module here.
 
 The keys each module returns are documented in that module's docstring and
 ultimately consumed by filter.py and score.py via config.json keys.
+
+Current spam-blocklist sources (3): safe_browsing, surbl, spamhaus.
+If you add or remove one, update the "three spam blocklists" claim in
+src/components/Methodology.astro to match.
 """
