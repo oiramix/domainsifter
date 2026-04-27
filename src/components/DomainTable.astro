@@ -266,45 +266,38 @@ const verdictClass = (verdict: Verdict) => {
                     role="menu"
                     aria-label={`Register ${d.name} at`}
                     hidden
-                    class="absolute right-4 top-full z-10 mt-1 items-center gap-3 rounded-md border border-stone-200 bg-white px-3 py-2 shadow-lg whitespace-nowrap"
+                    class="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap"
                   >
-                    <span class="text-[10px] font-medium uppercase tracking-wide text-stone-500">
-                      Register at:
-                    </span>
-                    <ul class="flex items-center gap-2">
-                      {d.registrars.map((r) => {
-                        const logo = REGISTRAR_LOGOS[r.name];
-                        return (
-                          <li class="shrink-0">
-                            <a
-                              href={r.url}
-                              target="_blank"
-                              rel="noopener sponsored"
-                              role="menuitem"
-                              title={r.name}
-                              aria-label={`Register at ${r.name}`}
-                              class="block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40"
-                            >
-                              {logo ? (
-                                <img
-                                  src={logo}
-                                  alt=""
-                                  width="20"
-                                  height="20"
-                                  class="block h-5 w-5 rounded-sm"
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              ) : (
-                                <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">
-                                  {r.name}
-                                </span>
-                              )}
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    {d.registrars.map((r) => {
+                      const logo = REGISTRAR_LOGOS[r.name];
+                      return (
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener sponsored"
+                          role="menuitem"
+                          title={r.name}
+                          aria-label={`Register at ${r.name}`}
+                          class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        >
+                          {logo ? (
+                            <img
+                              src={logo}
+                              alt=""
+                              width="20"
+                              height="20"
+                              class="block h-5 w-5 rounded-sm"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : (
+                            <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">
+                              {r.name}
+                            </span>
+                          )}
+                        </a>
+                      );
+                    })}
                   </div>
                 </td>
               </tr>
@@ -388,45 +381,38 @@ const verdictClass = (verdict: Verdict) => {
                 role="menu"
                 aria-label={`Register ${d.name} at`}
                 hidden
-                class="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-1 flex items-center gap-3 rounded-md border border-stone-200 bg-white px-3 py-2 shadow-lg whitespace-nowrap"
+                class="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-1 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap"
               >
-                <span class="text-[10px] font-medium uppercase tracking-wide text-stone-500">
-                  Register at:
-                </span>
-                <ul class="flex items-center gap-2">
-                  {d.registrars.map((r) => {
-                    const logo = REGISTRAR_LOGOS[r.name];
-                    return (
-                      <li class="shrink-0">
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noopener sponsored"
-                          role="menuitem"
-                          title={r.name}
-                          aria-label={`Register at ${r.name}`}
-                          class="block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40"
-                        >
-                          {logo ? (
-                            <img
-                              src={logo}
-                              alt=""
-                              width="20"
-                              height="20"
-                              class="block h-5 w-5 rounded-sm"
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">
-                              {r.name}
-                            </span>
-                          )}
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
+                {d.registrars.map((r) => {
+                  const logo = REGISTRAR_LOGOS[r.name];
+                  return (
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noopener sponsored"
+                      role="menuitem"
+                      title={r.name}
+                      aria-label={`Register at ${r.name}`}
+                      class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                    >
+                      {logo ? (
+                        <img
+                          src={logo}
+                          alt=""
+                          width="20"
+                          height="20"
+                          class="block h-5 w-5 rounded-sm"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">
+                          {r.name}
+                        </span>
+                      )}
+                    </a>
+                  );
+                })}
               </div>
             </div>
           </li>
@@ -563,44 +549,54 @@ const verdictClass = (verdict: Verdict) => {
   // closes). Click outside any trigger/popover → close. Escape → close.
   // Tap-friendly on touch devices (no hover behaviour).
   //
+  // Implementation: ONE delegated click listener on document. We stopped
+  // using per-trigger listeners after a regression where the visual layout
+  // change to leftward-anchored popovers exposed the underlying fragility:
+  // any element added or replaced after page load would get no listener.
+  // Delegation removes that whole class of bug.
+  //
   // Display toggle uses BOTH the HTML `hidden` attribute AND a `flex` class.
   // The popover's horizontal layout is `display: flex`; the `hidden`
   // attribute alone (`display: none` from the UA stylesheet) loses to any
   // author-stylesheet `display` rule. By gating `flex` on open-state we
   // guarantee `display: none` wins when closed and `display: flex` when open.
-  const triggers = document.querySelectorAll<HTMLButtonElement>('[data-popover-trigger]');
-  const popovers = document.querySelectorAll<HTMLElement>('[data-popover]');
-
   const closeAllPopovers = () => {
-    popovers.forEach((p) => {
+    document.querySelectorAll<HTMLElement>('[data-popover]').forEach((p) => {
       p.hidden = true;
       p.classList.remove('flex');
     });
-    triggers.forEach((t) => t.setAttribute('aria-expanded', 'false'));
+    document.querySelectorAll<HTMLButtonElement>('[data-popover-trigger]').forEach((t) => {
+      t.setAttribute('aria-expanded', 'false');
+    });
   };
 
-  triggers.forEach((trigger) => {
-    trigger.addEventListener('click', (e) => {
-      e.stopPropagation();
+  document.addEventListener('click', (e) => {
+    const target = e.target as Element | null;
+    if (!target) return;
+
+    // Hit a trigger? Toggle its popover.
+    const trigger = target.closest('[data-popover-trigger]');
+    if (trigger) {
       const id = trigger.getAttribute('data-popover-trigger');
       if (!id) return;
-      const target = document.querySelector<HTMLElement>(`[data-popover="${id}"]`);
-      if (!target) return;
+      const popover = document.querySelector<HTMLElement>(`[data-popover="${id}"]`);
+      if (!popover) return;
       const wasOpen = trigger.getAttribute('aria-expanded') === 'true';
       closeAllPopovers();
       if (!wasOpen) {
-        target.hidden = false;
-        target.classList.add('flex');
+        popover.hidden = false;
+        popover.classList.add('flex');
         trigger.setAttribute('aria-expanded', 'true');
       }
-    });
-  });
+      return;
+    }
 
-  document.addEventListener('click', (e) => {
-    const inside = (e.target as Element | null)?.closest(
-      '[data-popover-trigger], [data-popover]'
-    );
-    if (!inside) closeAllPopovers();
+    // Click landed inside an OPEN popover (e.g., on a registrar logo link).
+    // Don't close — the click is meaningful, let it through.
+    if (target.closest('[data-popover]')) return;
+
+    // Click outside everything popover-related → close.
+    closeAllPopovers();
   });
 
   document.addEventListener('keydown', (e) => {
