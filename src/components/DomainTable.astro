@@ -266,7 +266,7 @@ const verdictClass = (verdict: Verdict) => {
                     role="menu"
                     aria-label={`Register ${d.name} at`}
                     hidden
-                    class="absolute right-4 top-full z-10 mt-1 flex items-center gap-3 rounded-md border border-stone-200 bg-white px-3 py-2 shadow-lg whitespace-nowrap"
+                    class="absolute right-4 top-full z-10 mt-1 items-center gap-3 rounded-md border border-stone-200 bg-white px-3 py-2 shadow-lg whitespace-nowrap"
                   >
                     <span class="text-[10px] font-medium uppercase tracking-wide text-stone-500">
                       Register at:
@@ -275,7 +275,7 @@ const verdictClass = (verdict: Verdict) => {
                       {d.registrars.map((r) => {
                         const logo = REGISTRAR_LOGOS[r.name];
                         return (
-                          <li>
+                          <li class="shrink-0">
                             <a
                               href={r.url}
                               target="_blank"
@@ -397,7 +397,7 @@ const verdictClass = (verdict: Verdict) => {
                   {d.registrars.map((r) => {
                     const logo = REGISTRAR_LOGOS[r.name];
                     return (
-                      <li>
+                      <li class="shrink-0">
                         <a
                           href={r.url}
                           target="_blank"
@@ -562,12 +562,19 @@ const verdictClass = (verdict: Verdict) => {
   // Click a Register button → its popover opens (and any other open one
   // closes). Click outside any trigger/popover → close. Escape → close.
   // Tap-friendly on touch devices (no hover behaviour).
+  //
+  // Display toggle uses BOTH the HTML `hidden` attribute AND a `flex` class.
+  // The popover's horizontal layout is `display: flex`; the `hidden`
+  // attribute alone (`display: none` from the UA stylesheet) loses to any
+  // author-stylesheet `display` rule. By gating `flex` on open-state we
+  // guarantee `display: none` wins when closed and `display: flex` when open.
   const triggers = document.querySelectorAll<HTMLButtonElement>('[data-popover-trigger]');
   const popovers = document.querySelectorAll<HTMLElement>('[data-popover]');
 
   const closeAllPopovers = () => {
     popovers.forEach((p) => {
       p.hidden = true;
+      p.classList.remove('flex');
     });
     triggers.forEach((t) => t.setAttribute('aria-expanded', 'false'));
   };
@@ -583,6 +590,7 @@ const verdictClass = (verdict: Verdict) => {
       closeAllPopovers();
       if (!wasOpen) {
         target.hidden = false;
+        target.classList.add('flex');
         trigger.setAttribute('aria-expanded', 'true');
       }
     });
