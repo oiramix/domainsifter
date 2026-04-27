@@ -33,6 +33,8 @@ import os
 
 import requests
 
+from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_ENDPOINT = "https://safebrowsing.googleapis.com/v4/threatMatches:find"
@@ -43,6 +45,7 @@ _THREAT_TYPES = [
     "UNWANTED_SOFTWARE",
     "POTENTIALLY_HARMFUL_APPLICATION",
 ]
+_BREAKER = CircuitBreaker("spam_check")
 
 
 class SpamCheckConfigError(RuntimeError):
@@ -58,6 +61,9 @@ def enrich(domain: str, config: dict) -> dict:
             "spam_check is a core filter rule and cannot be silently skipped."
         )
 
+    if _BREAKER.is_open():
+        return {}
+
     endpoint = config.get("api_endpoints", {}).get("safe_browsing", _DEFAULT_ENDPOINT)
     timeout = config.get("request_timeout_seconds", 10)
     body = {
@@ -71,14 +77,23 @@ def enrich(domain: str, config: dict) -> dict:
     }
 
     try:
-        response = requests.post(
-            endpoint, params={"key": api_key}, json=body, timeout=timeout
+        response = request_with_429_backoff(
+            lambda: requests.post(
+                endpoint, params={"key": api_key}, json=body, timeout=timeout
+            )
         )
+        if response.status_code == 429:
+            logger.warning("spam_check persistent 429 for %s", domain)
+            _BREAKER.record_failure()
+            return {}
         response.raise_for_status()
         data = response.json()
     except (requests.RequestException, ValueError) as exc:
         logger.warning("spam_check enrich failed for %s: %s", domain, exc)
+        _BREAKER.record_failure()
         return {}
+
+    _BREAKER.record_success()
 
     matches = data.get("matches") if isinstance(data, dict) else None
     if not matches:

@@ -25,23 +25,41 @@ import logging
 
 import requests
 
+from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE = "https://crt.sh"
+# crt.sh was the worst offender on day 2 — rate-limited within 14s and then
+# every subsequent request hung on the 10s timeout. Aggressive breaker here
+# is the only thing keeping the enrichment phase from melting again.
+_BREAKER = CircuitBreaker("crtsh")
 
 
 def enrich(domain: str, config: dict) -> dict:
+    if _BREAKER.is_open():
+        return {}
+
     base = config.get("api_endpoints", {}).get("crtsh", _DEFAULT_BASE).rstrip("/")
     timeout = config.get("request_timeout_seconds", 10)
     params = {"q": f"%.{domain}", "output": "json"}
 
     try:
-        response = requests.get(base + "/", params=params, timeout=timeout)
+        response = request_with_429_backoff(
+            lambda: requests.get(base + "/", params=params, timeout=timeout)
+        )
+        if response.status_code == 429:
+            logger.warning("crt.sh persistent 429 for %s", domain)
+            _BREAKER.record_failure()
+            return {}
         response.raise_for_status()
         rows = response.json()
     except (requests.RequestException, ValueError) as exc:
         logger.warning("crt.sh enrich failed for %s: %s", domain, exc)
+        _BREAKER.record_failure()
         return {}
+
+    _BREAKER.record_success()
 
     if not isinstance(rows, list):
         return {}

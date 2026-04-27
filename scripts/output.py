@@ -25,7 +25,9 @@ Output shape:
     }
 
 `write_output(...)` takes already-scored, already-sorted candidates and:
-- caps at config.max_candidates_per_day
+- caps at config.max_candidates_for_publication (CEILING, not a quota — if
+  fewer survived, we publish all of them; we never pad the list to hit the
+  cap with weak candidates).
 - builds an affiliate_link from config.affiliate_link_template
 - projects each candidate to ONLY the contract fields (no internal
   enrichment metadata leaks into the public JSON)
@@ -81,8 +83,16 @@ def build_payload(
     *,
     generated_at: datetime | None = None,
 ) -> dict:
-    """Build the final JSON payload (does not write to disk)."""
-    cap = int(config.get("max_candidates_per_day", 500))
+    """Build the final JSON payload (does not write to disk).
+
+    Cap precedence: max_candidates_for_publication wins; max_candidates_per_day
+    kept as a fallback so older configs / tests still parse. The cap is a
+    CEILING — if `candidates` has fewer entries than the cap, all are emitted.
+    """
+    cap = int(
+        config.get("max_candidates_for_publication")
+        or config.get("max_candidates_per_day", 500)
+    )
     template = config.get("affiliate_link_template", "")
     capped = candidates[:cap]
     domains = [_project(c, template) for c in capped]

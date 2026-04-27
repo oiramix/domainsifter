@@ -10,7 +10,7 @@ import pytest
 from scripts import output
 
 CONFIG = {
-    "max_candidates_per_day": 3,
+    "max_candidates_for_publication": 3,
     "affiliate_link_template": "https://example.com/?domain={name}",
 }
 
@@ -44,11 +44,25 @@ def test_build_payload_returns_contract_shape():
     assert set(d.keys()) == set(output.CONTRACT_FIELDS)
 
 
-def test_build_payload_caps_at_max_candidates_per_day():
+def test_build_payload_caps_at_max_candidates_for_publication():
     cands = [_cand(f"d{i}.com", 100 - i) for i in range(10)]
     payload = output.build_payload(cands, CONFIG)
     assert payload["domain_count"] == 3
     assert [d["name"] for d in payload["domains"]] == ["d0.com", "d1.com", "d2.com"]
+
+
+def test_build_payload_falls_back_to_legacy_per_day_key():
+    """Configs predating the rename keep working — legacy key still parsed."""
+    legacy = {"max_candidates_per_day": 2, "affiliate_link_template": ""}
+    payload = output.build_payload([_cand(f"d{i}.com", 90 - i) for i in range(5)], legacy)
+    assert payload["domain_count"] == 2
+
+
+def test_build_payload_publishes_all_when_below_cap():
+    """Cap is a CEILING, not a quota — fewer candidates → fewer published."""
+    cands = [_cand(f"d{i}.com", 100 - i) for i in range(2)]  # 2 candidates, cap=3
+    payload = output.build_payload(cands, CONFIG)
+    assert payload["domain_count"] == 2
 
 
 def test_build_payload_applies_affiliate_template():

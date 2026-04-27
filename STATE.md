@@ -386,3 +386,92 @@ as the "yesterday" baseline.
 ## Total cost to date
 
 26 EUR (domain registration only). Everything else: free.
+
+---
+
+## Day-2 ops check (2026-04-27)
+
+Run #4 — scheduled cron — **cancelled (timeout)**.
+
+- Triggered: 2026-04-27 08:28 UTC (cron is `0 6 * * *`, queued ~2.5h late by GitHub free-tier scheduler)
+- Duration: 45m 19s — hit the workflow's `timeout-minutes: 45` cap
+- Cancellation reason: "The job has exceeded the maximum execution time of 45m0s"
+- Run URL: https://github.com/oiramix/domainsifter/actions/runs/24984601314
+- No `data: daily refresh 2026-04-27` commit landed on `main` (origin still tipped at `e91becb`, the front-end wiring fix from 2026-04-26).
+- `src/data/daily-domains.json` still contains the day-1 cold-start payload: `generated_at=2026-04-26T18:00:04Z`, `domain_count=0`.
+- No score-distribution data to report (no domains).
+- Other warning observed on the run page: "Node.js 20 actions are deprecated" — `actions/checkout@v4`, `actions/setup-python@v5` need updating before 2026-06-02. Not the cause of the timeout.
+
+Cause not yet diagnosed from this check alone. Next step is reading the run logs to find which phase consumed the 45 minutes (zone download? enrichment? R2 writes?) — but not doing that here per instructions.
+
+---
+
+## Day 2 Incident and Architectural Response (2026-04-27)
+
+### Incident
+
+Cron run #4 (https://github.com/oiramix/domainsifter/actions/runs/24984601314) was cancelled at the 45-minute timeout. From log review after the fact:
+
+- Pipeline collected **53,125 drops** across the 11 approved TLDs — that's the correct order of magnitude for a single day's churn, not a runaway count.
+- Enrichment submitted all 53,125 candidates to a `ThreadPoolExecutor(max_workers=10)` and started hitting all 7 sources sequentially per candidate.
+- **crt.sh** and **Wayback** rate-limited within ~14 seconds of the run start. Every subsequent request from those sources hung for the full 10s timeout.
+- With 53,125 × 7 sources × 10s timeout / 10 workers ≈ 10.3 hours of degraded work scheduled, the 45m budget shredded.
+- No partial output — the workflow's commit step never ran, so the site stayed on day-1 cold-start.
+
+Root cause: the v1 architecture had no admission control. Every drop was treated as worth enriching, every API call was retried at full timeout, and there was no clock cap on enrichment. Once one source went bad, the budget was already lost.
+
+### Architectural response (this commit)
+
+Five interlocked changes — all required, all shipped together:
+
+1. **Lexical pre-enrichment filter** (`scripts/lexical_filter.py`): two passes between structural reject and enrichment. Garbage detection (digit/vowel ratios, Shannon entropy, repeat runs, consonant runs) and pronounceability (overlapping trigrams matched against a ~700-entry English trigram set, derived at module load from ~200 seed words). Defaults are deliberately permissive — better to enrich a borderline real domain than reject a real one. Tunable in `config.json` under `lexical_thresholds`.
+
+2. **Per-source circuit breaker** (`scripts/enrichment/_circuit_breaker.py`): each enrichment source instantiates one `CircuitBreaker` at module level. After 5 consecutive failures, the circuit opens for 15 minutes — `enrich()` returns `{}` immediately without making the network call. Half-open behavior on timeout: one trial allowed; failure re-opens. Thread-safe (pipeline runs candidates concurrently). 429 responses get exponential backoff (1s, 2s, then count as failure). Wired into all 7 sources without changing the public `enrich(domain, config) -> dict` contract.
+
+3. **Wall-clock budget for enrichment** (`pipeline.enrich_all`): config gets `enrichment_time_budget_seconds: 2100` (35 min). The submission loop checks elapsed time before submitting each candidate. When budget exhausts, no new submissions; in-flight workers get up to 60s grace. Whatever finished gets filtered+scored+published. **Partial output is the design**, not a failure mode — 200 enriched survivors > 0 enriched survivors because of timeout.
+
+4. **Two-stage caps**: `max_candidates_per_day: 500` is gone. Replaced by `max_candidates_for_enrichment: 1000` (safety net after lexical filter — sort by length asc and trim if exceeded; logs a warning) and `max_candidates_for_publication: 300` (CEILING after scoring; if fewer survive, publish all of them; **never pad**).
+
+5. **Methodology copy on the site** (`src/components/Methodology.astro`): the inflated "12+ spam signals, 95% rejected" claim is replaced with the literal description of what the pipeline actually does. No invented statistics (CLAUDE.md rule #2).
+
+### Filter ordering in the new pipeline
+
+```
+collect_drops              (~53,000 expected on a normal day)
+  ↓
+filter_candidates_structural   (R1-R5: punycode/length/numeric/keyword)
+  ↓
+lexical_filter.filter_candidates   (Pass 2A garbage + Pass 2B pronounceability)
+  ↓
+trim_for_enrichment    (cap to max_candidates_for_enrichment by length asc)
+  ↓
+enrich_all   (ThreadPoolExecutor; wall-clock budget; per-source breakers)
+  ↓
+filter_candidates_post_enrichment   (R6-R10: blocklists, wayback floor, spam_check_missing)
+  ↓
+score_candidates
+  ↓
+write_output   (cap to max_candidates_for_publication; cap is a CEILING)
+```
+
+### Decisions on ambiguous points (surfaced for review)
+
+- **`max_consonant_run` set to 6, not the spec's 5.** "quartzbloom" — one of our sample-data brand names — has 5 consecutive consonants ("rtzbl"). Spec literal `5+` would reject it; spec narrative says "lean PERMISSIVE — better to let borderline cases through than reject real domains like 'lumenpath'". Resolved in favor of the narrative. Easily tightened in Wave 1 via `config.lexical_thresholds.max_consonant_run`.
+- **Trigram seed list is ~200 words rather than a hand-curated trigram table.** Generation gives ~700 unique trigrams covering common English syllable structure. Tradeoff: less precise tuning, but easier to extend (add a word, get its trigrams for free). All 19 sample-domain roots pass; "78win012", "kvk434k1ha62", and unpronounceable noise reject.
+- **Circuit breaker is module-level singleton per source, lifetime = process lifetime (one pipeline run).** Considered passing breakers via `config` but it needlessly complicated the plugin contract. Trade-off accepted; tests reset breakers via an autouse fixture in `tests/enrichment/conftest.py`.
+- **bootstrap fetch in `rdap.py` is NOT routed through the 429 helper.** It's `lru_cached` and fetched once per process, so 429 retry/backoff has marginal value there. Per-domain RDAP queries DO use the helper.
+
+### Day 3 expectation
+
+- Cron triggers at 06:00 UTC, runs as a module (`python -m scripts.pipeline ...`).
+- Structural filter takes ~53,000 → ~50,000 (rejects punycode, all-numeric, short, banned keywords).
+- Lexical filter takes ~50,000 → ~3,000-15,000 (rejects digit-heavy, low-vowel, high-entropy, unpronounceable). This is a guess — actual ratio is what Wave 1 measures.
+- If still over the 1,000 enrichment cap, sort-by-length-asc trim down. Logged as a warning.
+- Enrichment with breakers + 35-minute budget should comfortably finish ≤30 min. Worst case (every source rate-limits) the breakers open within 5 × 10s = 50 seconds and the rest of the run skips them.
+- Post-enrichment + score + cap to 300 → publish.
+- Total runtime expectation: 5-15 minutes, well under the 45-min Actions cap.
+
+### Failure modes added to the matrix
+
+- Enrichment time budget exhausted → log warns, partial output published (NOT a failure mode any more).
+- Source circuit opens → that source's fields are absent from candidates; `filter_candidates_post_enrichment` tolerates absent fields (R9 wayback floor only fires when the field is present; R10 spam_check still rejects under strict mode if `spam_flagged` is missing).

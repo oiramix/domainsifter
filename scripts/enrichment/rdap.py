@@ -29,9 +29,12 @@ from typing import Any
 
 import requests
 
+from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+
 logger = logging.getLogger(__name__)
 
 _BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json"
+_BREAKER = CircuitBreaker("rdap")
 
 
 @lru_cache(maxsize=8)
@@ -96,6 +99,9 @@ def _extract_registrar(record: dict[str, Any]) -> str | None:
 
 
 def enrich(domain: str, config: dict) -> dict:
+    if _BREAKER.is_open():
+        return {}
+
     timeout = config.get("request_timeout_seconds", 10)
     bootstrap = _load_bootstrap(config, timeout)
     if bootstrap is None or not bootstrap:
@@ -112,21 +118,35 @@ def enrich(domain: str, config: dict) -> dict:
     base = bases[0].rstrip("/")
     url = f"{base}/domain/{domain}"
     try:
-        response = requests.get(url, timeout=timeout)
+        response = request_with_429_backoff(
+            lambda: requests.get(url, timeout=timeout)
+        )
     except requests.RequestException as exc:
         logger.warning("RDAP query for %s failed: %s", domain, exc)
+        _BREAKER.record_failure()
         return {}
 
     if response.status_code == 404:
+        # 404 means "registry has no record" — that is a SUCCESSFUL query
+        # for a freshly-dropped domain, not a transport failure.
+        _BREAKER.record_success()
         return {"previous_registrar": None, "rdap_status": []}
+    if response.status_code == 429:
+        logger.warning("RDAP persistent 429 for %s", domain)
+        _BREAKER.record_failure()
+        return {}
     if response.status_code != 200:
+        _BREAKER.record_failure()
         return {}
 
     try:
         record = response.json()
     except ValueError as exc:
         logger.warning("RDAP response for %s was not JSON: %s", domain, exc)
+        _BREAKER.record_failure()
         return {}
+
+    _BREAKER.record_success()
 
     if not isinstance(record, dict):
         return {}

@@ -40,7 +40,17 @@
     "escort",
     "cialis"
   ],
-  "max_candidates_per_day": 500,
+  "lexical_thresholds": {
+    "max_digit_ratio": 0.30,
+    "min_vowel_ratio": 0.15,
+    "max_shannon_entropy": 3.5,
+    "max_repeat_run": 4,
+    "max_consonant_run": 6,
+    "min_trigram_match_ratio": 0.20
+  },
+  "max_candidates_for_enrichment": 1000,
+  "max_candidates_for_publication": 300,
+  "enrichment_time_budget_seconds": 2100,
   "affiliate_link_template": "https://www.namecheap.com/domains/registration/results/?domain={name}",
   "api_endpoints": {
     "czds_auth_base": "https://account-api.icann.org",

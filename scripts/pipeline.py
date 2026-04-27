@@ -7,15 +7,23 @@ Order of operations:
     4. for each TLD:
          a. download zone to a tempdir
          b. parse_zone → today's set
-         c. diff vs yesterday's snapshot → drops
+         c. diff vs yesterday's R2 snapshot → drops
          d. commit_today (overwrite snapshot for tomorrow's run)
          e. delete the temp zone file
-    5. build candidate dicts for every drop across all TLDs
-    6. enrich each candidate concurrently across the 7 sources
-       (ThreadPoolExecutor, max_workers from config)
-    7. filter (strict_spam_check=True)
-    8. score + sort
-    9. write_output → src/data/daily-domains.json
+    5. structural filter        (filter.filter_candidates_structural)
+                                — punycode, length, all-numeric, keyword
+    6. lexical filter           (lexical_filter.filter_candidates)
+                                — digit/vowel/entropy/repeats/pronounceability
+    7. enrichment safety cap    (max_candidates_for_enrichment)
+                                — sort by length asc, take top N
+    8. enrich each survivor concurrently within a wall-clock budget
+       (max_workers from config; budget from enrichment_time_budget_seconds).
+       Candidates not started by deadline are skipped, NOT a failure mode.
+    9. post-enrichment filter   (strict_spam_check=True)
+   10. score + sort
+   11. publication cap          (max_candidates_for_publication)
+                                — CEILING, not quota; never pad with weak
+   12. write_output → src/data/daily-domains.json
 
 Logging: each module gets its own logger; root config writes INFO+ to stdout
 so GitHub Actions surfaces everything in the run log.
@@ -32,13 +40,23 @@ import logging
 import os
 import sys
 import tempfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import date
 from importlib import import_module
 from pathlib import Path
 from typing import Callable
 
-from scripts import czds_client, diff, env_check, filter as filter_mod, output, score, zone_parser
+from scripts import (
+    czds_client,
+    diff,
+    env_check,
+    filter as filter_mod,
+    lexical_filter,
+    output,
+    score,
+    zone_parser,
+)
 
 logger = logging.getLogger("scripts.pipeline")
 
@@ -159,22 +177,121 @@ def _enrich_one(
 
 
 def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
-    """Enrich every candidate concurrently. Each candidate runs all 7 sources
-    sequentially (within one worker); different candidates run in parallel
-    across the pool. max_workers from config.max_concurrent_enrichments."""
+    """Enrich every candidate concurrently, capped by a wall-clock budget.
+
+    Submission strategy:
+      - Fill the pool up to max_workers.
+      - Each time a future completes, submit the next queued candidate IF
+        the wall-clock budget hasn't expired.
+      - Once expired: stop submitting new ones, give in-flight workers up
+        to `grace` seconds to finish, then stop.
+
+    The point: enrichment that times out under rate limits should still
+    publish whatever it managed to enrich, not lose the entire run.
+    Per project guidance: 200 properly-enriched > 0 because of timeout.
+    """
     if not candidates:
-        return candidates
+        return list(candidates)
 
     max_workers = max(1, int(config.get("max_concurrent_enrichments", 10)))
-    enrichers = _load_enrichers()
-    logger.info("Enriching %d candidates with %d concurrent workers", len(candidates), max_workers)
+    budget = float(config.get("enrichment_time_budget_seconds", 2100))
+    grace = 60.0
 
+    enrichers = _load_enrichers()
+    logger.info(
+        "Enriching %d candidates: %d workers, %.0fs budget + %.0fs grace",
+        len(candidates), max_workers, budget, grace,
+    )
+
+    queue = list(candidates)
     enriched: list[dict] = []
+    spam_check_error: BaseException | None = None
+    start = time.monotonic()
+    deadline = start + budget
+    grace_deadline = deadline + grace
+
+    from scripts.enrichment.spam_check import SpamCheckConfigError
+
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_enrich_one, c, config, enrichers): c for c in candidates}
-        for fut in as_completed(futures):
-            enriched.append(fut.result())
+        in_flight: set = set()
+
+        def _submit_one() -> None:
+            cand = queue.pop(0)
+            in_flight.add(pool.submit(_enrich_one, cand, config, enrichers))
+
+        # Prime the pool.
+        while queue and len(in_flight) < max_workers:
+            _submit_one()
+
+        budget_warned = False
+        while in_flight:
+            now = time.monotonic()
+            if now >= grace_deadline:
+                logger.warning(
+                    "Enrichment grace period exhausted; abandoning %d in-flight",
+                    len(in_flight),
+                )
+                for f in in_flight:
+                    f.cancel()
+                break
+
+            timeout = max(0.1, grace_deadline - now)
+            done, in_flight = wait(in_flight, timeout=timeout, return_when=FIRST_COMPLETED)
+
+            for fut in done:
+                try:
+                    enriched.append(fut.result())
+                except SpamCheckConfigError as exc:
+                    spam_check_error = exc
+                    # Cancel pending work; we'll re-raise after teardown.
+                    for f in in_flight:
+                        f.cancel()
+                    in_flight = set()
+                    queue.clear()
+                    break
+
+            if spam_check_error is not None:
+                break
+
+            # Refill only while budget remains.
+            if time.monotonic() < deadline:
+                while queue and len(in_flight) < max_workers:
+                    _submit_one()
+            elif not budget_warned and (queue or in_flight):
+                logger.warning(
+                    "Enrichment time budget (%.0fs) exhausted at %d/%d enriched; "
+                    "%d skipped, %d in-flight (grace period now active)",
+                    budget, len(enriched), len(candidates), len(queue), len(in_flight),
+                )
+                budget_warned = True
+
+    if spam_check_error is not None:
+        raise spam_check_error
+
+    skipped = len(candidates) - len(enriched)
+    if skipped:
+        logger.info(
+            "Enrichment summary: %d enriched, %d skipped (budget/grace), elapsed %.1fs",
+            len(enriched), skipped, time.monotonic() - start,
+        )
+    else:
+        logger.info(
+            "Enrichment summary: %d enriched (all candidates), elapsed %.1fs",
+            len(enriched), time.monotonic() - start,
+        )
     return enriched
+
+
+def _trim_for_enrichment(candidates: list[dict], cap: int) -> list[dict]:
+    """Safety net: if more candidates survived the lexical filter than we're
+    willing to enrich, take the shortest names (proxy for higher quality)."""
+    if len(candidates) <= cap:
+        return candidates
+    logger.warning(
+        "Lexical survivors (%d) exceed enrichment cap (%d); trimming by length asc",
+        len(candidates), cap,
+    )
+    return sorted(candidates, key=lambda c: (len(c.get("name", "")), c.get("name", "")))[:cap]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -211,12 +328,37 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     drops = collect_drops(config, access_token, today=date.today())
-    enriched = enrich_all(drops, config)
-    survivors = filter_mod.filter_candidates(enriched, config, strict_spam_check=True)
+
+    # Stage 1: structural filter (cheap; pre-enrichment)
+    structural_kept = filter_mod.filter_candidates_structural(drops, config)
+
+    # Stage 2: lexical filter (cheap; pre-enrichment)
+    lexical_kept = lexical_filter.filter_candidates(structural_kept, config)
+
+    # Safety net before paying for enrichment
+    enrich_cap = int(config.get("max_candidates_for_enrichment", 1000))
+    candidates_to_enrich = _trim_for_enrichment(lexical_kept, enrich_cap)
+
+    # Stage 3: enrichment (with wall-clock budget)
+    enriched = enrich_all(candidates_to_enrich, config)
+
+    # Stage 4: post-enrichment filter
+    survivors = filter_mod.filter_candidates_post_enrichment(
+        enriched, config, strict_spam_check=True
+    )
+
+    # Stage 5: score + sort
     score.score_candidates(survivors, config)
+
+    # Stage 6: write (publication cap is applied inside output.build_payload)
     output.write_output(survivors, config, output_path=args.output)
 
-    logger.info("Pipeline complete: %d domains in output", len(survivors))
+    publication_cap = int(config.get("max_candidates_for_publication", 300))
+    published = min(len(survivors), publication_cap)
+    logger.info(
+        "Pipeline complete: %d survivors → %d published (cap=%d)",
+        len(survivors), published, publication_cap,
+    )
     return 0
 
 

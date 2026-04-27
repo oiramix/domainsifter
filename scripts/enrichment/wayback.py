@@ -13,13 +13,9 @@ Returned fields:
 Endpoint: https://web.archive.org/cdx/search/cdx
 Docs: https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server
 
-We use `output=json&fl=timestamp&limit=-1` so the response is small (just the
-last snapshot's timestamp) plus we ask for total via `showNumPages`. Simpler
-approach: request `output=json&fl=timestamp` and let the result list size be
-the count, then take the max timestamp. Counts are bounded (CZDS-eligible
-domains rarely exceed 100k snapshots) but we cap with `limit=10000` defensively.
-
-Returns empty dict on any failure.
+Returns empty dict on any failure (network, 5xx, malformed JSON, OR an open
+circuit breaker — see scripts.enrichment._circuit_breaker for the why).
+429 responses are retried with exponential backoff before counting as failure.
 """
 
 from __future__ import annotations
@@ -28,12 +24,18 @@ import logging
 
 import requests
 
+from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_ENDPOINT = "https://web.archive.org/cdx/search/cdx"
+_BREAKER = CircuitBreaker("wayback")
 
 
 def enrich(domain: str, config: dict) -> dict:
+    if _BREAKER.is_open():
+        return {}
+
     endpoint = config.get("api_endpoints", {}).get("wayback_cdx", _DEFAULT_ENDPOINT)
     timeout = config.get("request_timeout_seconds", 10)
     params = {
@@ -44,12 +46,21 @@ def enrich(domain: str, config: dict) -> dict:
         "limit": 10000,
     }
     try:
-        response = requests.get(endpoint, params=params, timeout=timeout)
+        response = request_with_429_backoff(
+            lambda: requests.get(endpoint, params=params, timeout=timeout)
+        )
+        if response.status_code == 429:
+            logger.warning("Wayback persistent 429 for %s", domain)
+            _BREAKER.record_failure()
+            return {}
         response.raise_for_status()
         rows = response.json()
     except (requests.RequestException, ValueError) as exc:
         logger.warning("Wayback enrich failed for %s: %s", domain, exc)
+        _BREAKER.record_failure()
         return {}
+
+    _BREAKER.record_success()
 
     if not isinstance(rows, list) or len(rows) <= 1:
         return {"wayback_snapshots": 0, "wayback_last_snapshot": None}

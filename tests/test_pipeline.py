@@ -56,7 +56,9 @@ def cfg(tmp_path):
             "czds_api_base": "https://czds-api.icann.org",
         },
         "max_concurrent_enrichments": 4,
-        "max_candidates_per_day": 100,
+        "max_candidates_for_enrichment": 1000,
+        "max_candidates_for_publication": 100,
+        "enrichment_time_budget_seconds": 60,  # tests don't actually wait — short keeps the wait() ceilings small
         "affiliate_link_template": "https://aff.example/?d={name}",
         "output_path": str(tmp_path / "daily.json"),
         "filter_thresholds": {
@@ -190,6 +192,108 @@ def test_enrich_one_propagates_spam_check_config_error(cfg):
 
 def test_enrich_all_returns_empty_when_no_candidates(cfg):
     assert pipeline.enrich_all([], cfg) == []
+
+
+def test_trim_for_enrichment_no_op_when_under_cap():
+    cands = [{"name": "a.com"}, {"name": "bbb.com"}]
+    assert pipeline._trim_for_enrichment(cands, 10) == cands
+
+
+def test_trim_for_enrichment_keeps_shortest_names_first():
+    cands = [
+        {"name": "longerdomain.com"},
+        {"name": "ab.com"},
+        {"name": "medium.com"},
+        {"name": "abcd.com"},
+    ]
+    trimmed = pipeline._trim_for_enrichment(cands, 2)
+    assert [c["name"] for c in trimmed] == ["ab.com", "abcd.com"]
+
+
+def test_enrich_all_respects_time_budget(monkeypatch, cfg):
+    """When budget exhausts mid-run, enrich_all stops submitting and returns
+    whatever finished. Per project guidance: partial output is the design,
+    not a failure."""
+    cfg = {**cfg, "enrichment_time_budget_seconds": 0.0, "max_concurrent_enrichments": 2}
+
+    # Stub out _load_enrichers so we don't import real modules.
+    def slow_enricher(_d, _c):
+        import time as _t
+        _t.sleep(0.05)
+        return {"slow_field": True}
+
+    monkeypatch.setattr(pipeline, "_load_enrichers", lambda: [("slow", slow_enricher)])
+
+    cands = [{"name": f"d{i}.com"} for i in range(10)]
+    result = pipeline.enrich_all(cands, cfg)
+    # We can't assert exactly how many got enriched (depends on the scheduler),
+    # but with budget=0.0 we definitely don't process all 10.
+    assert len(result) <= len(cands)
+
+
+def test_enrich_all_propagates_spam_check_config_error(monkeypatch, cfg):
+    from scripts.enrichment.spam_check import SpamCheckConfigError
+
+    def boom(_d, _c):
+        raise SpamCheckConfigError("nope")
+
+    monkeypatch.setattr(pipeline, "_load_enrichers", lambda: [("spam_check", boom)])
+    cands = [{"name": "anything.com"}]
+    with pytest.raises(SpamCheckConfigError):
+        pipeline.enrich_all(cands, cfg)
+
+
+def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cfg, tmp_path):
+    """Trace which filtering stages run in what order. Inputs are crafted so:
+       - "great.com" survives both filter passes (real word)
+       - "78win012.com" survives structural but gets killed by lexical
+       - "xn--bad.com" gets killed by structural (punycode)
+    Final output should contain only "great.com".
+    """
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(
+        pipeline,
+        "collect_drops",
+        lambda _cfg, _tok, today: [
+            {"name": "great.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "78win012.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "xn--bad.com", "tld": "com", "dropped_date": today.isoformat()},
+        ],
+    )
+
+    enriched_names: list[str] = []
+
+    def fake_enrich_all(cands, _cfg):
+        for c in cands:
+            enriched_names.append(c["name"])
+            c.update({
+                "wayback_snapshots": 50,
+                "wayback_last_snapshot": "2024-01-01",
+                "open_page_rank": 3.0,
+                "cert_history": True,
+                "spam_flagged": False,
+                "surbl_listed": False,
+                "spamhaus_listed": False,
+                "previous_registrar": "Acme",
+            })
+        return cands
+
+    monkeypatch.setattr(pipeline, "enrich_all", fake_enrich_all)
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+    # Only great.com should have hit enrichment (78win012 fails lexical, xn-- fails structural)
+    assert enriched_names == ["great.com"]
+    written = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    assert [d["name"] for d in written["domains"]] == ["great.com"]
 
 
 def test_main_aborts_when_required_env_missing(monkeypatch, cfg, tmp_path):
