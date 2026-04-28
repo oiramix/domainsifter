@@ -47,9 +47,12 @@ def enrich(domain: str, config: dict) -> dict:
     headers = {"API-OPR": api_key}
     params = [("domains[]", domain)]
 
+    min_interval = float(config.get("api_min_interval_seconds", {}).get("open_page_rank", 0.4))
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(endpoint, headers=headers, params=params, timeout=timeout)
+            lambda: requests.get(endpoint, headers=headers, params=params, timeout=timeout),
+            host="openpagerank.com",
+            min_interval=min_interval,
         )
         if response.status_code == 429:
             logger.warning("OPR persistent 429 for %s", domain)

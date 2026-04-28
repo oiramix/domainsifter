@@ -117,9 +117,16 @@ def enrich(domain: str, config: dict) -> dict:
 
     base = bases[0].rstrip("/")
     url = f"{base}/domain/{domain}"
+    # RDAP servers vary per-TLD. Throttle is keyed on the actual host so
+    # each registry's limit is respected independently.
+    from urllib.parse import urlparse
+    rdap_host = urlparse(base).hostname or "rdap"
+    min_interval = float(config.get("api_min_interval_seconds", {}).get("rdap", 0.2))
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(url, timeout=timeout)
+            lambda: requests.get(url, timeout=timeout),
+            host=rdap_host,
+            min_interval=min_interval,
         )
     except requests.RequestException as exc:
         logger.warning("RDAP query for %s failed: %s", domain, exc)

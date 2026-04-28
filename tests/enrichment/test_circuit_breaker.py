@@ -200,3 +200,90 @@ def test_backoff_passes_through_non_429_status_codes():
     resp = request_with_429_backoff(call_fn, sleep=sleeps.append)
     assert resp.status_code == 503
     assert sleeps == []
+
+
+# --- HostThrottle ------------------------------------------------------------
+
+
+def test_throttle_no_op_when_interval_zero():
+    from scripts.enrichment._circuit_breaker import HostThrottle
+    throttle = HostThrottle()
+    sleeps: list[float] = []
+    throttle.acquire("a.com", 0.0, sleep=sleeps.append)
+    throttle.acquire("a.com", 0.0, sleep=sleeps.append)
+    assert sleeps == []
+
+
+def test_throttle_first_acquire_does_not_sleep():
+    from scripts.enrichment._circuit_breaker import HostThrottle
+    throttle = HostThrottle()
+    sleeps: list[float] = []
+    fake_clock_now = [100.0]
+    throttle.acquire(
+        "a.com", 1.0,
+        clock=lambda: fake_clock_now[0],
+        sleep=sleeps.append,
+    )
+    assert sleeps == []  # first call has no prior request to wait on
+
+
+def test_throttle_second_acquire_waits_remaining_interval():
+    from scripts.enrichment._circuit_breaker import HostThrottle
+    throttle = HostThrottle()
+    sleeps: list[float] = []
+    fake_clock_now = [100.0]
+
+    def fake_sleep(s):
+        sleeps.append(s)
+        fake_clock_now[0] += s  # simulate time advancing during sleep
+
+    # First acquire — no wait, slot taken at t=100.0
+    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+                     clock=lambda: fake_clock_now[0], sleep=fake_sleep)
+    # 0.3s elapses
+    fake_clock_now[0] = 100.3
+    # Second acquire — should wait 0.7s to reach 1.0s interval
+    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+                     clock=lambda: fake_clock_now[0], sleep=fake_sleep)
+    assert sleeps and abs(sleeps[0] - 0.7) < 0.001
+
+
+def test_throttle_separate_hosts_dont_block_each_other():
+    from scripts.enrichment._circuit_breaker import HostThrottle
+    throttle = HostThrottle()
+    sleeps: list[float] = []
+    clock = [100.0]
+    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+                     clock=lambda: clock[0], sleep=sleeps.append)
+    # Different host — should pass through immediately
+    throttle.acquire("b.com", 1.0, jitter_seconds=0,
+                     clock=lambda: clock[0], sleep=sleeps.append)
+    assert sleeps == []
+
+
+def test_throttle_reset_clears_state():
+    from scripts.enrichment._circuit_breaker import HostThrottle
+    throttle = HostThrottle()
+    sleeps: list[float] = []
+    clock = [100.0]
+    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+                     clock=lambda: clock[0], sleep=sleeps.append)
+    throttle.reset()
+    # After reset, the next acquire treats the host as "never seen"
+    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+                     clock=lambda: clock[0], sleep=sleeps.append)
+    assert sleeps == []
+
+
+def test_request_with_429_backoff_accepts_host_and_interval():
+    """Smoke test — the integrated helper should accept the new kwargs
+    without changing behavior when min_interval=0 (back-compat)."""
+    sleeps: list[float] = []
+    calls = [_resp(200)]
+    resp = request_with_429_backoff(
+        lambda: calls.pop(0),
+        host="a.com", min_interval=0.0,
+        sleep=sleeps.append,
+    )
+    assert resp.status_code == 200
+    assert sleeps == []

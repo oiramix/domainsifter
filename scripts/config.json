@@ -78,5 +78,12 @@
   "request_timeout_seconds": 10,
   "download_timeout_seconds": 120,
   "max_concurrent_enrichments": 10,
+  "api_min_interval_seconds": {
+    "_doc": "Minimum interval between requests to each API host across all workers. Empirical/documented fair-use rates calibrated 2026-04-28. See scripts/enrichment/_circuit_breaker.py header for sources.",
+    "wayback": 1.0,
+    "crtsh": 1.0,
+    "open_page_rank": 0.4,
+    "rdap": 0.2
+  },
   "output_path": "src/data/daily-domains.json"
 }

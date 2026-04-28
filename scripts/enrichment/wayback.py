@@ -45,9 +45,12 @@ def enrich(domain: str, config: dict) -> dict:
         "fl": "timestamp",
         "limit": 10000,
     }
+    min_interval = float(config.get("api_min_interval_seconds", {}).get("wayback", 1.0))
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(endpoint, params=params, timeout=timeout)
+            lambda: requests.get(endpoint, params=params, timeout=timeout),
+            host="web.archive.org",
+            min_interval=min_interval,
         )
         if response.status_code == 429:
             logger.warning("Wayback persistent 429 for %s", domain)
