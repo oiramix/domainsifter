@@ -47,7 +47,9 @@
     "max_shannon_entropy": 3.5,
     "max_repeat_run": 4,
     "max_consonant_run": 6,
-    "min_trigram_match_ratio": 0.20
+    "min_trigram_match_ratio": 0.55,
+    "min_alpha_trigram_matches": 3,
+    "min_apex_length": 3
   },
   "max_candidates_for_enrichment": 1000,
   "max_candidates_for_publication": 300,

@@ -17,10 +17,20 @@ Pass 2A — garbage detection (any one rejects):
     G5  5+ consonants in a row       — "xprzbtfm" with no vowel break
 
 Pass 2B — pronounceability:
-    P1  fewer than 20% of overlapping trigrams in the apex match the
-        natural-English trigram set. The set is derived at module load
-        from ~200 common English seed words (and the sample-domain
-        roots), giving ~700 unique trigrams. Permissive by design.
+    P1  apex must be at least 3 characters long
+    P2  must have at least 2 alphabetic trigrams that are in the
+        natural-English trigram set (absolute count — catches short
+        labels like "5pro" or "ckyy" that would pass a ratio check
+        on a single matching trigram)
+    P3  matching ratio (matched / total alpha trigrams) must be
+        >= min_trigram_match_ratio (0.55 default — calibrated against
+        day-3 published junk: "ckyy", "anddi", "antmap", "appibo",
+        "agkbet", etc., all of which had 1 matching trigram and ratios
+        in the 0.25-0.50 range. 0.55 catches them while keeping real
+        compound names like "lumenpath" (0.71) and "tideblock" (0.86)).
+    The natural-English trigram set is derived at module load from
+    ~250 common English seed words (and the sample-domain roots),
+    giving ~800 unique trigrams.
 
 Public API:
     keep_lexical(name, config) -> tuple[bool, str | None]
@@ -48,7 +58,24 @@ DEFAULTS = {
     # ^ spec said "5+" but real compound brand names can hit 5 consecutive
     #   consonants ("quartzbloom" → rtzbl). Bumping to 6 lets those pass
     #   while still catching keysmash like "kvkbhmt". Permissive per spec.
-    "min_trigram_match_ratio": 0.20,
+    "min_trigram_match_ratio": 0.55,
+    # ^ raised from 0.20 → 0.55 in response to day-3 published junk that
+    #   passed at the old threshold ("ckyy", "5pro", "anddi", "antmap"...).
+    #   Empirically calibrated: catches that junk while letting real
+    #   compounds like "lumenpath" (0.71), "tideblock" (0.86), "northpath"
+    #   (0.71), "marketglow" (0.75) through unscathed.
+    "min_alpha_trigram_matches": 3,
+    # ^ NEW: absolute count of matching trigrams. Catches short labels
+    #   ("5pro", "1gen", "ckyy", "llop", "hest") whose 1-2 matching trigrams
+    #   give a high ratio (50-100%) but don't actually demonstrate
+    #   English-likeness. Calibrated against day-3 junk: rejects 95% of it
+    #   (39/41) with zero regressions on real compound names. Residue
+    #   ("hiplar", "vicat") is phonetically plausible — score floor in
+    #   output.py catches the rest.
+    "min_apex_length": 3,
+    # ^ NEW: 2-char apex labels can't even produce a trigram and slip
+    #   the trigram check entirely (they returned ratio=1.0 by default).
+    #   Reject them outright — "oom", "wp" type junk.
 }
 
 _VOWELS = frozenset("aeiouy")
@@ -127,6 +154,24 @@ _SEED_WORDS = (
     "people country family parent friend partner office project report "
     "meeting research analysis decision answer question reason sense "
     "approach approach attention beginning conclusion reference example "
+    # Common brandable compound bases — added 2026-04-28 to broaden trigram
+    # coverage so legitimate compound names ("ironforge", "bluehaven") pass.
+    # Materials, colors, directions, nature, and small-business descriptors.
+    "iron steel brass bronze gold silver copper jade pearl ruby agate slate "
+    "blue red green yellow orange purple pink white black gray amber crimson "
+    "north south east west far near deep high low wild free bold swift calm "
+    "tree oak pine cedar birch maple ivy vine leaf root bough branch sprout "
+    "wolf fox bear owl hawk eagle lion tiger deer hare rabbit raven crow "
+    "forge mill shop labs works yard fields acres lodge cabin hut "
+    "swift true brave kind sharp light dark bright soft fierce gentle keen "
+    "sun moon star cloud rain snow wind storm tide wave shore beach "
+    "haven hollow heath glade thicket meadow ridge peak falls glen hill dale "
+    "brook creek ford port harbor bay cove point isle reef cape "
+    "iron forge anvil stone gem crown coin chain bridge tower beacon "
+    "trade craft skill tool hand mind soul heart spirit charm grace "
+    "fast quick sure clear pure clean smart neat tidy fine prime "
+    "dawn dusk noon morning evening night midnight twilight sunset sunrise "
+    "front back side top end edge core base path road trail "
 )
 
 
@@ -222,19 +267,29 @@ def _has_consonant_run(label: str, n: int) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _trigram_match_ratio(label: str) -> float:
-    """Fraction of overlapping 3-grams in `label` that appear in the natural
-    English trigram set. Labels with fewer than 3 alpha chars get 1.0 (treat
-    as 'pass'); we don't have enough signal to reject."""
+def _trigram_stats(label: str) -> tuple[int, int]:
+    """Return (matches, total_alpha_trigrams) for the label. Both 0 when
+    label has no alphabetic trigrams at all (all-digit, too-short, etc.).
+    Caller decides what to do with edge cases — keeps this helper pure."""
     label = label.lower()
     if len(label) < 3:
-        return 1.0
+        return 0, 0
     trigrams = [label[i : i + 3] for i in range(len(label) - 2)]
     alpha_trigrams = [t for t in trigrams if t.isalpha()]
     if not alpha_trigrams:
-        return 0.0  # all-digit or all-hyphen — caller should already rejected
+        return 0, 0
     matches = sum(1 for t in alpha_trigrams if t in _NATURAL_TRIGRAMS)
-    return matches / len(alpha_trigrams)
+    return matches, len(alpha_trigrams)
+
+
+def _trigram_match_ratio(label: str) -> float:
+    """Match ratio in [0.0, 1.0]. Returns 1.0 only when there are no alpha
+    trigrams to evaluate (callers must apply the absolute-count rule and
+    min-length rule alongside this)."""
+    matches, total = _trigram_stats(label)
+    if total == 0:
+        return 1.0
+    return matches / total
 
 
 # ---------------------------------------------------------------------------
@@ -271,8 +326,21 @@ def keep_lexical(name: str, config: dict) -> tuple[bool, str | None]:
     if _has_consonant_run(apex_label, th["max_consonant_run"]):
         return False, f"consonant_run(>={th['max_consonant_run']})"
 
-    # Pass 2B — pronounceability
-    ratio = _trigram_match_ratio(apex_label)
+    # Pass 2B — pronounceability (three rules, all must pass).
+    if len(apex_label) < th["min_apex_length"]:
+        return False, f"short_apex(<{th['min_apex_length']})"
+
+    matches, total_alpha = _trigram_stats(apex_label)
+    if total_alpha == 0:
+        return False, "no_alpha_trigrams"
+
+    # Absolute match count rule — catches short labels like "ckyy" (1 match
+    # of 2 → 50% ratio passes by ratio alone, but only 1 trigram is "real").
+    if matches < th["min_alpha_trigram_matches"]:
+        return False, f"too_few_matches({matches}<{th['min_alpha_trigram_matches']})"
+
+    # Match ratio rule — catches labels with widely-distributed near-misses.
+    ratio = matches / total_alpha
     if ratio < th["min_trigram_match_ratio"]:
         return False, f"unpronounceable({ratio:.2f}<{th['min_trigram_match_ratio']:.2f})"
 

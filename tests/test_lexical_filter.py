@@ -206,3 +206,93 @@ def test_natural_trigrams_includes_common_english():
     s = lexical_filter._NATURAL_TRIGRAMS
     for tri in ("the", "ing", "ent", "ion", "ate", "ery", "lum", "men", "pat", "blo"):
         assert tri in s, f"expected {tri!r} in natural trigram set"
+
+
+# --- Day-3 regression: random-letter junk that shipped on the live list -----
+# The first real-data run (2026-04-28, commit 75f0992) published 300 domains,
+# topped by "ckyy.xyz" — exactly the lexical garbage the filter was supposed
+# to reject. Root cause: the old 20% trigram-match threshold combined with
+# no absolute-count rule let single-trigram passes through ("pro" in "5pro",
+# "and" in "anddi"). Three rules were tightened to fix this; these tests
+# pin the regression so it can't silently re-open.
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ckyy.xyz",         # 1 match (cky)
+        "5pro.xyz",         # 1 alpha trigram (pro)
+        "agkbet.live",      # 1 match (bet)
+        "anddi.xyz",        # 1 match (and)
+        "antmap.xyz",       # 1 match (ant)
+        "appibo.xyz",       # 2 matches; ratio 0.50 < 0.55
+        "aniyuu.xyz",       # 1 match
+        "aphedu.xyz",       # 1 match
+        "aoac.xyz",         # 1 match
+        "aneu.xyz",         # 1 match
+        "ampeh.xyz",        # 1 match
+        "ifusi.xyz",        # 1 match
+        "kunbet.xyz",       # 1 match
+        "mwpha.xyz",        # 1 match
+        "ptshow.xyz",       # 2 matches; ratio 0.50 < 0.55
+        "tnida.xyz",        # 1 match
+        "1gen.xyz",         # 1 alpha trigram
+        "5app.xyz",         # 1 alpha trigram
+        "bitetf.xyz",       # 1 match
+        "lvbanv.xyz",       # 1 match
+        "gflo.xyz",         # 1 match
+        "chibi.xyz",        # 1 match
+        "bragi.xyz",        # 1 match
+        "oom.xyz",          # only 1 alpha trigram
+        "masla.xyz",        # 1 match
+        "gimid.xyz",        # 2 matches; <3 absolute
+        "tyon.xyz",         # 1 match
+        "treu.xyz",         # 1 match
+        "thezum.xyz",       # 1 match
+        "floqi.xyz",        # 1 match
+        "hest.xyz",         # 2 matches; <3 absolute
+        "delo.xyz",         # 2 matches; <3 absolute
+        "apei.xyz",         # 1 match
+        "apeguy.xyz",       # 1 match
+        "ariald.xyz",       # 2 matches; ratio 0.50 < 0.55
+        "llop.xyz",         # 2 matches; <3 absolute
+        "gerr.xyz",         # 2 matches; <3 absolute
+        "bowe.xyz",         # 2 matches; <3 absolute
+        "arcee.xyz",        # 2 matches; <3 absolute
+    ],
+)
+def test_rejects_day3_junk(name):
+    """Each of these landed in the day-3 published list under the old rules.
+    The new rules (threshold 0.55, min_alpha_trigram_matches=3) reject
+    every single one. If a regression here, the filter has loosened."""
+    keep, _ = lexical_filter.keep_lexical(name, {})
+    assert not keep, f"{name!r} should be rejected as random-letter junk"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # Sample-domain roots (these MUST keep passing — they're our brand
+        # of legitimate name).
+        "marketglow.com",
+        "tideblock.io",
+        "coppernest.org",
+        "lumenpath.dev",
+        "northpath.org",
+        "ironforge.org",     # NEW seed coverage: "iron" + "forge"
+        "bluehaven.org",     # NEW seed coverage: "blue" + "haven"
+        "quartzbloom.info",
+        "warblerstack.dev",
+        "sablequill.online",
+        "glassbarrow.info",
+        "petrichorlab.tech",
+        "lanterncreek.org",
+        "frostledge.xyz",
+        "silverbrook.store",
+    ],
+)
+def test_keeps_real_compound_names_after_tightening(name):
+    """The threshold/abs-count tightening must NOT regress real compound
+    names. If any of these fail, the seed list needs another word added."""
+    keep, reason = lexical_filter.keep_lexical(name, {})
+    assert keep, f"{name!r} should pass; rejected by {reason}"
