@@ -297,6 +297,17 @@ const verdictClass = (verdict: Verdict) => {
                     {verdict}
                   </span>
                 </td>
+                {/*
+                  STRUCTURAL INVARIANT: the popover <div> MUST be a child of
+                  this <td>, NOT a sibling. The td has `position: relative`
+                  which is the anchor for the popover's `position: absolute`
+                  + `right-full top-1/2`. If the div ends up outside the td
+                  (e.g., due to a misplaced closing tag), absolute positioning
+                  resolves to whatever positioned ancestor it finds — usually
+                  <body> — and the popover renders at the wrong screen
+                  location. Verified by tests/test_dom_structure (if added)
+                  and by html.parser-based smoke check in build CI.
+                */}
                 <td class="px-4 py-3 text-right relative">
                   <button
                     type="button"
