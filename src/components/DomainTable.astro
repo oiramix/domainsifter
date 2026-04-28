@@ -77,6 +77,27 @@ const droppedDaysAgo = (isoDate: string): string => {
   return `${days} days ago`;
 };
 
+// --- Null-safe formatters ----------------------------------------------------
+// Pipeline output can have null for any enrichment-derived field when the
+// corresponding source's circuit breaker opened mid-run (see day-2 incident).
+// Today's first-real-data run had 293/300 wayback_snapshots null, 298/300
+// cert_history null, 5/300 previous_registrar null. open_page_rank and score
+// were fully populated but we treat them defensively anyway. Em-dash ("—")
+// is the editorial convention for "data not available" — clearly distinct
+// from a value of zero or an empty string.
+const DASH = '—';
+
+const fmtInt = (v: number | null | undefined): string =>
+  v == null ? DASH : v.toLocaleString('en-US');
+
+const fmtDecimal = (v: number | null | undefined, digits = 1): string =>
+  v == null ? DASH : v.toFixed(digits);
+
+// Width % for the OPR progress bar. Null → 0% (empty bar) rather than
+// crashing the CSS calc. The em-dash next to the bar communicates "no data".
+const oprPct = (v: number | null | undefined): number =>
+  v == null ? 0 : Math.max(0, Math.min(100, (v / 10) * 100));
+
 const tldClass = (tld: string) => {
   switch (tld) {
     case 'org':
@@ -235,13 +256,13 @@ const verdictClass = (verdict: Verdict) => {
                   </span>
                 </td>
                 <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
-                <td class="px-4 py-3 text-right tabular-nums text-stone-700">{d.wayback_snapshots.toLocaleString('en-US')}</td>
+                <td class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-2">
                     <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
-                      <div class="h-full bg-accent" style={`width: ${(d.open_page_rank / 10) * 100}%`}></div>
+                      <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
                     </div>
-                    <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{d.open_page_rank.toFixed(1)}</span>
+                    <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{fmtDecimal(d.open_page_rank)}</span>
                   </div>
                 </td>
                 <td class="px-4 py-3">
@@ -266,7 +287,7 @@ const verdictClass = (verdict: Verdict) => {
                     role="menu"
                     aria-label={`Register ${d.name} at`}
                     hidden
-                    class="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap"
+                    class="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap w-max"
                   >
                     {d.registrars.map((r) => {
                       const logo = REGISTRAR_LOGOS[r.name];
@@ -351,15 +372,15 @@ const verdictClass = (verdict: Verdict) => {
               </div>
               <div class="flex items-center justify-between col-span-2">
                 <dt class="text-stone-500">Wayback snapshots</dt>
-                <dd class="text-stone-800 tabular-nums">{d.wayback_snapshots.toLocaleString('en-US')}</dd>
+                <dd class="text-stone-800 tabular-nums">{fmtInt(d.wayback_snapshots)}</dd>
               </div>
               <div class="flex items-center justify-between col-span-2">
                 <dt class="text-stone-500">OpenPageRank</dt>
                 <dd class="flex items-center gap-2">
                   <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
-                    <div class="h-full bg-accent" style={`width: ${(d.open_page_rank / 10) * 100}%`}></div>
+                    <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
                   </div>
-                  <span class="text-stone-800 tabular-nums text-xs">{d.open_page_rank.toFixed(1)}</span>
+                  <span class="text-stone-800 tabular-nums text-xs">{fmtDecimal(d.open_page_rank)}</span>
                 </dd>
               </div>
             </dl>
@@ -441,7 +462,16 @@ const verdictClass = (verdict: Verdict) => {
   let sortKey: SortKey | null = null;
   let sortDir: SortDir = 'asc';
 
-  const readValue = (el: HTMLElement, key: SortKey): string | number => {
+  // Returns null for missing numeric attributes so the comparator can push
+  // them to the bottom regardless of sort direction. Astro renders null/
+  // undefined props as omitted attributes, so getAttribute returns null for
+  // any candidate whose pipeline-derived field was null (e.g., wayback when
+  // the breaker opened during enrichment).
+  const readValue = (el: HTMLElement, key: SortKey): string | number | null => {
+    const numOrNull = (attr: string): number | null => {
+      const v = el.getAttribute(attr);
+      return v === null || v === '' ? null : Number(v);
+    };
     switch (key) {
       case 'name':
         return el.getAttribute('data-name') ?? '';
@@ -451,11 +481,11 @@ const verdictClass = (verdict: Verdict) => {
         // ISO YYYY-MM-DD sorts lexicographically the same as chronologically.
         return el.getAttribute('data-dropped') ?? '';
       case 'wayback':
-        return Number(el.getAttribute('data-wayback') ?? 0);
+        return numOrNull('data-wayback');
       case 'opr':
-        return Number(el.getAttribute('data-opr') ?? 0);
+        return numOrNull('data-opr');
       case 'score':
-        return Number(el.getAttribute('data-score') ?? 0);
+        return numOrNull('data-score');
     }
   };
 
@@ -465,6 +495,14 @@ const verdictClass = (verdict: Verdict) => {
     items.sort((a, b) => {
       const va = readValue(a, sortKey!);
       const vb = readValue(b, sortKey!);
+      // Nulls sort to the BOTTOM regardless of sort direction. Sorting
+      // descending by Wayback should still surface the populated rows
+      // first; null rows are "no data" not "minimum value".
+      const aMissing = va === null || va === undefined;
+      const bMissing = vb === null || vb === undefined;
+      if (aMissing && bMissing) return 0;
+      if (aMissing) return 1;
+      if (bMissing) return -1;
       let cmp: number;
       if (typeof va === 'number' && typeof vb === 'number') {
         cmp = va - vb;

@@ -2,7 +2,12 @@ name: Daily Domain Diff
 
 on:
   schedule:
-    - cron: "0 6 * * *"
+    # Off-peak time to reduce GitHub Actions free-tier queue delay.
+    # 0 6 * * * was the most popular cron minute on GitHub globally — every
+    # daily report job in the world fires at the top of the hour and the
+    # queue piles up. 05:17 UTC is well off any common round-number minute.
+    # 05:17 UTC = 08:17 Tallinn time. Adjust if local schedule shifts.
+    - cron: "17 5 * * *"
   workflow_dispatch: {}
 
 permissions:

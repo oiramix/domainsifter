@@ -12,9 +12,10 @@
       "store",
       "xyz",
       "info",
-      "org"
+      "org",
+      "shop"
     ],
-    "pending": ["com", "net", "shop", "biz"]
+    "pending": ["com", "net", "biz"]
   },
   "filter_thresholds": {
     "min_wayback_snapshots": 1,
