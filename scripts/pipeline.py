@@ -338,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     # Safety net before paying for enrichment
     enrich_cap = int(config.get("max_candidates_for_enrichment", 1000))
     candidates_to_enrich = _trim_for_enrichment(lexical_kept, enrich_cap)
+    total_evaluated = len(candidates_to_enrich)
 
     # Stage 3: enrichment (with wall-clock budget)
     enriched = enrich_all(candidates_to_enrich, config)
@@ -350,14 +351,21 @@ def main(argv: list[str] | None = None) -> int:
     # Stage 5: score + sort
     score.score_candidates(survivors, config)
 
-    # Stage 6: write (publication cap is applied inside output.build_payload)
-    output.write_output(survivors, config, output_path=args.output)
+    # Stage 6: write — output.build_payload applies the quality floor
+    # (publish_min_score + publish_min_enrichment_completeness) and the
+    # publication cap. total_evaluated lands in the payload so the
+    # frontend can render "Showing N of M candidates evaluated today".
+    output.write_output(
+        survivors,
+        config,
+        output_path=args.output,
+        total_evaluated=total_evaluated,
+    )
 
     publication_cap = int(config.get("max_candidates_for_publication", 300))
-    published = min(len(survivors), publication_cap)
     logger.info(
-        "Pipeline complete: %d survivors → %d published (cap=%d)",
-        len(survivors), published, publication_cap,
+        "Pipeline complete: %d post-enrich survivors, %d total evaluated, cap=%d",
+        len(survivors), total_evaluated, publication_cap,
     )
     return 0
 

@@ -27,6 +27,12 @@ interface PipelinePayload {
   generated_at: string;            // ISO 8601
   domain_count: number;
   domains: PipelineDomain[];
+  // Optional — present when the pipeline writes it (added 2026-04-28).
+  // The total count of candidates that entered enrichment that day, so the
+  // frontend can render "Showing N of M candidates evaluated today" without
+  // inventing a number. Older sample-data payloads don't include this; we
+  // fall back to domain_count when it's absent.
+  total_candidates_evaluated?: number;
 }
 
 type Verdict = 'Clean' | 'Promising' | 'Caution';
@@ -56,6 +62,15 @@ const lastUpdatedLabel = isPreview
   : new Date(payload.generated_at).toUTCString().replace('GMT', 'UTC');
 
 const tldsInData = Array.from(new Set(domains.map((d) => d.tld))).sort();
+
+// Total candidates evaluated today (post-lexical, pre-publication-floor).
+// Pipeline writes this as `total_candidates_evaluated`; older sample-data
+// payloads don't have it and fall back to the rendered domain count. The
+// caption text uses this for the "of N candidates evaluated today" copy
+// — honest reporting that the daily list is filtered down from a larger pool.
+const totalEvaluated = (!isPreview && payload.total_candidates_evaluated)
+  ? payload.total_candidates_evaluated
+  : domains.length;
 
 // --- Display helpers ----------------------------------------------------------
 
@@ -151,7 +166,9 @@ const verdictClass = (verdict: Verdict) => {
         )}
       </div>
       <p class="mt-2 text-sm text-stone-600">
-        <span data-result-count>Showing {domains.length} of {domains.length} domains</span>
+        <span data-result-count data-total-evaluated={totalEvaluated}>
+          Showing {domains.length} of {totalEvaluated.toLocaleString('en-US')} candidates evaluated today
+        </span>
         <span class="text-stone-400"> • </span>
         <span>
           Last updated: <span data-last-updated>{lastUpdatedLabel}</span>
@@ -194,8 +211,18 @@ const verdictClass = (verdict: Verdict) => {
     </div>
   </div>
 
+  {domains.length === 0 && !isPreview && (
+    <div class="rounded-lg border border-stone-200 bg-white px-6 py-12 text-center shadow-sm">
+      <p class="text-base font-medium text-ink">No domains met our quality bar today.</p>
+      <p class="mt-2 text-sm text-stone-600">
+        We evaluated {totalEvaluated.toLocaleString('en-US')} candidates and none passed the score and
+        completeness thresholds. Check back tomorrow.
+      </p>
+    </div>
+  )}
+
   <!-- Desktop / tablet table -->
-  <div class="hidden md:block overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+  <div class:list={["hidden md:block overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm", domains.length === 0 && !isPreview ? "md:!hidden" : ""]}>
     <table class="w-full text-sm" data-domain-table>
       <thead class="bg-stone-50 text-stone-600">
         <tr>
@@ -334,7 +361,7 @@ const verdictClass = (verdict: Verdict) => {
   </div>
 
   <!-- Mobile card layout -->
-  <ul class="md:hidden space-y-3" data-card-list>
+  <ul class:list={["md:hidden space-y-3", domains.length === 0 && !isPreview ? "!hidden" : ""]} data-card-list>
     {
       domains.map((d, i) => {
         const verdict = verdictFromScore(d.score);
@@ -554,7 +581,12 @@ const verdictClass = (verdict: Verdict) => {
     });
 
     if (resultCount) {
-      resultCount.textContent = `Showing ${visible} of ${totalCount} domains`;
+      // Total-evaluated comes from the data attribute set in Astro markup
+      // (the count of candidates that entered enrichment today, not just
+      // those rendered in the table). Falls back to the table row count
+      // when the JSON payload didn't include the field.
+      const totalEvaluated = Number(resultCount.getAttribute('data-total-evaluated') ?? totalCount);
+      resultCount.textContent = `Showing ${visible} of ${totalEvaluated.toLocaleString('en-US')} candidates evaluated today`;
     }
     emptyTable?.classList.toggle('hidden', visible !== 0);
     emptyCards?.classList.toggle('hidden', visible !== 0);

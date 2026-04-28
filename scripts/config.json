@@ -53,6 +53,8 @@
   },
   "max_candidates_for_enrichment": 1000,
   "max_candidates_for_publication": 300,
+  "publish_min_score": 30,
+  "publish_min_enrichment_completeness": 0.50,
   "enrichment_time_budget_seconds": 2100,
   "registrars": [
     {

@@ -1,31 +1,37 @@
 """Write the daily JSON contract consumed by the Astro frontend.
 
 The site reads `src/data/daily-domains.json`. The shape is locked in
-PLAN.md Principle 5 with one schema migration applied 2026-04-27 evening:
-the single `affiliate_link` string was replaced by a `registrars` array.
+PLAN.md Principle 5 with two schema migrations applied:
+  - 2026-04-27 evening: single `affiliate_link` → `registrars[]` array
+  - 2026-04-28 evening: added `total_candidates_evaluated` (top-level) so
+    the frontend can render "Showing N of M candidates evaluated today"
+    without inventing a count.
 
 Output shape:
     {
         "generated_at": "2026-04-27T06:00:00Z",
-        "domain_count": 487,
+        "domain_count": 47,                   # passed all filters AND quality floor
+        "total_candidates_evaluated": 1000,   # entered enrichment phase
         "domains": [
             {
-                "name": "example.com",
-                "tld": "com",
-                "dropped_date": "2026-04-26",
-                "wayback_snapshots": 142,
-                "wayback_last_snapshot": "2024-08-15",
-                "open_page_rank": 3.7,
-                "cert_history": true,
-                "previous_registrar": "GoDaddy",
-                "score": 78,
-                "registrars": [
-                    {"name": "Namecheap", "url": "https://namecheap.pxf.io/..."},
-                    {"name": "NameSilo",  "url": "https://www.namesilo.com/..."}
-                ]
+                "name": "example.com", "tld": "com", "dropped_date": "2026-04-26",
+                "wayback_snapshots": 142, "wayback_last_snapshot": "2024-08-15",
+                "open_page_rank": 3.7, "cert_history": true,
+                "previous_registrar": "GoDaddy", "score": 78,
+                "registrars": [{"name": "Namecheap", "url": "https://..."}, ...]
             }
         ]
     }
+
+Quality floor (added 2026-04-28 in response to day-3 publishing 300 random-
+letter domains with mean score 12.1):
+  - publish_min_score                       — drop candidates below this
+  - publish_min_enrichment_completeness     — drop candidates with too few
+                                               enrichment fields populated
+                                               (fraction in [0.0, 1.0])
+
+The floor is applied BEFORE the publication cap, so the cap is still a
+CEILING (never pads with weak rows) and the floor is the lower bound.
 
 The registrars list comes from config.registrars and preserves order.
 The {name} placeholder in each `link_template` is substituted with the
@@ -34,9 +40,8 @@ URL contains literal `%3D` (`=`) and similar percent-encoded characters
 that `.format()` would either error on or mishandle as positional refs.
 
 `write_output(...)` takes already-scored, already-sorted candidates and:
-- caps at config.max_candidates_for_publication (CEILING, not a quota — if
-  fewer survived, we publish all of them; we never pad the list to hit the
-  cap with weak candidates).
+- applies the quality floor (publish_min_score, publish_min_enrichment_completeness)
+- caps at config.max_candidates_for_publication (still a CEILING)
 - builds each candidate's registrars list from config.registrars
 - projects each candidate to ONLY the contract fields (no internal
   enrichment metadata leaks into the public JSON)
@@ -66,6 +71,18 @@ CONTRACT_FIELDS = (
     "previous_registrar",
     "score",
     "registrars",
+)
+
+# Enrichment fields used to compute completeness ratio. A candidate's
+# completeness = (count of these fields that are not null) / len(this tuple).
+# Excludes pipeline-mandatory fields (name, tld, dropped_date, score) which
+# are never null in valid candidates.
+_ENRICHMENT_FIELDS_FOR_COMPLETENESS = (
+    "wayback_snapshots",
+    "wayback_last_snapshot",
+    "open_page_rank",
+    "cert_history",
+    "previous_registrar",
 )
 
 
@@ -104,31 +121,110 @@ def _project(candidate: dict, registrars_config: list[dict]) -> dict:
     }
 
 
+def _enrichment_completeness(candidate: dict) -> float:
+    """Fraction in [0.0, 1.0] of enrichment fields that are populated.
+    'Populated' means: key present AND value not None. Empty string and 0
+    count as populated (they ARE data — just zero / empty)."""
+    populated = sum(
+        1 for f in _ENRICHMENT_FIELDS_FOR_COMPLETENESS if candidate.get(f) is not None
+    )
+    return populated / len(_ENRICHMENT_FIELDS_FOR_COMPLETENESS)
+
+
+def apply_quality_floor(
+    candidates: list[dict],
+    config: dict,
+) -> tuple[list[dict], dict[str, int]]:
+    """Drop candidates below the configured score / completeness thresholds.
+
+    Returns (survivors, rejection_counts). The thresholds come from config:
+        publish_min_score                          (default 30)
+        publish_min_enrichment_completeness        (default 0.50, fraction)
+
+    Either threshold = 0 (or absent) means "no floor on this dimension."
+
+    A candidate is REJECTED if EITHER threshold fails — both must pass.
+    """
+    min_score = float(config.get("publish_min_score", 0))
+    min_completeness = float(config.get("publish_min_enrichment_completeness", 0.0))
+
+    survivors: list[dict] = []
+    rejected_score = 0
+    rejected_completeness = 0
+
+    for c in candidates:
+        score = float(c.get("score", 0))
+        if score < min_score:
+            rejected_score += 1
+            continue
+        completeness = _enrichment_completeness(c)
+        if completeness < min_completeness:
+            rejected_completeness += 1
+            continue
+        survivors.append(c)
+
+    counts = {
+        "rejected_score": rejected_score,
+        "rejected_completeness": rejected_completeness,
+        "kept": len(survivors),
+    }
+    return survivors, counts
+
+
 def build_payload(
     candidates: list[dict],
     config: dict,
     *,
     generated_at: datetime | None = None,
+    total_evaluated: int | None = None,
 ) -> dict:
     """Build the final JSON payload (does not write to disk).
 
+    Pipeline:
+      1. Apply quality floor (score + completeness)
+      2. Cap at max_candidates_for_publication (CEILING — never pads)
+      3. Project to contract fields
+
+    `total_evaluated` is the count of candidates that entered enrichment
+    (post-lexical, post-cap-trim). It's included in the payload so the
+    frontend can render "Showing N of M candidates evaluated today"
+    without making up a number.
+
     Cap precedence: max_candidates_for_publication wins; max_candidates_per_day
-    kept as a fallback so older configs / tests still parse. The cap is a
-    CEILING — if `candidates` has fewer entries than the cap, all are emitted.
+    kept as a fallback so older configs / tests still parse.
     """
     cap = int(
         config.get("max_candidates_for_publication")
         or config.get("max_candidates_per_day", 500)
     )
+
+    # Stage 1: quality floor
+    quality_kept, quality_counts = apply_quality_floor(candidates, config)
+    if quality_counts["rejected_score"] or quality_counts["rejected_completeness"]:
+        logger.info(
+            "Quality floor: kept %d, rejected %d (score) + %d (completeness) of %d input",
+            quality_counts["kept"],
+            quality_counts["rejected_score"],
+            quality_counts["rejected_completeness"],
+            len(candidates),
+        )
+
+    # Stage 2: publication cap (CEILING)
+    capped = quality_kept[:cap]
+
+    # Stage 3: project + assemble
     registrars_config = config.get("registrars") or []
-    capped = candidates[:cap]
     domains = [_project(c, registrars_config) for c in capped]
     when = (generated_at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return {
+
+    payload: dict = {
         "generated_at": when,
         "domain_count": len(domains),
         "domains": domains,
     }
+    if total_evaluated is not None:
+        payload["total_candidates_evaluated"] = int(total_evaluated)
+    return payload
 
 
 def write_output(
@@ -137,12 +233,15 @@ def write_output(
     output_path: str | Path | None = None,
     *,
     generated_at: datetime | None = None,
+    total_evaluated: int | None = None,
 ) -> Path:
     """Build the payload and write it atomically. Returns the written path."""
     target = Path(output_path or config.get("output_path", "src/data/daily-domains.json"))
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    payload = build_payload(candidates, config, generated_at=generated_at)
+    payload = build_payload(
+        candidates, config, generated_at=generated_at, total_evaluated=total_evaluated,
+    )
 
     fd, tmp_name = tempfile.mkstemp(
         prefix=target.name + ".", dir=str(target.parent), suffix=".tmp"
