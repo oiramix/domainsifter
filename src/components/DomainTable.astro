@@ -221,8 +221,15 @@ const verdictClass = (verdict: Verdict) => {
     </div>
   )}
 
-  <!-- Desktop / tablet table -->
-  <div class:list={["hidden md:block overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm", domains.length === 0 && !isPreview ? "md:!hidden" : ""]}>
+  <!-- Desktop / tablet table.
+       NOTE: NOT using overflow-hidden here. The popover for the last row
+       anchors `top-full` (below its trigger) and would be clipped against
+       the table wrapper's bottom edge if overflow were hidden. The rounded
+       corners are still drawn via `rounded-lg` + `border`; the visual
+       penalty for omitting overflow-hidden is that table cells at the
+       extreme corners square slightly inside the border radius, which is
+       imperceptible at this corner size. -->
+  <div class:list={["hidden md:block rounded-lg border border-stone-200 bg-white shadow-sm", domains.length === 0 && !isPreview ? "md:!hidden" : ""]}>
     <table class="w-full text-sm" data-domain-table>
       <thead class="bg-stone-50 text-stone-600">
         <tr>
@@ -325,7 +332,7 @@ const verdictClass = (verdict: Verdict) => {
                     role="menu"
                     aria-label={`Register ${d.name} at`}
                     hidden
-                    class="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-10 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap w-max"
+                    class="absolute right-0 top-full mt-1 z-20 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1.5 shadow-xl whitespace-nowrap w-max"
                   >
                     {d.registrars.map((r) => {
                       const logo = REGISTRAR_LOGOS[r.name];
