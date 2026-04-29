@@ -71,6 +71,11 @@ CONTRACT_FIELDS = (
     "previous_registrar",
     "score",
     "registrars",
+    # Availability validation fields (added 2026-04-29).
+    # Optional in the published payload — frontend can render or ignore.
+    "rdap_status",
+    "rdap_expiration",
+    "availability_verified_at",
 )
 
 # Enrichment fields used to compute completeness ratio. A candidate's
@@ -118,6 +123,9 @@ def _project(candidate: dict, registrars_config: list[dict]) -> dict:
         "previous_registrar": candidate.get("previous_registrar"),
         "score": candidate.get("score", 0),
         "registrars": _build_registrars(name, registrars_config),
+        "rdap_status": candidate.get("rdap_status") or [],
+        "rdap_expiration": candidate.get("rdap_expiration"),
+        "availability_verified_at": candidate.get("availability_verified_at"),
     }
 
 

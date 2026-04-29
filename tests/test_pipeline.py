@@ -246,6 +246,69 @@ def test_enrich_all_propagates_spam_check_config_error(monkeypatch, cfg):
         pipeline.enrich_all(cands, cfg)
 
 
+# --- validate_availability ---------------------------------------------------
+
+
+def test_validate_availability_keeps_only_404_responders(monkeypatch, cfg):
+    """is_available=True survives; False and None are rejected."""
+    def fake_check(domain, _config):
+        if domain == "free.com":
+            return {
+                "is_available": True, "rdap_http": 404,
+                "rdap_status": [], "rdap_expiration": None,
+                "previous_registrar": None,
+            }
+        if domain == "owned.com":
+            return {
+                "is_available": False, "rdap_http": 200,
+                "rdap_status": ["client hold"], "rdap_expiration": "2027-01-01",
+                "previous_registrar": "Namecheap",
+            }
+        return {  # transport failure / unknown
+            "is_available": None, "rdap_http": None,
+            "rdap_status": [], "rdap_expiration": None,
+            "previous_registrar": None,
+        }
+
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+
+    cands = [
+        {"name": "free.com", "score": 75},
+        {"name": "owned.com", "score": 60},
+        {"name": "broken.tld", "score": 50},
+    ]
+    kept = pipeline.validate_availability(cands, cfg)
+    assert [c["name"] for c in kept] == ["free.com"]
+    # The kept candidate has all RDAP fields merged on.
+    assert kept[0]["is_available"] is True
+    assert kept[0]["rdap_http"] == 404
+    assert "availability_verified_at" in kept[0]
+
+
+def test_validate_availability_respects_budget(monkeypatch, cfg):
+    """Budget=0 means we don't make any RDAP calls; everything rejected."""
+    cfg = {**cfg, "availability_budget_seconds": 0.0}
+    calls = []
+
+    def fake_check(domain, _config):
+        calls.append(domain)
+        return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                "rdap_expiration": None, "previous_registrar": None}
+
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+
+    cands = [{"name": f"d{i}.com", "score": 50} for i in range(5)]
+    kept = pipeline.validate_availability(cands, cfg)
+    assert kept == []
+    assert calls == []  # budget exhausted before first call
+
+
+def test_validate_availability_empty_input_short_circuits():
+    assert pipeline.validate_availability([], {}) == []
+
+
 def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cfg, tmp_path):
     """Trace which filtering stages run in what order. Inputs are crafted so:
        - "great.com" survives both filter passes (real word)
@@ -290,6 +353,16 @@ def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cf
         return cands
 
     monkeypatch.setattr(pipeline, "enrich_all", fake_enrich_all)
+
+    # Stub RDAP availability — every survivor is "available" so we can
+    # observe what reached the publication stage.
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(
+        rdap_mod, "check_availability",
+        lambda d, _c: {"is_available": True, "rdap_http": 404,
+                       "rdap_status": [], "rdap_expiration": None,
+                       "previous_registrar": None},
+    )
 
     rc = pipeline.main(["--config", str(cfg_path)])
     assert rc == 0
@@ -352,6 +425,15 @@ def test_main_happy_path_writes_output(monkeypatch, cfg, tmp_path):
 
     monkeypatch.setattr(pipeline, "enrich_all", fake_enrich_all)
 
+    # Both candidates are "available" per RDAP so they reach the output.
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(
+        rdap_mod, "check_availability",
+        lambda d, _c: {"is_available": True, "rdap_http": 404,
+                       "rdap_status": [], "rdap_expiration": None,
+                       "previous_registrar": None},
+    )
+
     rc = pipeline.main(["--config", str(cfg_path)])
     assert rc == 0
     written = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
@@ -363,6 +445,10 @@ def test_main_happy_path_writes_output(monkeypatch, cfg, tmp_path):
         reg_names = [r["name"] for r in d["registrars"]]
         assert reg_names == ["Namecheap", "NameSilo"]
         assert any(d["name"] in r["url"] for r in d["registrars"])
+        # Availability fields land in the published payload.
+        assert "rdap_status" in d
+        assert "rdap_expiration" in d
+        assert "availability_verified_at" in d
 
 
 def test_main_propagates_spam_check_config_error(monkeypatch, cfg, tmp_path):

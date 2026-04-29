@@ -536,3 +536,59 @@ Schema is still locked (PLAN.md Principle 5) — this is a coordinated migration
 ### Sample data domain-name plausibility
 
 The 20 invented names are creative compounds (color/material + nature noun) chosen to be plausibly unregistered. Examples: amberkite, frostledge, paperhalo, brassflint, silverbrook, jadeloom, lichenpath, thistlecove, opalstride, vellumstone, duskforge. CLAUDE.md rule #1 was the constraint: never use real registered domains in sample/test data. Quick spot-checks during selection — these aren't household names and don't show up in obvious commercial contexts.
+
+---
+
+## Critical bug fix: zone-diff "drops" weren't actually available (2026-04-29)
+
+### Bug
+
+The pipeline computed candidates as `zone(yesterday) − zone(today)` and treated absence-from-zone as proof of availability. That assumption is wrong. RDAP audit of 21 currently-published candidates (10 top-scored, 11 random) found the real distribution:
+
+| Bucket | Count | Pct |
+|---|---|---|
+| Truly available (HTTP 404) | 1 | **5%** |
+| Redemption period (lapsed but recoverable) | 16 | 76% |
+| Owned with future expiration | 4 | 19% |
+
+`gimid.dev` was on the published list with future expiration `2027-04-25`, recently auto-renewed `2026-04-29` (one day before the audit). It was never available. So were 19 of the other 20 sampled.
+
+Domains drop out of zone files for many reasons that don't make them registerable: clientHold/serverHold, redemption period (the most common — old owner has 30 days to recover at premium), DNSSEC re-signing, registrar transfer churn. None of these mean "this domain is now free to register."
+
+### Fix
+
+Authoritative RDAP availability check added as the FINAL pipeline stage. Only HTTP 404 from the registry counts as "available" — everything else (HTTP 200 with any status, transport failures, breaker-open) is rejected.
+
+**Pipeline order (new):**
+```
+zone diff → structural → lexical → cap → enrich → post-filter → score → VALIDATE_AVAILABILITY → write
+```
+
+**Files changed:**
+- `scripts/enrichment/rdap.py` — added `check_availability(domain, config) -> dict` returning `{is_available: True|False|None, rdap_status, rdap_expiration, previous_registrar, rdap_http}`. Reuses the existing IANA bootstrap cache, per-host throttle, and circuit breaker. HTTP 404 → True; HTTP 200 → False; anything else → None.
+- `scripts/pipeline.py` — removed `rdap` from `ENRICHMENT_MODULES` (it's now run as a dedicated post-score stage instead). Added `validate_availability(candidates, config)` that walks scored candidates in order, calls `check_availability`, and keeps only `is_available=True`. Honors `availability_budget_seconds` (default 600s) — untouched candidates default to None=REJECT, fail-closed.
+- `scripts/output.py` — added `rdap_status`, `rdap_expiration`, `availability_verified_at` to `CONTRACT_FIELDS` and `_project()`. These are optional for the frontend (will render as null/empty when absent).
+- `scripts/config.json` — added `availability_budget_seconds: 600`.
+- `tests/enrichment/test_rdap.py` — 10 new tests for `check_availability` covering the full HTTP code matrix (404/200-owned/200-redemption/5xx/429-persistent/connection-error/bootstrap-fail/unknown-tld/breaker-open) plus `registrar expiration` fallback.
+- `tests/test_pipeline.py` — 3 new tests for `validate_availability` (keep True / reject False+None, budget=0 short-circuits, empty input). Existing `main()` integration tests stub `rdap.check_availability` to return True so survivors reach the output.
+
+### Why HTTP 404 is the only acceptable signal
+
+The RDAP audit showed status flags overlap heavily — `pending delete` is paired with `redemption period` in real responses, so the "pending delete = drops in 5 days" rule from the spec doesn't apply (those domains are still in redemption). The only unambiguous registry signal is "I have no record of this name," which is HTTP 404. Any HTTP 200 means the registry is asserting that *someone* owns this name — even if the name is in a transitional state.
+
+### Why None defaults to REJECT
+
+Transport failures, persistent 429s, an open circuit breaker, or an unknown-TLD bootstrap miss all return `is_available=None`. Treating unknown as REJECT (not ACCEPT) means we under-publish during infrastructure trouble rather than over-publish stale-state guesses. The False-vs-None distinction stays in the logs as diagnostic signal: many None values means our RDAP path is degraded; many False means the zone-diff signal itself is just noisy.
+
+### Expected published count after fix
+
+The audit yielded 1/21 (~5%) actually available. With ~300 candidates reaching the score stage today, expect 5–25 in the post-fix published list — possibly fewer. **A list of 5 actually-available domains is correct; a list of 300 owned ones isn't.** Site copy may need tuning later but is out of scope for this fix.
+
+### Phase 3 verification
+
+Ran `check_availability()` (the new code path) against the existing published list:
+- 10/10 currently-published domains correctly identified as `is_available=False` (would be rejected).
+- 2/2 known-available controls (`naccd.site` from the audit + a synthetic non-existent domain) correctly identified as `is_available=True`.
+- All HTTP codes, expiration dates, and status flags extracted correctly.
+
+The user has paused the GitHub Actions cron; manual workflow run + new daily-domains.json verification still pending the operator's re-enable.

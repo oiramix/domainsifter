@@ -21,9 +21,15 @@ Order of operations:
        Candidates not started by deadline are skipped, NOT a failure mode.
     9. post-enrichment filter   (strict_spam_check=True)
    10. score + sort
-   11. publication cap          (max_candidates_for_publication)
+   11. validate_availability    (RDAP per-candidate; the AUTHORITATIVE check)
+                                — only HTTP 404 is "available"; everything
+                                  else (owned, redemption, hold, transport
+                                  failure) is rejected. Added 2026-04-29
+                                  after audit found ~95% of zone-diff
+                                  "drops" weren't actually available.
+   12. publication cap          (max_candidates_for_publication)
                                 — CEILING, not quota; never pad with weak
-   12. write_output → src/data/daily-domains.json
+   13. write_output → src/data/daily-domains.json
 
 Logging: each module gets its own logger; root config writes INFO+ to stdout
 so GitHub Actions surfaces everything in the run log.
@@ -67,7 +73,11 @@ ENRICHMENT_MODULES = (
     "surbl",
     "spamhaus",
     "crtsh",
-    "rdap",
+    # `rdap` is intentionally NOT in this list any more. It's now run as a
+    # dedicated post-score availability check (validate_availability), where
+    # HTTP 404 is the only signal that proves "actually registerable." The
+    # previous behaviour — running rdap during enrichment for `previous_registrar`
+    # display only — let owned domains slip through to publication.
 )
 
 
@@ -282,6 +292,80 @@ def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
     return enriched
 
 
+def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
+    """RDAP-validate each candidate; keep only the ones registry says are
+    actually available (HTTP 404).
+
+    Walks the input in score order (caller is responsible for sorting first).
+    For each candidate, calls `rdap.check_availability(...)` and merges the
+    returned fields onto the candidate dict so downstream stages can emit
+    them in the JSON payload.
+
+    Decision per candidate:
+        is_available = True  → KEEP
+        is_available = False → REJECT (owned / redemption / on-hold)
+        is_available = None  → REJECT (transport failure / breaker / etc.)
+
+    Why None defaults to REJECT:
+        Better to under-publish than to publish a domain we can't prove is
+        registerable. The False-vs-None distinction stays in the logs as
+        diagnostic signal: many None values means our RDAP path is degraded
+        (rate limits, bootstrap unreachable); many False values means the
+        zone-diff signal itself is just noisy.
+
+    Wall-clock budget: stops calling RDAP after `availability_budget_seconds`
+    (default 600). Untouched candidates get is_available=None and are
+    rejected. This is the same fail-closed posture used elsewhere.
+
+    Sets `availability_verified_at` (ISO 8601 Z) on every candidate that
+    actually had an RDAP attempt — useful for downstream debugging and
+    surfacing "checked at HH:MM" in the JSON payload.
+    """
+    from datetime import datetime, timezone
+
+    from scripts.enrichment import rdap
+
+    if not candidates:
+        return list(candidates)
+
+    budget = float(config.get("availability_budget_seconds", 600))
+    deadline = time.monotonic() + budget
+
+    kept: list[dict] = []
+    counts = {"available": 0, "not_available": 0, "unknown": 0, "skipped_budget": 0}
+
+    for cand in candidates:
+        if time.monotonic() >= deadline:
+            counts["skipped_budget"] += 1
+            cand["is_available"] = None
+            continue
+
+        result = rdap.check_availability(cand["name"], config)
+        cand.update(result)
+        cand["availability_verified_at"] = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+
+        if result.get("is_available") is True:
+            counts["available"] += 1
+            kept.append(cand)
+        elif result.get("is_available") is False:
+            counts["not_available"] += 1
+        else:
+            counts["unknown"] += 1
+
+    logger.info(
+        "Availability check: %d available, %d not available, %d unknown, %d skipped (budget) — kept %d / %d",
+        counts["available"],
+        counts["not_available"],
+        counts["unknown"],
+        counts["skipped_budget"],
+        len(kept),
+        len(candidates),
+    )
+    return kept
+
+
 def _trim_for_enrichment(candidates: list[dict], cap: int) -> list[dict]:
     """Safety net: if more candidates survived the lexical filter than we're
     willing to enrich, take the shortest names (proxy for higher quality)."""
@@ -351,12 +435,18 @@ def main(argv: list[str] | None = None) -> int:
     # Stage 5: score + sort
     score.score_candidates(survivors, config)
 
-    # Stage 6: write — output.build_payload applies the quality floor
+    # Stage 6: AUTHORITATIVE availability check via RDAP. This is the gate
+    # that prevents publishing owned/in-redemption domains. Only HTTP 404
+    # passes through. Walking in score order keeps the best candidates at
+    # the front of the list when the budget is tight.
+    available = validate_availability(survivors, config)
+
+    # Stage 7: write — output.build_payload applies the quality floor
     # (publish_min_score + publish_min_enrichment_completeness) and the
     # publication cap. total_evaluated lands in the payload so the
     # frontend can render "Showing N of M candidates evaluated today".
     output.write_output(
-        survivors,
+        available,
         config,
         output_path=args.output,
         total_evaluated=total_evaluated,
@@ -364,8 +454,8 @@ def main(argv: list[str] | None = None) -> int:
 
     publication_cap = int(config.get("max_candidates_for_publication", 300))
     logger.info(
-        "Pipeline complete: %d post-enrich survivors, %d total evaluated, cap=%d",
-        len(survivors), total_evaluated, publication_cap,
+        "Pipeline complete: %d post-enrich, %d available, %d total evaluated, cap=%d",
+        len(survivors), len(available), total_evaluated, publication_cap,
     )
     return 0
 
