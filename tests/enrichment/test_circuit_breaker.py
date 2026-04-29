@@ -228,6 +228,8 @@ def test_throttle_first_acquire_does_not_sleep():
 
 
 def test_throttle_second_acquire_waits_remaining_interval():
+    """With jitter disabled (jitter_factor_range=(1,1)), the wait is exactly
+    the remaining nominal interval — deterministic for sleep-amount asserts."""
     from scripts.enrichment._circuit_breaker import HostThrottle
     throttle = HostThrottle()
     sleeps: list[float] = []
@@ -238,14 +240,41 @@ def test_throttle_second_acquire_waits_remaining_interval():
         fake_clock_now[0] += s  # simulate time advancing during sleep
 
     # First acquire — no wait, slot taken at t=100.0
-    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+    throttle.acquire("a.com", 1.0, jitter_factor_range=(1.0, 1.0),
                      clock=lambda: fake_clock_now[0], sleep=fake_sleep)
     # 0.3s elapses
     fake_clock_now[0] = 100.3
     # Second acquire — should wait 0.7s to reach 1.0s interval
-    throttle.acquire("a.com", 1.0, jitter_seconds=0,
+    throttle.acquire("a.com", 1.0, jitter_factor_range=(1.0, 1.0),
                      clock=lambda: fake_clock_now[0], sleep=fake_sleep)
     assert sleeps and abs(sleeps[0] - 0.7) < 0.001
+
+
+def test_throttle_jitter_varies_actual_interval():
+    """Multiplicative jitter — actual effective interval is 75-125% of the
+    configured value. Sample many acquires and assert the spread."""
+    import random as _random
+    from scripts.enrichment._circuit_breaker import HostThrottle
+    throttle = HostThrottle()
+    _random.seed(42)  # deterministic for the assertion
+    sleeps: list[float] = []
+    fake_clock_now = [100.0]
+
+    def fake_sleep(s):
+        sleeps.append(s)
+        fake_clock_now[0] += s
+
+    # Prime the slot.
+    throttle.acquire("a.com", 1.0, jitter_factor_range=(0.75, 1.25),
+                     clock=lambda: fake_clock_now[0], sleep=fake_sleep)
+    # 100 acquires back-to-back; each should sleep ~ effective_interval
+    # (jitter-scaled) since the clock only advances via fake_sleep.
+    for _ in range(100):
+        throttle.acquire("a.com", 1.0, jitter_factor_range=(0.75, 1.25),
+                         clock=lambda: fake_clock_now[0], sleep=fake_sleep)
+    assert all(0.74 <= s <= 1.26 for s in sleeps), f"out-of-range sleep: {sleeps}"
+    # And there's actual variance (not all identical).
+    assert max(sleeps) - min(sleeps) > 0.1
 
 
 def test_throttle_separate_hosts_dont_block_each_other():

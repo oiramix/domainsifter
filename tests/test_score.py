@@ -60,15 +60,62 @@ def test_score_shorter_apex_scores_higher():
     assert short > long_name
 
 
-def test_score_treats_missing_fields_as_zero_signal():
-    bare = {"name": "ab.com"}
-    full_zero = {
+def test_full_data_score():
+    """All four components populated — score is the same as before the
+    null-aware refactor, since populated weight sum equals total weight."""
+    cand = {
         "name": "ab.com",
-        "wayback_snapshots": 0,
-        "open_page_rank": 0.0,
-        "cert_history": False,
+        "wayback_snapshots": 100,
+        "open_page_rank": 5.0,
+        "cert_history": True,
     }
-    assert score.score_candidate(bare, CONFIG) == score.score_candidate(full_zero, CONFIG)
+    s = score.score_candidate(cand, CONFIG)
+    # Compute expected via the same formula manually:
+    #   wayback: log10(101)/3 ≈ 0.667 × 0.3 = 0.2002
+    #   opr: 0.5 × 0.4 = 0.2
+    #   cert: 1.0 × 0.2 = 0.2
+    #   length: 1.0 × 0.1 = 0.1
+    # weighted=0.7002, total_weight=1.0, raw=0.7002, score=70
+    assert s == 70
+
+
+def test_partial_data_score():
+    """wayback null, OPR populated — denominator excludes wayback's weight,
+    so the score reflects the populated components rather than being
+    capped by the missing one."""
+    cand = {
+        "name": "ab.com",
+        "wayback_snapshots": None,   # missing — excluded
+        "open_page_rank": 5.0,        # populated → 0.5
+        "cert_history": True,         # populated → 1.0
+    }
+    s = score.score_candidate(cand, CONFIG)
+    # Expected:
+    #   opr: 0.5 × 0.4 = 0.2
+    #   cert: 1.0 × 0.2 = 0.2
+    #   length: 1.0 × 0.1 = 0.1
+    # weighted=0.5, total_weight=0.4+0.2+0.1=0.7, raw=0.714, score=71
+    assert s == 71
+    # And it is HIGHER than the same candidate scored as if wayback were 0
+    # (the old behaviour would have given a lower score).
+    cand_with_zero = {**cand, "wayback_snapshots": 0}
+    s_zero = score.score_candidate(cand_with_zero, CONFIG)
+    assert s > s_zero, "null wayback should score better than zero wayback"
+
+
+def test_no_data_returns_none():
+    """No name and no enrichment fields — degenerate input. score_candidate
+    returns None and score_candidates drops the row."""
+    bare = {"name": ""}  # empty name → length component absent too
+    assert score.score_candidate(bare, CONFIG) is None
+
+    # And the pipeline-level entry point drops unscoreable rows.
+    cands = [
+        bare,
+        {"name": "good.com", "wayback_snapshots": 100, "open_page_rank": 5.0, "cert_history": True},
+    ]
+    result = score.score_candidates(cands, CONFIG)
+    assert [c["name"] for c in result] == ["good.com"]
 
 
 def test_score_returns_integer_in_zero_to_hundred():
@@ -101,10 +148,12 @@ def test_score_candidates_sorts_by_score_descending():
 
 
 def test_score_candidates_breaks_ties_by_name():
+    # Same-length apex labels so the length-only signal scores all three
+    # identically; tie-break must fall to alphabetical name ordering.
     cands = [
-        {"name": "zeta.com"},
-        {"name": "alpha.com"},
-        {"name": "mike.com"},
+        {"name": "zzzz.com"},
+        {"name": "aaaa.com"},
+        {"name": "mmmm.com"},
     ]
     result = score.score_candidates(cands, CONFIG)
-    assert [c["name"] for c in result] == ["alpha.com", "mike.com", "zeta.com"]
+    assert [c["name"] for c in result] == ["aaaa.com", "mmmm.com", "zzzz.com"]

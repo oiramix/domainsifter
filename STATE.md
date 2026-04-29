@@ -592,3 +592,47 @@ Ran `check_availability()` (the new code path) against the existing published li
 - All HTTP codes, expiration dates, and status flags extracted correctly.
 
 The user has paused the GitHub Actions cron; manual workflow run + new daily-domains.json verification still pending the operator's re-enable.
+
+---
+
+## Pipeline reorder + politeness pass (2026-04-30)
+
+### Problems observed in the 2026-04-29 cron run
+
+- **Wayback returned 503, crt.sh returned 502** within ~3 seconds of enrichment start; circuit breakers tripped repeatedly with consecutive_failures climbing past 12. End result: 95%+ of enriched candidates had `wayback_snapshots=null` and `cert_history=null`. Per-host throttling at 1.0s wasn't enough — 10 workers × 1 req/s/host produced a perfectly-clockwork pattern that rate-limited services treat as suspicious.
+- **Wasted enrichment**: only 10 of 952 enriched candidates were actually available per the new RDAP check. We burned ~7000 API calls (1000 candidates × 7 sources) on 942 owned/redemption domains that nobody could register anyway.
+
+### Architectural fix
+
+**Pipeline reordered so availability runs BEFORE enrichment.** The two problems shared a root cause: enrichment ran in the wrong position in the pipeline, on the wrong scale, with the wrong pacing.
+
+Before:
+```
+zone diff → structural → lexical → enrich (1000) → filter → score → availability → publish
+```
+
+After:
+```
+zone diff → structural → lexical → cap → AVAILABILITY (1000) → ENRICH (5-50) → filter → score → publish
+```
+
+With enrichment running on confirmed-available domains only (typically 5-50, not 1000), we have time to be polite. The pipeline now runs enrichment SEQUENTIALLY (1 worker, not 10) with much more generous per-host pacing and irregular timing.
+
+### Files changed
+
+- `scripts/pipeline.py` — main() reorder. `validate_availability` moved up to run after the eval-cap and before `enrich_all`. `total_evaluated` now reflects "submitted to availability check" (the dominant filter), not "submitted to enrichment". Added a CRITICAL log line when >50% of availability checks return unknown — a tripwire that says RDAP infrastructure itself is degraded and today's published list will be unusually small.
+- `scripts/enrichment/_circuit_breaker.py` — `HostThrottle.acquire()` now uses **multiplicative jitter**: each effective interval is `min_interval × random.uniform(0.75, 1.25)` so back-to-back requests don't form a deterministic clockwork pattern. Also rewrote the loop as a single-shot **reserve-then-sleep**: the previous polling loop suffered from floating-point cancellation (`(now + wait) - now ≠ wait`) and could stall in microsleeps. The new shape is simpler, race-free under the lock, and naturally serialises concurrent callers.
+- `scripts/config.json` — `max_concurrent_enrichments: 10 → 1` (sequential). Per-host intervals: Wayback `1.0 → 3.0`, crt.sh `1.0 → 3.0`, OPR `0.4 → 1.0`, RDAP `0.2 → 0.4`. `availability_budget_seconds: 600 → 1500` (now budgeting for ~1000 RDAP queries pre-enrichment, not ~300 post-enrichment).
+- `scripts/score.py` — null-aware normalization. A field with `None` is now excluded from BOTH the numerator and denominator: `score = sum(value × weight for populated) / sum(weight for populated)`. Previously, missing fields coerced to 0 and stayed in the denominator, which artificially capped the score for any domain with a flaky enrichment. A candidate with null Wayback but populated OPR+cert+length now scores on what's actually known. If ALL components are None (degenerate input), `score_candidate` returns None and `score_candidates` drops the row.
+- `tests/enrichment/test_circuit_breaker.py` — old exact-sleep-amount test now passes `jitter_factor_range=(1.0, 1.0)` for determinism. New `test_throttle_jitter_varies_actual_interval` asserts the 75-125% spread.
+- `tests/test_score.py` — replaced `test_score_treats_missing_fields_as_zero_signal` (enshrined the old wrong behaviour) with three tests per the spec: `test_full_data_score`, `test_partial_data_score`, `test_no_data_returns_none`. Updated tie-break test to use same-length apex labels (otherwise length-only signal differs and there's no tie).
+- `tests/test_pipeline.py` — added `test_main_skips_enrichment_for_unavailable_domains` asserting the new pipeline order architecturally (an unavailable domain must NOT reach `enrich_all`). Updated `test_main_propagates_spam_check_config_error` to mock `check_availability=True` so the test candidate flows through to the spam-check failure under test.
+
+### Expected behaviour with the new settings
+
+- ~1000 RDAP availability checks at 0.4s/host with jitter → ~400-600s (under the 1500s budget)
+- ~5-50 enrichments at sequential pace: each candidate needs ~3s Wayback + ~3s crt.sh + ~1s OPR + RDAP-already-cached + ~0s for blocklist DNS lookups ≈ 7-10s/candidate. 50 candidates × 10s = 500s = 8 minutes (well under the 35-minute enrichment budget)
+- Wayback and crt.sh circuit breakers should not trip in normal operation. Multiplicative jitter + much slower nominal rate + sequential dispatch removes the perfect-clockwork signal.
+- Score distribution should be meaningful again — top >40, median >20 — because partial enrichment no longer mathematically caps the score.
+
+286/286 tests passing. Cron is paused; manual workflow trigger needed to verify the new flow on real data.

@@ -56,7 +56,7 @@
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,
   "enrichment_time_budget_seconds": 2100,
-  "availability_budget_seconds": 600,
+  "availability_budget_seconds": 1500,
   "registrars": [
     {
       "name": "Namecheap",
@@ -78,13 +78,13 @@
   },
   "request_timeout_seconds": 10,
   "download_timeout_seconds": 120,
-  "max_concurrent_enrichments": 10,
+  "max_concurrent_enrichments": 1,
   "api_min_interval_seconds": {
-    "_doc": "Minimum interval between requests to each API host across all workers. Empirical/documented fair-use rates calibrated 2026-04-28. See scripts/enrichment/_circuit_breaker.py header for sources.",
-    "wayback": 1.0,
-    "crtsh": 1.0,
-    "open_page_rank": 0.4,
-    "rdap": 0.2
+    "_doc": "Minimum interval between requests to each API host. With max_concurrent_enrichments=1 (sequential) and multiplicative 0.75-1.25× jitter applied per call, actual rates are ~25% slower than the nominal value. Tightened 2026-04-30 after 503/502 storms with the previous 1.0s/0.4s/0.2s settings.",
+    "wayback": 3.0,
+    "crtsh": 3.0,
+    "open_page_rank": 1.0,
+    "rdap": 0.4
   },
   "output_path": "src/data/daily-domains.json"
 }

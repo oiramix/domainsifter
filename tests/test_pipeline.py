@@ -309,6 +309,61 @@ def test_validate_availability_empty_input_short_circuits():
     assert pipeline.validate_availability([], {}) == []
 
 
+def test_main_skips_enrichment_for_unavailable_domains(monkeypatch, cfg, tmp_path):
+    """Architectural assertion: availability check runs BEFORE enrichment.
+    A candidate marked is_available=False must NOT reach enrich_all."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(
+        pipeline,
+        "collect_drops",
+        lambda _cfg, _tok, today: [
+            {"name": "available.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "owned.com", "tld": "com", "dropped_date": today.isoformat()},
+        ],
+    )
+
+    from scripts.enrichment import rdap as rdap_mod
+    def fake_check(domain, _c):
+        if domain == "available.com":
+            return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                    "rdap_expiration": None, "previous_registrar": None}
+        return {"is_available": False, "rdap_http": 200,
+                "rdap_status": ["client hold"], "rdap_expiration": "2027-01-01",
+                "previous_registrar": "Acme"}
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+
+    enriched_names: list[str] = []
+
+    def fake_enrich_all(cands, _cfg):
+        for c in cands:
+            enriched_names.append(c["name"])
+            c.update({
+                "wayback_snapshots": 50, "wayback_last_snapshot": "2024-01-01",
+                "open_page_rank": 3.0, "cert_history": True,
+                "spam_flagged": False, "surbl_listed": False,
+                "spamhaus_listed": False,
+            })
+        return cands
+
+    monkeypatch.setattr(pipeline, "enrich_all", fake_enrich_all)
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+    # owned.com was rejected at availability stage; only available.com hit
+    # the (expensive) enrichment phase.
+    assert enriched_names == ["available.com"]
+    written = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    assert [d["name"] for d in written["domains"]] == ["available.com"]
+
+
 def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cfg, tmp_path):
     """Trace which filtering stages run in what order. Inputs are crafted so:
        - "great.com" survives both filter passes (real word)
@@ -463,7 +518,17 @@ def test_main_propagates_spam_check_config_error(monkeypatch, cfg, tmp_path):
     monkeypatch.setattr(
         pipeline,
         "collect_drops",
-        lambda _cfg, _tok, today: [{"name": "x.com", "tld": "com", "dropped_date": "2026-04-27"}],
+        lambda _cfg, _tok, today: [{"name": "great.com", "tld": "com", "dropped_date": "2026-04-27"}],
+    )
+
+    # Availability check now runs BEFORE enrichment — stub it so the
+    # candidate flows through to the spam_check failure we're testing.
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(
+        rdap_mod, "check_availability",
+        lambda d, _c: {"is_available": True, "rdap_http": 404,
+                       "rdap_status": [], "rdap_expiration": None,
+                       "previous_registrar": None},
     )
 
     from scripts.enrichment.spam_check import SpamCheckConfigError

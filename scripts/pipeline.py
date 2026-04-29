@@ -14,20 +14,31 @@ Order of operations:
                                 — punycode, length, all-numeric, keyword
     6. lexical filter           (lexical_filter.filter_candidates)
                                 — digit/vowel/entropy/repeats/pronounceability
-    7. enrichment safety cap    (max_candidates_for_enrichment)
-                                — sort by length asc, take top N
-    8. enrich each survivor concurrently within a wall-clock budget
-       (max_workers from config; budget from enrichment_time_budget_seconds).
-       Candidates not started by deadline are skipped, NOT a failure mode.
-    9. post-enrichment filter   (strict_spam_check=True)
-   10. score + sort
-   11. validate_availability    (RDAP per-candidate; the AUTHORITATIVE check)
+    7. evaluation safety cap    (max_candidates_for_enrichment)
+                                — sort by length asc, take top N. Caps the
+                                  RDAP availability check (next stage), not
+                                  the enrichment phase any more.
+    8. validate_availability    (RDAP per-candidate; the AUTHORITATIVE check)
                                 — only HTTP 404 is "available"; everything
                                   else (owned, redemption, hold, transport
-                                  failure) is rejected. Added 2026-04-29
-                                  after audit found ~95% of zone-diff
-                                  "drops" weren't actually available.
-   12. publication cap          (max_candidates_for_publication)
+                                  failure) is rejected. MOVED HERE 2026-04-30
+                                  from the post-score position because:
+                                    a) availability is cheap per call (one
+                                       RDAP query) vs enrichment (six API
+                                       calls per candidate). Doing it first
+                                       eliminates 95%+ of work upstream.
+                                    b) running enrichment on confirmed-
+                                       available domains only means we can
+                                       drop concurrency to 1 and pace much
+                                       more politely without blowing the
+                                       time budget.
+    9. enrich each survivor sequentially within a wall-clock budget
+       (max_workers=1 by default, budget from enrichment_time_budget_seconds).
+       Typical post-availability set is 5-50 candidates; pacing room is now
+       generous.
+   10. post-enrichment filter   (strict_spam_check=True)
+   11. score + sort             — null components excluded from normalization
+   12. publication cap          (max_candidates_for_publication, in build_payload)
                                 — CEILING, not quota; never pad with weak
    13. write_output → src/data/daily-domains.json
 
@@ -363,6 +374,19 @@ def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
         len(kept),
         len(candidates),
     )
+
+    # If >50% of attempts came back unknown, RDAP itself is degraded — this
+    # is a CRITICAL signal because availability is now the gate that decides
+    # what gets enriched at all. The pipeline continues (better fewer than
+    # wrong) but the operator should investigate.
+    attempts = counts["available"] + counts["not_available"] + counts["unknown"]
+    if attempts > 0 and counts["unknown"] / attempts > 0.5:
+        logger.critical(
+            "RDAP availability degraded: %d/%d (%.0f%%) returned unknown — "
+            "today's published list will be much smaller than usual",
+            counts["unknown"], attempts, 100.0 * counts["unknown"] / attempts,
+        )
+
     return kept
 
 
@@ -416,37 +440,44 @@ def main(argv: list[str] | None = None) -> int:
     # Stage 1: structural filter (cheap; pre-enrichment)
     structural_kept = filter_mod.filter_candidates_structural(drops, config)
 
-    # Stage 2: lexical filter (cheap; pre-enrichment)
+    # Stage 2: lexical filter (cheap; pre-network)
     lexical_kept = lexical_filter.filter_candidates(structural_kept, config)
 
-    # Safety net before paying for enrichment
-    enrich_cap = int(config.get("max_candidates_for_enrichment", 1000))
-    candidates_to_enrich = _trim_for_enrichment(lexical_kept, enrich_cap)
-    total_evaluated = len(candidates_to_enrich)
+    # Safety net before paying for ANY network calls. Caps the availability
+    # check below; with confirmed-available domains then flowing into
+    # enrichment, this also caps enrichment indirectly.
+    eval_cap = int(config.get("max_candidates_for_enrichment", 1000))
+    candidates_to_evaluate = _trim_for_enrichment(lexical_kept, eval_cap)
+    total_evaluated = len(candidates_to_evaluate)
 
-    # Stage 3: enrichment (with wall-clock budget)
-    enriched = enrich_all(candidates_to_enrich, config)
+    # Stage 3: AUTHORITATIVE availability check via RDAP — the gate that
+    # eliminates owned/in-redemption domains BEFORE we burn enrichment
+    # budget on them. Only HTTP 404 passes through. ~95% of zone-diff
+    # "drops" reject here on a typical day.
+    available = validate_availability(candidates_to_evaluate, config)
 
-    # Stage 4: post-enrichment filter
+    # Stage 4: enrichment (sequential, paced) — runs only on confirmed-
+    # available candidates. Set is typically small (5-50).
+    enriched = enrich_all(available, config)
+
+    # Stage 5: post-enrichment filter
     survivors = filter_mod.filter_candidates_post_enrichment(
         enriched, config, strict_spam_check=True
     )
 
-    # Stage 5: score + sort
+    # Stage 6: score + sort (null components excluded from normalization,
+    # so a domain with partial enrichment scores on what's actually populated
+    # rather than being artificially capped).
     score.score_candidates(survivors, config)
-
-    # Stage 6: AUTHORITATIVE availability check via RDAP. This is the gate
-    # that prevents publishing owned/in-redemption domains. Only HTTP 404
-    # passes through. Walking in score order keeps the best candidates at
-    # the front of the list when the budget is tight.
-    available = validate_availability(survivors, config)
 
     # Stage 7: write — output.build_payload applies the quality floor
     # (publish_min_score + publish_min_enrichment_completeness) and the
     # publication cap. total_evaluated lands in the payload so the
-    # frontend can render "Showing N of M candidates evaluated today".
+    # frontend can render "Showing N of M candidates evaluated today";
+    # "evaluated" now means "submitted to availability check" since
+    # availability is the dominant filter.
     output.write_output(
-        available,
+        survivors,
         config,
         output_path=args.output,
         total_evaluated=total_evaluated,
@@ -454,8 +485,8 @@ def main(argv: list[str] | None = None) -> int:
 
     publication_cap = int(config.get("max_candidates_for_publication", 300))
     logger.info(
-        "Pipeline complete: %d post-enrich, %d available, %d total evaluated, cap=%d",
-        len(survivors), len(available), total_evaluated, publication_cap,
+        "Pipeline complete: %d evaluated, %d available, %d post-enrich, %d scored, cap=%d",
+        total_evaluated, len(available), len(enriched), len(survivors), publication_cap,
     )
     return 0
 

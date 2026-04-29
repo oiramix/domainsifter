@@ -128,9 +128,18 @@ class HostThrottle:
 
     Multiple workers can call `acquire(host, interval)` concurrently. Each
     call blocks until the elapsed time since the last acquired slot for that
-    host is at least `interval` seconds. Adds a small uniform jitter (≤ 100ms
-    by default) on top of the wait so a thundering herd doesn't all wake up
-    in the same millisecond.
+    host is at least `interval × jitter_factor` seconds, where jitter_factor
+    is sampled from `jitter_factor_range` (default 0.75–1.25 — i.e. each
+    actual interval is between 75% and 125% of the configured value).
+
+    Why multiplicative jitter: a deterministic-clockwork pattern of one
+    request per N seconds is suspicious to rate-limited services and is
+    one of the things that got us 502/503 from Wayback and crt.sh on
+    2026-04-29 even with a 1.0s/host throttle. Real human curiosity is
+    bursty and irregular; we mimic that.
+
+    Tests can pass `jitter_factor_range=(1.0, 1.0)` to get deterministic
+    waits for sleep-amount assertions.
 
     Per-process state (one instance per Python process). Resets when the
     pipeline run ends — no persistence needed.
@@ -145,25 +154,42 @@ class HostThrottle:
         host: str,
         min_interval_seconds: float,
         *,
-        jitter_seconds: float = 0.10,
+        jitter_factor_range: tuple[float, float] = (0.75, 1.25),
+        jitter_seconds: float | None = None,  # back-compat for tests
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         """Block until we can issue a new request to `host`. After this
-        returns, the caller has the slot for the next `min_interval_seconds`."""
+        returns, the caller has the slot for the next `effective` seconds,
+        where effective = min_interval_seconds × random factor in range.
+
+        `jitter_seconds=0` is recognised for back-compat with older tests
+        that wanted purely deterministic waits — it's mapped to
+        `jitter_factor_range=(1.0, 1.0)`.
+        """
         if min_interval_seconds <= 0:
             return
-        while True:
-            with self._lock:
-                now = clock()
-                last = self._last_request_at.get(host, 0.0)
-                elapsed = now - last
-                if elapsed >= min_interval_seconds:
-                    self._last_request_at[host] = now
-                    return
-                wait = min_interval_seconds - elapsed
-            # Sleep WITHOUT holding the lock so other threads can check.
-            sleep(wait + (random.uniform(0, jitter_seconds) if jitter_seconds > 0 else 0))
+        if jitter_seconds == 0:
+            jitter_factor_range = (1.0, 1.0)
+        lo, hi = jitter_factor_range
+        factor = random.uniform(lo, hi) if hi > lo else lo
+        effective = min_interval_seconds * factor
+
+        # Compute the wait once, reserve the slot, sleep without the lock.
+        # No polling loop — `(now + wait) - now` would suffer from float
+        # cancellation and could stall in microsleeps, which we hit on the
+        # first jitter implementation. Reserve-then-sleep also serialises
+        # concurrent callers naturally: thread B reads the slot we just
+        # reserved and waits past us.
+        with self._lock:
+            now = clock()
+            last = self._last_request_at.get(host, 0.0)
+            wait = effective - (now - last)
+            if wait <= 0:
+                self._last_request_at[host] = now
+                return
+            self._last_request_at[host] = now + wait
+        sleep(wait)
 
     def reset(self) -> None:
         """For tests — clear all per-host state."""
