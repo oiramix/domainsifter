@@ -184,12 +184,32 @@ class HostThrottle:
         with self._lock:
             now = clock()
             last = self._last_request_at.get(host, 0.0)
+            time_since_last = now - last if last > 0 else None
             wait = effective - (now - last)
             if wait <= 0:
                 self._last_request_at[host] = now
-                return
-            self._last_request_at[host] = now + wait
-        sleep(wait)
+                actual_delay = 0.0
+                next_allowed_at = now + effective
+            else:
+                self._last_request_at[host] = now + wait
+                actual_delay = wait
+                next_allowed_at = now + wait + effective
+
+        # Detailed pacing trace — gated by logger.isEnabledFor so the string
+        # formatting is skipped entirely when DEBUG isn't on (avoids overhead
+        # in production runs).
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "throttle host=%s configured=%.3fs factor=%.3f effective=%.3fs "
+                "delay_applied=%.3fs since_last=%s next_allowed=t+%.3fs",
+                host, min_interval_seconds, factor, effective,
+                actual_delay,
+                f"{time_since_last:.3f}s" if time_since_last is not None else "first",
+                next_allowed_at - now,
+            )
+
+        if wait > 0:
+            sleep(wait)
 
     def reset(self) -> None:
         """For tests — clear all per-host state."""

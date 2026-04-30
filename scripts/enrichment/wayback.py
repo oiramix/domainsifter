@@ -21,6 +21,7 @@ circuit breaker — see scripts.enrichment._circuit_breaker for the why).
 from __future__ import annotations
 
 import logging
+import time
 
 import requests
 
@@ -46,12 +47,23 @@ def enrich(domain: str, config: dict) -> dict:
         "limit": 10000,
     }
     min_interval = float(config.get("api_min_interval_seconds", {}).get("wayback", 1.0))
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("wayback request initiated host=web.archive.org domain=%s", domain)
+    request_started_at = time.monotonic()
+
     try:
         response = request_with_429_backoff(
             lambda: requests.get(endpoint, params=params, timeout=timeout),
             host="web.archive.org",
             min_interval=min_interval,
         )
+        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "wayback response host=web.archive.org domain=%s status=%s elapsed=%.0fms",
+                domain, response.status_code, elapsed_ms,
+            )
         if response.status_code == 429:
             logger.warning("Wayback persistent 429 for %s", domain)
             _BREAKER.record_failure()
@@ -59,7 +71,8 @@ def enrich(domain: str, config: dict) -> dict:
         response.raise_for_status()
         rows = response.json()
     except (requests.RequestException, ValueError) as exc:
-        logger.warning("Wayback enrich failed for %s: %s", domain, exc)
+        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+        logger.warning("Wayback enrich failed for %s after %.0fms: %s", domain, elapsed_ms, exc)
         _BREAKER.record_failure()
         return {}
 

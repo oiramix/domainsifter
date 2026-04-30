@@ -57,6 +57,7 @@
   "publish_min_enrichment_completeness": 0.50,
   "enrichment_time_budget_seconds": 2100,
   "availability_budget_seconds": 1500,
+  "diagnostic_logging": false,
   "registrars": [
     {
       "name": "Namecheap",

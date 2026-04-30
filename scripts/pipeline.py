@@ -427,6 +427,18 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config(args.config)
     logger.info("Loaded config v%s", config.get("version", "?"))
 
+    # Diagnostic logging: turns on DEBUG output for the throttle and the
+    # two enrichers we've had pacing trouble with. Off by default — only
+    # flip on when investigating.
+    if config.get("diagnostic_logging"):
+        for name in (
+            "scripts.enrichment._circuit_breaker",
+            "scripts.enrichment.wayback",
+            "scripts.enrichment.crtsh",
+        ):
+            logging.getLogger(name).setLevel(logging.DEBUG)
+        logger.info("Diagnostic logging ENABLED for throttle + wayback + crtsh")
+
     auth_base = config.get("api_endpoints", {}).get("czds_auth_base")
     auth_kwargs = {"auth_base_url": auth_base} if auth_base else {}
     access_token = czds_client.authenticate(

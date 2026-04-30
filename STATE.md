@@ -636,3 +636,48 @@ With enrichment running on confirmed-available domains only (typically 5-50, not
 - Score distribution should be meaningful again — top >40, median >20 — because partial enrichment no longer mathematically caps the score.
 
 286/286 tests passing. Cron is paused; manual workflow trigger needed to verify the new flow on real data.
+
+---
+
+## Pacing diagnostic — empirical verification (2026-04-30)
+
+### Question
+
+After commit `045d002` shipped the multiplicative-jitter HostThrottle and 1-worker sequential enrichment, the next pipeline run still saw Wayback 503 / crt.sh 502 storms. Two possibilities: (A) external services are degraded, (B) our throttle isn't actually enforcing the configured interval in production. We had no proof either way.
+
+### Method
+
+Added DEBUG-level instrumentation gated on `config.diagnostic_logging`:
+
+- `scripts/enrichment/_circuit_breaker.py` — `HostThrottle.acquire()` now logs `host`, `configured_interval`, sampled `factor`, `effective` interval, `delay_applied`, `since_last`, `next_allowed`.
+- `scripts/enrichment/wayback.py` and `scripts/enrichment/crtsh.py` — log request initiate / response with elapsed_ms.
+- `scripts/pipeline.py` — when `diagnostic_logging: true` in config, flips those three loggers to DEBUG for the run.
+
+A standalone harness (`diag_pacing.py`, not committed) drove 20 sequential calls through each of `wayback.enrich` and `crtsh.enrich` with synthetic candidate names. No CZDS/R2 needed — this isolates the throttle's behaviour from the rest of the pipeline.
+
+### Findings
+
+Computed **send-to-send gap** (`since_last + delay_applied`) from the throttle's own log lines, since the diagnostic harness's "fn-invocation gap" understates the real spacing (the throttle wait happens *inside* `enrich()`, after the harness records the start time).
+
+**Wayback (web.archive.org):** 19 non-first throttle events.
+- send-to-send gap: min 2.74s, median 6.91s, mean 7.04s, max 10.38s
+- compliance with effective interval (`gap >= effective`): **19/19 (100%)**
+- bursts (`gap < 1.0s`): **0/19**
+- 4 events triggered an actual `delay_applied > 0` (the previous request finished fast); on those, the throttle injected exactly the right amount of sleep to reach `effective`. Example: `since_last=1.83s + delay=1.16s = 2.99s` matched `effective=2.99s` to three decimal places.
+
+**crt.sh:** 7 non-first throttle events before the breaker tripped.
+- send-to-send gap: min 2.37s, median 3.52s, mean 5.39s, max 10.17s
+- compliance: **7/7 (100%)**
+- bursts: **0/7**
+- 4 events with `delay_applied > 0`, all reaching `effective` exactly.
+- The breaker correctly opened after 5 consecutive failures (mix of 10s timeouts and HTTP 404s — crt.sh's query-format handling is degraded today). The 12 subsequent calls returned 0 ms because the breaker short-circuited them before reaching the throttle, exactly as designed.
+
+### Conclusion
+
+**Pacing is correct.** The throttle enforces the configured interval (with multiplicative 0.75–1.25× jitter) on every back-to-back call. No code change required. The Wayback 503s / crt.sh 502s + 404s observed in the morning's run are external-service degradation, not pacing failure.
+
+A nuance worth noting for future debugging: when *all* requests are slow (5–11s end-to-end including timeouts), the inter-send spacing is naturally `>= request_latency`, so `delay_applied=0` for most calls — the server is pacing us, not us pacing ourselves. The throttle still kicks in correctly when a request finishes quickly (e.g. crt.sh's fast 404s did trigger 2.0–3.0s injected delays).
+
+### Operational note
+
+`diagnostic_logging` defaults to `false`. Flip to `true` in `scripts/config.json` and run a single `python -m scripts.pipeline` (or one cron tick) to capture the throttle/enricher DEBUG stream when investigating future pacing issues. Don't leave it on in production — the log volume is ~3-4 lines per request.

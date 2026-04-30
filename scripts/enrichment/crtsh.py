@@ -22,6 +22,7 @@ failures, not "no certs".
 from __future__ import annotations
 
 import logging
+import time
 
 import requests
 
@@ -45,12 +46,23 @@ def enrich(domain: str, config: dict) -> dict:
     params = {"q": f"%.{domain}", "output": "json"}
 
     min_interval = float(config.get("api_min_interval_seconds", {}).get("crtsh", 1.0))
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("crtsh request initiated host=crt.sh domain=%s", domain)
+    request_started_at = time.monotonic()
+
     try:
         response = request_with_429_backoff(
             lambda: requests.get(base + "/", params=params, timeout=timeout),
             host="crt.sh",
             min_interval=min_interval,
         )
+        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "crtsh response host=crt.sh domain=%s status=%s elapsed=%.0fms",
+                domain, response.status_code, elapsed_ms,
+            )
         if response.status_code == 429:
             logger.warning("crt.sh persistent 429 for %s", domain)
             _BREAKER.record_failure()
@@ -58,7 +70,8 @@ def enrich(domain: str, config: dict) -> dict:
         response.raise_for_status()
         rows = response.json()
     except (requests.RequestException, ValueError) as exc:
-        logger.warning("crt.sh enrich failed for %s: %s", domain, exc)
+        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+        logger.warning("crt.sh enrich failed for %s after %.0fms: %s", domain, elapsed_ms, exc)
         _BREAKER.record_failure()
         return {}
 
