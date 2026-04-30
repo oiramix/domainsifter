@@ -12,9 +12,9 @@
     </p>
 
     <form
-      action="#"
+      action="https://buttondown.com/api/emails/embed-subscribe/domainsifter"
       method="post"
-      novalidate
+      target="_blank"
       class="mt-8 flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
       data-signup-form
     >
@@ -28,9 +28,21 @@
         placeholder="your@email.com"
         class="flex-1 rounded-md border border-stone-300 bg-white px-4 py-3 text-sm text-ink placeholder:text-stone-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
       />
+      <input type="hidden" name="embed" value="1" />
+      <input type="hidden" name="tag" value="website-signup" />
+      <input
+        type="text"
+        name="website"
+        tabindex="-1"
+        autocomplete="off"
+        aria-hidden="true"
+        style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0;"
+        data-signup-honeypot
+      />
       <button
         type="submit"
-        class="inline-flex items-center justify-center rounded-md bg-accent px-5 py-3 text-sm font-medium text-white hover:bg-accent-hover transition-colors"
+        class="inline-flex items-center justify-center rounded-md bg-accent px-5 py-3 text-sm font-medium text-white hover:bg-accent-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        data-signup-button
       >
         Subscribe
       </button>
@@ -50,26 +62,61 @@
 <script>
   const form = document.querySelector<HTMLFormElement>('[data-signup-form]');
   const status = document.querySelector<HTMLElement>('[data-signup-status]');
+  const button = document.querySelector<HTMLButtonElement>('[data-signup-button]');
+  const honeypot = document.querySelector<HTMLInputElement>('[data-signup-honeypot]');
 
-  form?.addEventListener('submit', (event) => {
+  function setStatus(message: string, tone: 'idle' | 'success' | 'error' | 'pending') {
+    if (!status) return;
+    status.textContent = message;
+    status.classList.remove(
+      'text-stone-500', 'text-accent', 'font-medium',
+      'text-amber-700', 'text-red-700',
+    );
+    if (tone === 'success') status.classList.add('text-accent', 'font-medium');
+    else if (tone === 'error') status.classList.add('text-red-700');
+    else if (tone === 'pending') status.classList.add('text-stone-500');
+    else status.classList.add('text-stone-500');
+  }
+
+  form?.addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    // Honeypot — if a bot filled it, fail silently. Real users never see it.
+    if (honeypot && honeypot.value) return;
+
     const input = form.querySelector<HTMLInputElement>('input[type="email"]');
-    if (!input || !input.value || !input.checkValidity()) {
-      if (status) {
-        status.textContent = 'Please enter a valid email address.';
-        status.classList.remove('text-stone-500');
-        status.classList.add('text-amber-700');
-      }
-      input?.focus();
+    if (!input || !input.checkValidity()) {
+      input?.reportValidity();
       return;
     }
-    form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button').forEach((el) => {
-      el.disabled = true;
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Subscribing...';
+    }
+    setStatus('Submitting...', 'pending');
+
+    const body = new URLSearchParams({
+      email: input.value,
+      embed: '1',
+      tag: 'website-signup',
     });
-    if (status) {
-      status.textContent = "Thanks! We'll be in touch when we launch.";
-      status.classList.remove('text-stone-500', 'text-amber-700');
-      status.classList.add('text-accent', 'font-medium');
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setStatus('Thanks! Check your email to confirm subscription.', 'success');
+      input.value = '';
+    } catch {
+      setStatus('Something went wrong, please try again.', 'error');
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Subscribe';
+      }
     }
   });
 </script>
