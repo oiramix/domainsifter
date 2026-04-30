@@ -1,13 +1,10 @@
 name: Daily Domain Diff
 
 on:
-  schedule:
-    # Off-peak time to reduce GitHub Actions free-tier queue delay.
-    # 0 6 * * * was the most popular cron minute on GitHub globally — every
-    # daily report job in the world fires at the top of the hour and the
-    # queue piles up. 05:17 UTC is well off any common round-number minute.
-    # 05:17 UTC = 08:17 Tallinn time. Adjust if local schedule shifts.
-    - cron: "17 5 * * *"
+  # Triggered by the Cloudflare Cron Trigger Worker (domainsifter-cron-trigger).
+  # GitHub Actions free-tier `schedule:` is best-effort with significant queue
+  # delays at common minutes; Cloudflare's cron infrastructure fires reliably
+  # and dispatches this workflow via the GitHub API.
   workflow_dispatch: {}
 
 permissions:
