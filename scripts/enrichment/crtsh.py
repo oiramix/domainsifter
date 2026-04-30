@@ -26,7 +26,11 @@ import time
 
 import requests
 
-from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+from scripts.enrichment._circuit_breaker import (
+    CircuitBreaker,
+    request_with_429_backoff,
+    retry_on_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +46,10 @@ def enrich(domain: str, config: dict) -> dict:
         return {}
 
     base = config.get("api_endpoints", {}).get("crtsh", _DEFAULT_BASE).rstrip("/")
-    timeout = config.get("request_timeout_seconds", 10)
+    # crt.sh is also slow under load — 60s default, overridable via config.
+    timeout = config.get("api_request_timeout_seconds", {}).get(
+        "crtsh", config.get("request_timeout_seconds", 10)
+    )
     params = {"q": f"%.{domain}", "output": "json"}
 
     min_interval = float(config.get("api_min_interval_seconds", {}).get("crtsh", 1.0))
@@ -51,11 +58,16 @@ def enrich(domain: str, config: dict) -> dict:
         logger.debug("crtsh request initiated host=crt.sh domain=%s", domain)
     request_started_at = time.monotonic()
 
-    try:
-        response = request_with_429_backoff(
+    def _do_request():
+        return request_with_429_backoff(
             lambda: requests.get(base + "/", params=params, timeout=timeout),
             host="crt.sh",
             min_interval=min_interval,
+        )
+
+    try:
+        response = retry_on_timeout(
+            _do_request, label=f"crt.sh[{domain}]", log=logger,
         )
         elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
         if logger.isEnabledFor(logging.DEBUG):

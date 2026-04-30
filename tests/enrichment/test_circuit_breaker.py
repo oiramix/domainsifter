@@ -316,3 +316,97 @@ def test_request_with_429_backoff_accepts_host_and_interval():
     )
     assert resp.status_code == 200
     assert sleeps == []
+
+
+# --- retry_on_timeout --------------------------------------------------------
+
+
+def test_retry_on_timeout_returns_immediately_on_success():
+    from scripts.enrichment._circuit_breaker import retry_on_timeout
+    sleeps: list[float] = []
+    calls = [_resp(200)]
+    resp = retry_on_timeout(lambda: calls.pop(0), label="x", sleep=sleeps.append)
+    assert resp.status_code == 200
+    assert sleeps == []
+
+
+def test_retry_on_timeout_succeeds_on_second_attempt():
+    from requests.exceptions import ReadTimeout
+    from scripts.enrichment._circuit_breaker import retry_on_timeout
+    sleeps: list[float] = []
+    seq = [ReadTimeout("first"), _resp(200)]
+
+    def call_fn():
+        v = seq.pop(0)
+        if isinstance(v, Exception):
+            raise v
+        return v
+
+    resp = retry_on_timeout(call_fn, label="x", sleep=sleeps.append)
+    assert resp.status_code == 200
+    assert sleeps == [5.0]  # one backoff between attempts 1 and 2
+
+
+def test_retry_on_timeout_succeeds_on_third_attempt():
+    from requests.exceptions import ConnectTimeout
+    from scripts.enrichment._circuit_breaker import retry_on_timeout
+    sleeps: list[float] = []
+    seq = [ConnectTimeout("a"), ConnectTimeout("b"), _resp(200)]
+
+    def call_fn():
+        v = seq.pop(0)
+        if isinstance(v, Exception):
+            raise v
+        return v
+
+    resp = retry_on_timeout(call_fn, label="x", sleep=sleeps.append)
+    assert resp.status_code == 200
+    assert sleeps == [5.0, 15.0]
+
+
+def test_retry_on_timeout_reraises_after_three_attempts():
+    from requests.exceptions import ReadTimeout
+    from scripts.enrichment._circuit_breaker import retry_on_timeout
+    sleeps: list[float] = []
+    seq = [ReadTimeout("a"), ReadTimeout("b"), ReadTimeout("c")]
+
+    def call_fn():
+        raise seq.pop(0)
+
+    with pytest.raises(ReadTimeout):
+        retry_on_timeout(call_fn, label="x", sleep=sleeps.append)
+    assert sleeps == [5.0, 15.0]  # backoffs between 1->2 and 2->3 only
+
+
+def test_retry_on_timeout_does_not_retry_other_exceptions():
+    """ConnectionError, HTTPError, ValueError must propagate immediately —
+    only Connect/Read/Timeout trigger retry."""
+    from requests.exceptions import ConnectionError as ReqConnError
+    from scripts.enrichment._circuit_breaker import retry_on_timeout
+    sleeps: list[float] = []
+    calls: list[int] = []
+
+    def call_fn():
+        calls.append(1)
+        raise ReqConnError("network down")
+
+    with pytest.raises(ReqConnError):
+        retry_on_timeout(call_fn, label="x", sleep=sleeps.append)
+    assert len(calls) == 1  # exactly one attempt, no retry
+    assert sleeps == []
+
+
+def test_retry_on_timeout_custom_delays():
+    from requests.exceptions import ReadTimeout
+    from scripts.enrichment._circuit_breaker import retry_on_timeout
+    sleeps: list[float] = []
+    seq = [ReadTimeout("a"), ReadTimeout("b"), ReadTimeout("c"), ReadTimeout("d")]
+
+    def call_fn():
+        raise seq.pop(0)
+
+    with pytest.raises(ReadTimeout):
+        retry_on_timeout(
+            call_fn, label="x", delays=(1.0, 2.0, 3.0), sleep=sleeps.append,
+        )
+    assert sleeps == [1.0, 2.0, 3.0]  # 4 attempts, 3 backoffs

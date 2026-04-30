@@ -79,6 +79,11 @@
     "rdap_bootstrap": "https://data.iana.org/rdap/dns.json"
   },
   "request_timeout_seconds": 10,
+  "api_request_timeout_seconds": {
+    "_doc": "Per-enricher request timeout. Falls back to request_timeout_seconds when unset. Wayback CDX and crt.sh frequently take 15-30s under peak load — their 10s default forced ~80% of calls to time out on 2026-04-30. The retry-on-timeout logic in wayback.py / crtsh.py adds a second safety net.",
+    "wayback": 60,
+    "crtsh": 60
+  },
   "download_timeout_seconds": 120,
   "max_concurrent_enrichments": 1,
   "api_min_interval_seconds": {

@@ -70,3 +70,74 @@ def test_enrich_returns_empty_on_connection_error(monkeypatch):
 
     monkeypatch.setattr(crtsh.requests, "get", boom)
     assert crtsh.enrich("example.com", CONFIG) == {}
+
+
+# --- timeout retry behaviour -------------------------------------------------
+
+
+def test_enrich_retries_on_read_timeout_and_succeeds(monkeypatch):
+    """ReadTimeout, then success — crt.sh should return cert data, not empty."""
+    import requests as _requests
+    from unittest.mock import MagicMock
+
+    timeouts_remaining = [1]
+
+    def fake_get(*_a, **_kw):
+        if timeouts_remaining[0] > 0:
+            timeouts_remaining[0] -= 1
+            raise _requests.exceptions.ReadTimeout("simulated")
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = lambda: None
+        resp.json = lambda: [{"id": 7}]
+        return resp
+
+    monkeypatch.setattr(crtsh.requests, "get", fake_get)
+    from scripts.enrichment import _circuit_breaker as cb
+    monkeypatch.setattr(cb.time, "sleep", lambda s: None)
+
+    result = crtsh.enrich("example.com", CONFIG)
+    assert result == {"cert_history": True, "cert_count": 1}
+    assert timeouts_remaining[0] == 0
+
+
+def test_enrich_returns_empty_after_three_timeouts(monkeypatch):
+    import requests as _requests
+
+    call_count = [0]
+
+    def fake_get(*_a, **_kw):
+        call_count[0] += 1
+        raise _requests.exceptions.ConnectTimeout("always")
+
+    monkeypatch.setattr(crtsh.requests, "get", fake_get)
+    from scripts.enrichment import _circuit_breaker as cb
+    monkeypatch.setattr(cb.time, "sleep", lambda s: None)
+
+    failures_before = crtsh._BREAKER.consecutive_failures
+    result = crtsh.enrich("example.com", CONFIG)
+    assert result == {}
+    assert call_count[0] == 3
+    assert crtsh._BREAKER.consecutive_failures == failures_before + 1
+
+
+def test_enrich_uses_per_enricher_timeout_override(monkeypatch):
+    captured: dict = {}
+
+    def fake_get(_url, *_a, **kw):
+        captured["timeout"] = kw.get("timeout")
+        from unittest.mock import MagicMock
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = lambda: None
+        resp.json = lambda: []
+        return resp
+
+    monkeypatch.setattr(crtsh.requests, "get", fake_get)
+    cfg = {
+        **CONFIG,
+        "request_timeout_seconds": 5,
+        "api_request_timeout_seconds": {"crtsh": 60},
+    }
+    crtsh.enrich("example.com", cfg)
+    assert captured["timeout"] == 60

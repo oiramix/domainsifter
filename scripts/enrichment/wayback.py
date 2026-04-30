@@ -25,7 +25,11 @@ import time
 
 import requests
 
-from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+from scripts.enrichment._circuit_breaker import (
+    CircuitBreaker,
+    request_with_429_backoff,
+    retry_on_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,10 @@ def enrich(domain: str, config: dict) -> dict:
         return {}
 
     endpoint = config.get("api_endpoints", {}).get("wayback_cdx", _DEFAULT_ENDPOINT)
-    timeout = config.get("request_timeout_seconds", 10)
+    # Wayback CDX is slow under peak load — 60s default, overridable via config.
+    timeout = config.get("api_request_timeout_seconds", {}).get(
+        "wayback", config.get("request_timeout_seconds", 10)
+    )
     params = {
         "url": domain,
         "matchType": "domain",
@@ -52,11 +59,18 @@ def enrich(domain: str, config: dict) -> dict:
         logger.debug("wayback request initiated host=web.archive.org domain=%s", domain)
     request_started_at = time.monotonic()
 
-    try:
-        response = request_with_429_backoff(
+    def _do_request():
+        # Each attempt re-acquires the throttle slot so retries respect
+        # per-host pacing exactly like first-attempt requests.
+        return request_with_429_backoff(
             lambda: requests.get(endpoint, params=params, timeout=timeout),
             host="web.archive.org",
             min_interval=min_interval,
+        )
+
+    try:
+        response = retry_on_timeout(
+            _do_request, label=f"wayback[{domain}]", log=logger,
         )
         elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
         if logger.isEnabledFor(logging.DEBUG):

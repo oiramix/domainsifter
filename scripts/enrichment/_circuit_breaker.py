@@ -227,6 +227,68 @@ GLOBAL_HOST_THROTTLE = HostThrottle()
 # ---------------------------------------------------------------------------
 
 
+def retry_on_timeout(
+    call_fn: Callable[[], "object"],
+    *,
+    label: str,
+    delays: tuple[float, ...] = (5.0, 15.0),
+    sleep: Callable[[float], None] | None = None,
+    log: logging.Logger | None = None,
+):
+    """Run `call_fn()` with retry-on-timeout. Retries ONLY on requests'
+    Connect/Read/Timeout exceptions; any other exception (including HTTPError,
+    ConnectionError, JSON errors) propagates immediately so the caller can
+    handle it without burning a retry slot.
+
+    Total attempts = len(delays) + 1 (default: 3 attempts at 0s, 5s, 15s).
+
+    Logs at INFO so production runs can see the retry rate without flipping
+    DEBUG. Returns whatever `call_fn` returns on the first successful attempt;
+    re-raises the LAST timeout exception if all attempts time out.
+
+    Used by wayback.py and crtsh.py — endpoints that routinely take 15-30s
+    under peak load. Other enrichers (RDAP, OPR, blocklists) use
+    request_with_429_backoff directly without retry, since timeouts there
+    are rare and the wall-clock budget is more precious than coverage.
+    """
+    # Imported here to keep the breaker module self-contained when requests
+    # isn't installed in some hypothetical test setup.
+    from requests.exceptions import ConnectTimeout, ReadTimeout, Timeout
+
+    timeout_exc_types = (ConnectTimeout, ReadTimeout, Timeout)
+    log = log or logger
+    # Resolve sleep at call time (not def time) so monkeypatching time.sleep
+    # in tests actually takes effect.
+    if sleep is None:
+        sleep = time.sleep
+    last_exc: BaseException | None = None
+    max_attempts = len(delays) + 1
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = call_fn()
+            if attempt > 1:
+                log.info("%s: retry succeeded on attempt %d/%d", label, attempt, max_attempts)
+            return result
+        except timeout_exc_types as exc:
+            last_exc = exc
+            if attempt < max_attempts:
+                delay = delays[attempt - 1]
+                log.info(
+                    "%s: timeout on attempt %d/%d (%s), retrying in %.0fs",
+                    label, attempt, max_attempts, exc.__class__.__name__, delay,
+                )
+                sleep(delay)
+                continue
+            log.warning(
+                "%s: timed out on final attempt %d/%d, giving up (%s)",
+                label, attempt, max_attempts, exc.__class__.__name__,
+            )
+            raise
+    # Unreachable — the loop either returns or re-raises.
+    raise last_exc if last_exc else RuntimeError("retry_on_timeout fell through")  # pragma: no cover
+
+
 def request_with_429_backoff(
     call_fn: Callable[[], "object"],
     *,
