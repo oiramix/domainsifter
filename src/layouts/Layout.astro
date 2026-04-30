@@ -64,6 +64,8 @@ const jsonLd = {
 
     <title>{title}</title>
     <meta name="description" content={description} />
+    {/* impact.com (Namecheap affiliate) site verification — uses value= NOT content= per their requirement, do not "fix" to W3C-standard attribute */}
+    <meta name='impact-site-verification' value='108bcfa3-0d96-4623-8098-747f1614e520'>
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="canonical" href={canonical} />
 
