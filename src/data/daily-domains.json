@@ -1,6 +1,31 @@
 {
-  "generated_at": "2026-04-29T06:04:59Z",
-  "domain_count": 0,
-  "domains": [],
+  "generated_at": "2026-04-30T07:54:30Z",
+  "domain_count": 1,
+  "domains": [
+    {
+      "name": "nomoda.org",
+      "tld": "org",
+      "dropped_date": "2026-04-30",
+      "wayback_snapshots": 1663,
+      "wayback_last_snapshot": "2026-03-09",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 59,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dnomoda.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=nomoda.org&rid=36a0644du"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-04-30T07:44:41Z"
+    }
+  ],
   "total_candidates_evaluated": 1000
 }
