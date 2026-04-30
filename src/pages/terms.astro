@@ -1,0 +1,129 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout
+  title="Terms of Service — DomainSifter"
+  description="Plain-English terms covering acceptable use, affiliate disclosure, and limits of liability for DomainSifter."
+  noindex={true}
+>
+  <Header />
+  <main id="main">
+    <article class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
+      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-ink">Terms of Service</h1>
+      <p class="mt-2 text-sm text-stone-500"><em>Last updated: April 2026</em></p>
+
+      <div class="mt-8 space-y-6 text-stone-700 leading-relaxed">
+        <p>
+          By using DomainSifter (&ldquo;the service&rdquo;, &ldquo;the site&rdquo;), you agree to
+          these terms. They're short and written in plain English on purpose.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">What DomainSifter is</h2>
+        <p>
+          DomainSifter publishes a daily-curated list of recently-expired
+          domain names that appear to be available for registration. We filter
+          out spam, malware, gibberish, and known abuse signals before
+          publishing.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">What we don't guarantee</h2>
+        <p>
+          <strong class="text-ink">Availability.</strong> We verify availability via RDAP at the moment we
+          publish the list, but the actual availability of any specific domain
+          can change between the moment we check and the moment you try to
+          register it. A domain shown on our list may already be registered
+          by someone else by the time you click through to a registrar.
+        </p>
+        <p>
+          <strong class="text-ink">Quality or value.</strong> We filter for spam and abuse, but we don't
+          guarantee any domain on our list has commercial value, isn't
+          trademarked, doesn't have a legal history, or won't have problems
+          after registration. Do your own due diligence before purchasing.
+        </p>
+        <p>
+          <strong class="text-ink">Legal cleanliness.</strong> Some expired domains have legal history we
+          can't detect (UDRP disputes, trademark conflicts, defamation history).
+          We don't research individual domains for legal issues. If you register
+          a domain that turns out to have legal problems, that's on you.
+        </p>
+        <p>
+          <strong class="text-ink">Continuous availability.</strong> We try to publish daily but make no
+          uptime guarantee. The service may be temporarily unavailable due
+          to technical issues.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Affiliate disclosure</h2>
+        <p>
+          When you click &ldquo;Register&rdquo; links on the site, you're taken to
+          third-party domain registrars (Namecheap, NameSilo). We earn a
+          commission when you register a domain via these links. This
+          commission doesn't affect the price you pay — it's paid by the
+          registrar from their margin.
+        </p>
+        <p>
+          This means DomainSifter has a financial interest in users registering
+          domains via our links. The list itself is filtered honestly regardless
+          of which registrars we have affiliate relationships with — we don't
+          prioritize or hide domains based on commission rates.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Acceptable use</h2>
+        <p>
+          You may use DomainSifter freely for personal or commercial domain
+          research. You may NOT:
+        </p>
+        <ul class="list-disc pl-6 space-y-2 marker:text-stone-400">
+          <li>Scrape the site at high frequency or in ways that disrupt service</li>
+          <li>Republish our daily list as your own without attribution</li>
+          <li>Use the service for any illegal purpose</li>
+        </ul>
+        <p>We reserve the right to block access to anyone violating these rules.</p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">No warranty</h2>
+        <p>
+          The service is provided &ldquo;as is&rdquo; without warranty of any kind. We
+          make no guarantees about uptime, accuracy, completeness, or fitness
+          for any particular purpose.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Limitation of liability</h2>
+        <p>
+          To the fullest extent permitted by law, the operator of DomainSifter
+          is not liable for any direct, indirect, incidental, or consequential
+          damages arising from your use of the service. This includes (but is
+          not limited to) financial loss from unavailable domains, legal issues
+          with registered domains, or business decisions based on data shown
+          on the site.
+        </p>
+        <p>
+          If you registered a domain via our links and it turned out to have
+          problems, your recourse is with the domain registrar (where you paid
+          for the domain) and any relevant legal body — not with DomainSifter.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Governing law</h2>
+        <p>
+          These terms are governed by Estonian law. Any disputes will be
+          resolved in Estonian courts.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Changes to these terms</h2>
+        <p>
+          We may update these terms occasionally. The &ldquo;Last updated&rdquo; date
+          at the top reflects the most recent change. Material changes will
+          be communicated via the newsletter to existing subscribers.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Contact</h2>
+        <p>
+          For questions about these terms:<br />
+          <a href="mailto:hello@domainsifter.com" class="text-accent font-medium hover:underline">hello@domainsifter.com</a>
+        </p>
+      </div>
+    </article>
+  </main>
+  <Footer />
+</Layout>

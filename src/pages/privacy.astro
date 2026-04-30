@@ -1,0 +1,119 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout
+  title="Privacy Policy — DomainSifter"
+  description="What data DomainSifter collects, how we use it, and your rights under GDPR."
+  noindex={true}
+>
+  <Header />
+  <main id="main">
+    <article class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
+      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-ink">Privacy Policy</h1>
+      <p class="mt-2 text-sm text-stone-500"><em>Last updated: April 2026</em></p>
+
+      <div class="mt-8 space-y-6 text-stone-700 leading-relaxed">
+        <p>
+          DomainSifter is run by an individual based in Estonia (the &ldquo;operator&rdquo;).
+          This policy explains what data we collect, how we use it, and your
+          rights under GDPR and Estonian law.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">What we collect</h2>
+        <p>
+          <strong class="text-ink">Newsletter email addresses.</strong> If you sign up for our newsletter,
+          we collect your email address and the date you subscribed.
+        </p>
+        <p>
+          <strong class="text-ink">Standard server logs.</strong> Cloudflare (our hosting provider) automatically
+          logs requests to our website, including IP addresses, browser type,
+          referrer URLs, and timestamps. We don't access these logs unless
+          investigating abuse or technical issues.
+        </p>
+        <p>
+          <strong class="text-ink">That's it.</strong> We don't use cookies for tracking, we don't run
+          analytics platforms (Google Analytics, Mixpanel, etc.), we don't
+          collect names, addresses, or any other personal information.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">How we use it</h2>
+        <p>
+          <strong class="text-ink">Email addresses</strong> are used to send the DomainSifter newsletter —
+          that's the only purpose. We don't sell, share, or use them for any
+          other communication.
+        </p>
+        <p>
+          <strong class="text-ink">Server logs</strong> are used by Cloudflare for routine operations
+          (rate limiting, abuse prevention) and by us if we need to debug
+          technical problems.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Who we share data with</h2>
+        <p>We use these third-party services (sub-processors) to operate the site:</p>
+        <ul class="list-disc pl-6 space-y-2 marker:text-stone-400">
+          <li>
+            <strong class="text-ink">Buttondown</strong> (newsletter delivery) — receives your email address
+            to send you the newsletter.
+          </li>
+          <li>
+            <strong class="text-ink">Postmark</strong> (Buttondown's email infrastructure) — handles the
+            actual email sending.
+          </li>
+          <li>
+            <strong class="text-ink">Cloudflare</strong> (hosting, DNS, email routing) — handles all incoming
+            requests to the website.
+          </li>
+          <li>
+            <strong class="text-ink">Brevo</strong> (outbound email for hello@domainsifter.com) — used only
+            if we reply to emails you send us.
+          </li>
+        </ul>
+        <p>Each of these is GDPR-compliant. We never share your data with anyone else.</p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Your rights under GDPR</h2>
+        <p>You have the right to:</p>
+        <ul class="list-disc pl-6 space-y-2 marker:text-stone-400">
+          <li><strong class="text-ink">Access</strong> the data we have about you (just your email address, if you're a subscriber)</li>
+          <li><strong class="text-ink">Delete</strong> your data — unsubscribe from the newsletter and your email is removed</li>
+          <li><strong class="text-ink">Export</strong> your data</li>
+          <li><strong class="text-ink">Object</strong> to processing</li>
+          <li>
+            <strong class="text-ink">Lodge a complaint</strong> with the Estonian Data Protection Inspectorate
+            (Andmekaitse Inspektsioon,
+            <a href="https://www.aki.ee" class="text-accent hover:underline" target="_blank" rel="noopener">https://www.aki.ee</a>)
+          </li>
+        </ul>
+        <p>
+          To exercise any of these rights, email
+          <a href="mailto:hello@domainsifter.com" class="text-accent hover:underline">hello@domainsifter.com</a>.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Cookies</h2>
+        <p>We don't use cookies. The site is fully static and doesn't require them to function.</p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Children's data</h2>
+        <p>
+          DomainSifter is not directed at children under 16. We don't knowingly
+          collect data from anyone under 16.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Changes to this policy</h2>
+        <p>
+          If we change this policy, we'll update the &ldquo;Last updated&rdquo; date at
+          the top. Material changes will be communicated via the newsletter
+          to existing subscribers.
+        </p>
+
+        <h2 class="text-2xl font-semibold tracking-tight text-ink pt-4">Contact</h2>
+        <p>
+          For any questions about this privacy policy or your data:<br />
+          <a href="mailto:hello@domainsifter.com" class="text-accent font-medium hover:underline">hello@domainsifter.com</a>
+        </p>
+      </div>
+    </article>
+  </main>
+  <Footer />
+</Layout>
