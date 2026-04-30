@@ -170,6 +170,67 @@ def test_total_evaluated_omitted_when_not_passed():
     assert "total_candidates_evaluated" not in payload
 
 
+# --- persistent-list bucket counts -------------------------------------------
+
+
+def test_payload_includes_today_and_carryover_counts():
+    """today_count = entries with days_listed == 0; carryover_count = the rest.
+    Both are top-level fields the frontend reads to drive the two-card layout."""
+    cfg = {**CONFIG, "max_candidates_for_publication": 10}  # don't truncate
+    cands = [
+        _cand("today1.com", 80, days_listed=0),
+        _cand("today2.com", 70, days_listed=0),
+        _cand("yesterday.com", 60, days_listed=1),
+        _cand("week.com", 50, days_listed=7),
+    ]
+    payload = output.build_payload(cands, cfg)
+    assert payload["today_count"] == 2
+    assert payload["carryover_count"] == 2
+    assert payload["domain_count"] == 4
+
+
+def test_payload_today_count_zero_when_only_carryover():
+    cands = [
+        _cand("a.com", 80, days_listed=3),
+        _cand("b.com", 70, days_listed=10),
+    ]
+    payload = output.build_payload(cands, CONFIG)
+    assert payload["today_count"] == 0
+    assert payload["carryover_count"] == 2
+
+
+def test_payload_carryover_count_zero_when_only_today():
+    """First-ever run or zero-carryover state — all entries days_listed=0."""
+    cands = [_cand("fresh.com", 80, days_listed=0)]
+    payload = output.build_payload(cands, CONFIG)
+    assert payload["today_count"] == 1
+    assert payload["carryover_count"] == 0
+
+
+def test_payload_treats_missing_days_listed_as_today():
+    """Sample data and migration-state entries may omit days_listed; treat
+    those as today (they'll show up in Card 1)."""
+    cands = [_cand("legacy.com", 80)]  # no days_listed field
+    payload = output.build_payload(cands, CONFIG)
+    assert payload["today_count"] == 1
+    assert payload["carryover_count"] == 0
+    assert payload["domains"][0]["days_listed"] == 0
+
+
+def test_project_preserves_persistence_fields():
+    """first_seen_date, last_validated_date, days_listed must survive
+    projection so they're available to the frontend."""
+    cand = _cand("d.com", 75,
+                 first_seen_date="2026-04-25",
+                 last_validated_date="2026-04-30",
+                 days_listed=5)
+    payload = output.build_payload([cand], CONFIG)
+    d = payload["domains"][0]
+    assert d["first_seen_date"] == "2026-04-25"
+    assert d["last_validated_date"] == "2026-04-30"
+    assert d["days_listed"] == 5
+
+
 def test_build_payload_drops_internal_fields():
     cand = _cand("foo.com")
     cand["spam_flagged"] = False

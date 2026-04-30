@@ -65,6 +65,7 @@ from pathlib import Path
 from typing import Callable
 
 from scripts import (
+    carryover,
     czds_client,
     diff,
     env_check,
@@ -122,14 +123,25 @@ def collect_drops(
     *,
     r2_client=None,
     r2_bucket: str | None = None,
-) -> list[dict]:
+    carryover_candidates: list[dict] | None = None,
+) -> tuple[list[dict], list[dict]]:
     """Download every approved-TLD zone, diff vs yesterday's R2 snapshot,
-    overwrite that snapshot with today's set, and return a flat list of
-    candidate dicts.
+    revalidate carryover entries against today's zone, overwrite the
+    snapshot for tomorrow, and return (today_drops, retained_carryover).
 
     Yesterday's snapshots live in Cloudflare R2 (see scripts/diff.py header
-    for why). The R2 client + bucket name are resolved once and reused across
-    all TLDs; tests inject mocks via `r2_client=` / `r2_bucket=`.
+    for why). The R2 client + bucket name are resolved once and reused
+    across all TLDs; tests inject mocks via `r2_client=` / `r2_bucket=`.
+
+    Carryover validation happens INSIDE the per-TLD loop because today_set
+    can be 10-50M apex names per TLD; holding all 13 in memory at once is
+    a non-starter on the 7 GB GHA runner. We validate the TLD's carryover
+    while its today_set is still in scope, then let it go.
+
+    A TLD whose zone download or parse fails is treated as "unknown" for
+    carryover: those entries pass through with last_validated_date
+    UNCHANGED (we don't drop them just because we couldn't reach the
+    registry — they age out naturally if the failure persists 14 days).
     """
     api_base = config.get("api_endpoints", {}).get("czds_api_base")
     download_timeout = config.get("download_timeout_seconds", 120)
@@ -137,11 +149,22 @@ def collect_drops(
     s3 = r2_client if r2_client is not None else diff._r2_client()
     bucket = r2_bucket if r2_bucket is not None else diff._bucket()
 
+    # Index carryover by TLD so we can validate per-TLD while today_set is
+    # in memory. Entries for TLDs not in this run's approved list (e.g. an
+    # operator removed a TLD) pass through unvalidated — same fail-open
+    # posture as a TLD whose zone download failed.
+    carryover_by_tld: dict[str, list[dict]] = {}
+    if carryover_candidates:
+        for entry in carryover_candidates:
+            carryover_by_tld.setdefault(entry.get("tld", ""), []).append(entry)
+    validated_tlds: set[str] = set()
+
     all_links = czds_client.list_zone_links(access_token, api_base) if api_base else czds_client.list_zone_links(access_token)
     targeted = [u for u in all_links if _filename_to_tld(u) in approved]
     logger.info("CZDS approved %d zones; %d match our TLD list", len(all_links), len(targeted))
 
     drops_total: list[dict] = []
+    retained_carryover: list[dict] = []
     dropped_date_str = today.isoformat()
     for url in targeted:
         tld = _filename_to_tld(url)
@@ -166,8 +189,37 @@ def collect_drops(
         for name in drops:
             drops_total.append({"name": name, "tld": tld, "dropped_date": dropped_date_str})
 
-    logger.info("Collected %d total drops across %d TLDs", len(drops_total), len(targeted))
-    return drops_total
+        # Validate this TLD's carryover against today_set while it's still
+        # in scope. After this iteration today_set is collected.
+        tld_carryover = carryover_by_tld.get(tld, [])
+        if tld_carryover:
+            kept, registered = carryover.validate_against_zone(tld_carryover, today_set, today)
+            retained_carryover.extend(kept)
+            logger.info(
+                ".%s carryover: %d kept, %d registered (in today's zone)",
+                tld, len(kept), registered,
+            )
+            validated_tlds.add(tld)
+
+    # Carryover for TLDs we couldn't validate this run (zone download/parse
+    # failed, or TLD not in approved list any more): pass through with
+    # last_validated_date unchanged. They'll age out naturally if the
+    # failure persists.
+    for tld, entries in carryover_by_tld.items():
+        if tld in validated_tlds:
+            continue
+        retained_carryover.extend(entries)
+        if entries:
+            logger.warning(
+                ".%s carryover: %d entries passed through unvalidated (TLD zone unavailable)",
+                tld, len(entries),
+            )
+
+    logger.info(
+        "Collected %d total drops across %d TLDs; %d carryover entries retained",
+        len(drops_total), len(targeted), len(retained_carryover),
+    )
+    return drops_total, retained_carryover
 
 
 def _enrich_one(
@@ -447,9 +499,36 @@ def main(argv: list[str] | None = None) -> int:
         **auth_kwargs,
     )
 
-    drops = collect_drops(config, access_token, today=date.today())
+    today = date.today()
 
-    # Stage 1: structural filter (cheap; pre-enrichment)
+    # Persistent rolling list — read existing daily-domains.json so today's
+    # run can carry over still-available entries from prior days. Missing /
+    # malformed file → empty existing list (graceful first-run / corruption
+    # handling).
+    output_path = Path(args.output or config.get("output_path", "src/data/daily-domains.json"))
+    existing = carryover.load_existing(output_path)
+    fresh_carryover, dropped_by_age = carryover.filter_by_age(
+        existing, today, max_age_days=int(config.get("carryover_max_age_days", 14)),
+    )
+    logger.info(
+        "Existing list: %d entries; %d within age window, %d aged out (>14 days)",
+        len(existing), len(fresh_carryover), dropped_by_age,
+    )
+
+    drops, retained_carryover = collect_drops(
+        config, access_token, today=today, carryover_candidates=fresh_carryover,
+    )
+
+    registered_count = len(fresh_carryover) - len(retained_carryover)
+    logger.info(
+        "Carryover validation: %d kept, %d registered (now in today's zone), %d aged out",
+        len(retained_carryover), registered_count, dropped_by_age,
+    )
+    logger.info("Today's new drops: %d", len(drops))
+
+    # Stage 1: structural filter (cheap; pre-enrichment) — applies ONLY to
+    # today's new drops. Carryover already passed structural+lexical when
+    # they were first published; their data is stable.
     structural_kept = filter_mod.filter_candidates_structural(drops, config)
 
     # Stage 2: lexical filter (cheap; pre-network)
@@ -482,14 +561,20 @@ def main(argv: list[str] | None = None) -> int:
     # rather than being artificially capped).
     score.score_candidates(survivors, config)
 
-    # Stage 7: write — output.build_payload applies the quality floor
+    # Stage 7: persistent rolling list — annotate today's drops with
+    # first_seen=today/days_listed=0, compute days_listed for carryover,
+    # then merge. The merged list is the input to write_output.
+    carryover.annotate_today_drops(survivors, today)
+    carryover.annotate_carryover_days_listed(retained_carryover, today)
+    final_list = carryover.merge(today_drops=survivors, carryover=retained_carryover)
+
+    # Stage 8: write — output.build_payload applies the quality floor
     # (publish_min_score + publish_min_enrichment_completeness) and the
-    # publication cap. total_evaluated lands in the payload so the
-    # frontend can render "Showing N of M candidates evaluated today";
-    # "evaluated" now means "submitted to availability check" since
-    # availability is the dominant filter.
+    # publication cap. The payload includes today_count + carryover_count
+    # so the frontend can split into the two-card layout. total_evaluated
+    # is what entered availability check today (the dominant filter).
     output.write_output(
-        survivors,
+        final_list,
         config,
         output_path=args.output,
         total_evaluated=total_evaluated,
@@ -497,8 +582,9 @@ def main(argv: list[str] | None = None) -> int:
 
     publication_cap = int(config.get("max_candidates_for_publication", 300))
     logger.info(
-        "Pipeline complete: %d evaluated, %d available, %d post-enrich, %d scored, cap=%d",
-        total_evaluated, len(available), len(enriched), len(survivors), publication_cap,
+        "Pipeline complete: %d evaluated today, %d available, %d post-enrich, %d scored today + %d carryover = %d total, cap=%d",
+        total_evaluated, len(available), len(enriched), len(survivors),
+        len(retained_carryover), len(final_list), publication_cap,
     )
     return 0
 

@@ -76,6 +76,14 @@ CONTRACT_FIELDS = (
     "rdap_status",
     "rdap_expiration",
     "availability_verified_at",
+    # Persistent rolling list fields (added 2026-04-30).
+    # first_seen_date is set on first capture and never modified after;
+    # last_validated_date is updated each day a successful zone check
+    # confirms the domain is still absent from the registry zone;
+    # days_listed is derived (today − first_seen_date) at write time.
+    "first_seen_date",
+    "last_validated_date",
+    "days_listed",
 )
 
 # Enrichment fields used to compute completeness ratio. A candidate's
@@ -126,6 +134,12 @@ def _project(candidate: dict, registrars_config: list[dict]) -> dict:
         "rdap_status": candidate.get("rdap_status") or [],
         "rdap_expiration": candidate.get("rdap_expiration"),
         "availability_verified_at": candidate.get("availability_verified_at"),
+        # Persistent-list fields. days_listed defaults to 0 — the pipeline
+        # annotates this before passing to build_payload; sample-data
+        # fixtures and tests can omit it and get a sensible "today" default.
+        "first_seen_date": candidate.get("first_seen_date"),
+        "last_validated_date": candidate.get("last_validated_date"),
+        "days_listed": candidate.get("days_listed", 0),
     }
 
 
@@ -206,7 +220,12 @@ def build_payload(
         or config.get("max_candidates_per_day", 500)
     )
 
-    # Stage 1: quality floor
+    # Stage 1: quality floor — applied uniformly to today's drops AND
+    # carryover. Carryover that passed the floor in their original run
+    # passes again (their score and completeness don't change). If config
+    # thresholds tighten between runs, old entries that fail the new bar
+    # drop out — that's the right behaviour: the published list always
+    # reflects the CURRENT quality standards.
     quality_kept, quality_counts = apply_quality_floor(candidates, config)
     if quality_counts["rejected_score"] or quality_counts["rejected_completeness"]:
         logger.info(
@@ -217,7 +236,11 @@ def build_payload(
             len(candidates),
         )
 
-    # Stage 2: publication cap (CEILING)
+    # Stage 2: publication cap (CEILING). Sort by score desc within each
+    # bucket so the cap (when it bites) keeps the strongest entries from
+    # both today AND carryover, rather than e.g. truncating all carryover
+    # to make room for low-score today's drops.
+    quality_kept.sort(key=lambda c: -float(c.get("score") or 0))
     capped = quality_kept[:cap]
 
     # Stage 3: project + assemble
@@ -225,9 +248,14 @@ def build_payload(
     domains = [_project(c, registrars_config) for c in capped]
     when = (generated_at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    today_count = sum(1 for d in domains if (d.get("days_listed") or 0) == 0)
+    carryover_count = len(domains) - today_count
+
     payload: dict = {
         "generated_at": when,
         "domain_count": len(domains),
+        "today_count": today_count,
+        "carryover_count": carryover_count,
         "domains": domains,
     }
     if total_evaluated is not None:

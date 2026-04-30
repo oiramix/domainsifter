@@ -121,19 +121,76 @@ def test_collect_drops_filters_to_approved_and_handles_failed_zone(monkeypatch, 
     monkeypatch.setattr(pipeline.czds_client, "download_zone", fake_download)
     monkeypatch.setattr(pipeline.zone_parser, "parse_zone", lambda _p: {"keep.com", "newcomer.com"})
 
-    drops = pipeline.collect_drops(
+    drops, retained_carryover = pipeline.collect_drops(
         cfg, "tok", today=date(2026, 4, 27), r2_client=r2, r2_bucket="test-bucket",
     )
     names = {d["name"] for d in drops}
     assert names == {"dropping.com"}  # only com processed; net not approved; app failed
     assert all(d["dropped_date"] == "2026-04-27" for d in drops)
     assert all(d["tld"] == "com" for d in drops)
+    assert retained_carryover == []  # no carryover_candidates passed in
 
     # Today's snapshot was committed for com only (app failed before R2 reads).
     written_keys = [c.kwargs["Key"] for c in r2.put_object.call_args_list]
     assert written_keys == ["state/com_yesterday.txt"]
     # And it landed in the bucket the caller specified.
     assert r2.put_object.call_args.kwargs["Bucket"] == "test-bucket"
+
+
+def test_collect_drops_validates_carryover_against_today_zone(monkeypatch, cfg):
+    """Carryover entry whose name is ABSENT from today's zone is kept with
+    a refreshed last_validated_date. An entry whose name IS in today's zone
+    (someone registered) is dropped. Entries for a TLD whose download failed
+    pass through unvalidated."""
+    r2 = MagicMock()
+    def _fake_get(**_kw):
+        raise _no_such_key()  # cold start for each TLD's R2 read
+    r2.get_object.side_effect = _fake_get
+
+    links = ["https://x/com.zone", "https://x/app.zone"]
+    monkeypatch.setattr(pipeline.czds_client, "list_zone_links", lambda *_a, **_k: links)
+
+    def fake_download(url, _token, path, timeout=120):
+        if "app.zone" in url:
+            from scripts.czds_client import CzdsApiError
+            raise CzdsApiError("simulated failure")
+        with open(path, "wb") as fh:
+            fh.write(b"placeholder")
+        return 11
+
+    monkeypatch.setattr(pipeline.czds_client, "download_zone", fake_download)
+    # com zone today contains "registered.com" (someone took it overnight)
+    # but NOT "still-free.com".
+    monkeypatch.setattr(
+        pipeline.zone_parser, "parse_zone",
+        lambda _p: {"registered.com", "other.com"},
+    )
+
+    carryover_candidates = [
+        {"name": "still-free.com", "tld": "com", "first_seen_date": "2026-04-28",
+         "last_validated_date": "2026-04-29", "score": 60},
+        {"name": "registered.com", "tld": "com", "first_seen_date": "2026-04-28",
+         "last_validated_date": "2026-04-29", "score": 50},
+        # .app failed to download — this entry should pass through unvalidated.
+        {"name": "untouched.app", "tld": "app", "first_seen_date": "2026-04-28",
+         "last_validated_date": "2026-04-29", "score": 70},
+    ]
+
+    drops, retained = pipeline.collect_drops(
+        cfg, "tok", today=date(2026, 4, 30),
+        r2_client=r2, r2_bucket="test-bucket",
+        carryover_candidates=carryover_candidates,
+    )
+    retained_names = {r["name"] for r in retained}
+    assert "still-free.com" in retained_names
+    assert "registered.com" not in retained_names  # rejected — in today's zone
+    assert "untouched.app" in retained_names       # passed through (zone DL failed)
+
+    # The validated survivor has last_validated_date=today; the unvalidated
+    # one keeps its prior value.
+    by_name = {r["name"]: r for r in retained}
+    assert by_name["still-free.com"]["last_validated_date"] == "2026-04-30"
+    assert by_name["untouched.app"]["last_validated_date"] == "2026-04-29"
 
 
 def test_collect_drops_constructs_r2_client_when_none_supplied(monkeypatch, cfg):
@@ -309,6 +366,111 @@ def test_validate_availability_empty_input_short_circuits():
     assert pipeline.validate_availability([], {}) == []
 
 
+def test_main_persists_carryover_across_runs(monkeypatch, cfg, tmp_path):
+    """End-to-end: existing daily-domains.json contains an entry from 3 days
+    ago with full enrichment. Today's run finds NO new drops but the
+    carryover entry passes back through with days_listed=3 and refreshed
+    last_validated_date."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    # Seed an existing daily-domains.json with a 3-day-old carryover entry.
+    output_path = tmp_path / "daily.json"
+    today = date.today()
+    fsd = (today.toordinal() - 3)
+    fsd_iso = date.fromordinal(fsd).isoformat()
+    output_path.write_text(json.dumps({
+        "generated_at": "2026-04-27T07:00:00Z",
+        "domain_count": 1,
+        "domains": [{
+            "name": "amberkite.com", "tld": "com", "dropped_date": fsd_iso,
+            "wayback_snapshots": 100, "wayback_last_snapshot": "2024-01-01",
+            "open_page_rank": 4.0, "cert_history": True,
+            "previous_registrar": "Acme", "score": 75,
+            "registrars": [], "first_seen_date": fsd_iso,
+            "last_validated_date": fsd_iso, "days_listed": 3,
+        }],
+    }), encoding="utf-8")
+
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+
+    # Today's run finds NO new drops; carryover survives because today's
+    # zone (passed through to validate_against_zone) does NOT contain it.
+    def fake_collect_drops(_cfg, _tok, today, *, carryover_candidates=None, **_kw):
+        # The carryover_candidates that survived age-filter must include
+        # amberkite.com (3 days < 14-day window).
+        names = {c["name"] for c in (carryover_candidates or [])}
+        assert "amberkite.com" in names
+        # Validate carryover against today's zone — amberkite.com is NOT
+        # there, so it's retained with last_validated_date=today.
+        retained = []
+        for c in (carryover_candidates or []):
+            retained.append({**c, "last_validated_date": today.isoformat()})
+        return [], retained  # no new drops today
+
+    monkeypatch.setattr(pipeline, "collect_drops", fake_collect_drops)
+    monkeypatch.setattr(pipeline, "enrich_all", lambda cands, _cfg: cands)
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+
+    written = json.loads(output_path.read_text(encoding="utf-8"))
+    names = [d["name"] for d in written["domains"]]
+    assert names == ["amberkite.com"]  # carryover survived
+    entry = written["domains"][0]
+    assert entry["days_listed"] == 3
+    assert entry["first_seen_date"] == fsd_iso        # preserved
+    assert entry["last_validated_date"] == today.isoformat()  # refreshed
+    assert written["today_count"] == 0
+    assert written["carryover_count"] == 1
+
+
+def test_main_drops_carryover_older_than_14_days(monkeypatch, cfg, tmp_path):
+    """A 20-day-old carryover entry is dropped at the age filter; the
+    pipeline should never see it as a candidate, and the output omits it."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    today = date.today()
+    fsd_iso = date.fromordinal(today.toordinal() - 20).isoformat()
+    output_path = tmp_path / "daily.json"
+    output_path.write_text(json.dumps({
+        "generated_at": "2026-04-10T07:00:00Z",
+        "domain_count": 1,
+        "domains": [{
+            "name": "ancient.com", "tld": "com", "dropped_date": fsd_iso,
+            "score": 60, "registrars": [], "first_seen_date": fsd_iso,
+            "last_validated_date": fsd_iso, "days_listed": 20,
+        }],
+    }), encoding="utf-8")
+
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+
+    seen_carryover_names: set[str] = set()
+
+    def fake_collect_drops(_cfg, _tok, today, *, carryover_candidates=None, **_kw):
+        for c in (carryover_candidates or []):
+            seen_carryover_names.add(c["name"])
+        return [], []
+
+    monkeypatch.setattr(pipeline, "collect_drops", fake_collect_drops)
+    monkeypatch.setattr(pipeline, "enrich_all", lambda cands, _cfg: cands)
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+    assert "ancient.com" not in seen_carryover_names  # filtered out before collect_drops
+    written = json.loads(output_path.read_text(encoding="utf-8"))
+    assert written["domains"] == []
+
+
 def test_main_skips_enrichment_for_unavailable_domains(monkeypatch, cfg, tmp_path):
     """Architectural assertion: availability check runs BEFORE enrichment.
     A candidate marked is_available=False must NOT reach enrich_all."""
@@ -324,10 +486,10 @@ def test_main_skips_enrichment_for_unavailable_domains(monkeypatch, cfg, tmp_pat
     monkeypatch.setattr(
         pipeline,
         "collect_drops",
-        lambda _cfg, _tok, today: [
+        lambda _cfg, _tok, today, **_kw: ([
             {"name": "available.com", "tld": "com", "dropped_date": today.isoformat()},
             {"name": "owned.com", "tld": "com", "dropped_date": today.isoformat()},
-        ],
+        ], []),
     )
 
     from scripts.enrichment import rdap as rdap_mod
@@ -383,11 +545,11 @@ def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cf
     monkeypatch.setattr(
         pipeline,
         "collect_drops",
-        lambda _cfg, _tok, today: [
+        lambda _cfg, _tok, today, **_kw: ([
             {"name": "great.com", "tld": "com", "dropped_date": today.isoformat()},
             {"name": "78win012.com", "tld": "com", "dropped_date": today.isoformat()},
             {"name": "xn--bad.com", "tld": "com", "dropped_date": today.isoformat()},
-        ],
+        ], []),
     )
 
     enriched_names: list[str] = []
@@ -456,10 +618,10 @@ def test_main_happy_path_writes_output(monkeypatch, cfg, tmp_path):
     monkeypatch.setattr(
         pipeline,
         "collect_drops",
-        lambda _cfg, _tok, today: [
+        lambda _cfg, _tok, today, **_kw: ([
             {"name": "great.com", "tld": "com", "dropped_date": today.isoformat()},
             {"name": "alsogood.com", "tld": "com", "dropped_date": today.isoformat()},
-        ],
+        ], []),
     )
 
     def fake_enrich_all(cands, _cfg):
@@ -518,7 +680,7 @@ def test_main_propagates_spam_check_config_error(monkeypatch, cfg, tmp_path):
     monkeypatch.setattr(
         pipeline,
         "collect_drops",
-        lambda _cfg, _tok, today: [{"name": "great.com", "tld": "com", "dropped_date": "2026-04-27"}],
+        lambda _cfg, _tok, today, **_kw: ([{"name": "great.com", "tld": "com", "dropped_date": "2026-04-27"}], []),
     )
 
     # Availability check now runs BEFORE enrichment — stub it so the
