@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: April 26, 2026 (V1 PIPELINE — state migrated to Cloudflare R2 to unblock first run; awaiting R2 setup + re-run)
+Last updated: 2026-04-30 (Wave 1.5 — 14-day persistent rolling list shipped; two-card frontend; CSS-grid table; cron migrated to Cloudflare Worker; 13 active TLDs; 325/325 tests passing)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -681,3 +681,66 @@ A nuance worth noting for future debugging: when *all* requests are slow (5–11
 ### Operational note
 
 `diagnostic_logging` defaults to `false`. Flip to `true` in `scripts/config.json` and run a single `python -m scripts.pipeline` (or one cron tick) to capture the throttle/enricher DEBUG stream when investigating future pacing issues. Don't leave it on in production — the log volume is ~3-4 lines per request.
+
+---
+
+## Wave 1.5 ship (2026-04-30) — persistence, two-card frontend, grid layout, ops hardening
+
+Detailed commit-by-commit log lives in `WORK_LOG_2026-04-30.md`. Cross-cutting summary of what changed at architectural level:
+
+### 14-day persistent rolling list
+
+- New `scripts/carryover.py` with pure functions: `load_existing`, `filter_by_age`, `validate_against_zone`, `annotate_today_drops`, `annotate_carryover_days_listed`, `merge`.
+- `pipeline.collect_drops` now takes `carryover_candidates=...` and returns `(drops, retained_carryover)`. Validates each TLD's carryover INSIDE the per-TLD loop while `today_set` is still in scope; this avoids holding all 13 zones (10–50M apex names each) in memory simultaneously on the GHA runner.
+- TLD whose zone download/parse fails → carryover for that TLD passes through with `last_validated_date` UNCHANGED. Fail-open. Ages out naturally if the failure persists 14 days.
+- New schema fields per domain: `first_seen_date` (immutable after capture), `last_validated_date` (refreshed each successful zone check), `days_listed` (derived at write time). Top-level adds: `today_count`, `carryover_count`.
+- Migration: pre-persistence entries (no `first_seen_date`) get treated as `first_seen_date = today` so they survive the migration day cleanly and age naturally going forward.
+
+### Frontend: two-card layout
+
+- DomainTable.astro split: Card 1 "Today's drops" (`days_listed === 0`, 7 columns) + Card 2 "Still available" (`days_listed > 0`, 8 columns including "Listed").
+- Shared search + TLD filter at top applies to both cards. Per-card sort state.
+- Differentiated empty states: real-data zero ("No new drops met our quality bar today" / "rolling list builds up over time") vs filter-reduced zero (per-card "No domains in {Today's drops|Still available} match your filters").
+- `sample-domains.json` regenerated with 5 today + 15 carryover so the cold-start fallback exercises both cards.
+
+### Frontend: table → CSS Grid
+
+- Replaced `<table>` markup with semantic `<div role="table"/row/cell"/columnheader">`. Each row is its own grid container with an identical `grid-cols-[200px_80px_…_1fr]` template; columns align across rows because templates match.
+- Card 1: `grid-cols-[200px_80px_110px_110px_180px_120px_1fr]` (Domain, TLD, Dropped, Wayback, OPR, Verdict, Register).
+- Card 2: `grid-cols-[200px_80px_110px_110px_110px_180px_120px_1fr]` (Domain, TLD, Dropped, **Listed**, Wayback, OPR, Verdict, Register — Listed reordered to position 4 next to Dropped, both temporal).
+- Domain through Verdict are content-sized fixed pixels; Register is `1fr` and absorbs all card slack.
+- **Inline popover, not absolute:** Register cell is a flex container `[button | popover-icons]`. Popover starts `hidden`; JS toggles `flex` class on open so it lays out inline next to the button using the 1fr slack space the cell already owns. Killed three classes of bug: `<td>`-as-containing-block inconsistency, overflow-clip from the scrolling wrapper, overlap with neighbouring columns.
+
+### Methodology section: 3 → 6 cards
+
+- Walks the actual pipeline order: Catch → Filter → Verify → Enrich → Score → Publish.
+- 1×6 mobile, 2×3 tablet, 3×2 desktop.
+- New SVG icons (Lucide-style stroke geometry, no runtime icon library) for shield-check / database / bar-chart / file-check.
+
+### Enrichment hardening
+
+- `config.api_request_timeout_seconds.{wayback,crtsh}: 60` (per-enricher override; other enrichers still 10 s default).
+- New `retry_on_timeout` helper in `_circuit_breaker.py` — 3 attempts, 5 s + 15 s backoff. Retries ONLY on Connect/Read/Timeout; other failures (HTTPError, ConnectionError, JSON) propagate immediately. One breaker failure recorded per FINAL failure, not per attempt.
+- Wired into `wayback.enrich` and `crtsh.enrich`. Each retry re-acquires the host throttle slot so retries respect per-host pacing identically to first attempts.
+
+### Diagnostic instrumentation
+
+- `config.diagnostic_logging: false` flag added. When `true`, the pipeline flips throttle + wayback + crtsh loggers to DEBUG: per-request initiate/response timing in the enrichers + per-acquire throttle trace (`configured`, `factor`, `effective`, `delay_applied`, `since_last`).
+- Empirically verified pacing is 100% compliant via 20-call probe on 2026-04-30. Today's external 503/502 storms were upstream-service degradation, not us hammering.
+
+### Operational changes
+
+- `.biz` activated (CZDS approved this morning). `tlds.approved` now contains 13 entries: `app, dev, live, studio, tech, online, site, store, xyz, info, org, shop, biz`. `tlds.pending`: `com, net`.
+- GitHub Actions `schedule:` cron removed. Workflow now only triggers via `workflow_dispatch`. Cloudflare Cron Trigger Worker (`domainsifter-cron-trigger`) dispatches via the GitHub API on schedule. Free-tier GHA cron queue delays no longer affect us.
+- Newsletter signup wired to Buttondown's public embed endpoint (`https://buttondown.com/api/emails/embed-subscribe/domainsifter`). No API key in client code. Honeypot field, inline submit with status, no page navigation.
+
+### Test surface
+
+- 286 → 325 tests (39 new across `test_carryover.py`, `test_pipeline.py`, `test_output.py`, `test_circuit_breaker.py`, `test_wayback.py`, `test_crtsh.py`).
+- All passing in ~12.5 s on Python 3.10.
+
+### Known follow-ups (not blockers)
+
+- Cron is paused. Trigger workflow_dispatch manually after the next Cloudflare Pages deploy to validate the new persistence flow on real data; then re-enable the Worker schedule.
+- Tomorrow's first persistent-list run should keep `nomoda.org` as a carryover entry showing "Listed: 1 day ago" in Card 2 (assuming it stays absent from the .org zone overnight).
+- DMARC remains `p=none` — calendar reminder for 2026-05-24 to consider stricter policy.
