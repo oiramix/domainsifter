@@ -1,10 +1,12 @@
 ---
 import samplePayload from '../data/sample-domains.json';
 
-// Pipeline output (locked schema — PLAN.md Principle 5, with the
-// 2026-04-27-evening migration: single affiliate_link → registrars[]).
-// The pipeline composes each registrar URL using the configured template;
-// the site uses them verbatim, never re-derives or URL-encodes.
+// Pipeline output (locked schema — PLAN.md Principle 5).
+// Migrations applied:
+//   2026-04-27 evening: single affiliate_link → registrars[]
+//   2026-04-30:        added first_seen_date / last_validated_date /
+//                      days_listed for the 14-day persistent rolling list,
+//                      plus top-level today_count / carryover_count.
 interface RegistrarLink {
   name: string;                    // "Namecheap", "NameSilo", ...
   url: string;                     // affiliate URL with {name} substituted
@@ -14,37 +16,35 @@ interface PipelineDomain {
   name: string;
   tld: string;
   dropped_date: string;            // ISO YYYY-MM-DD
-  wayback_snapshots: number;
+  wayback_snapshots: number | null;
   wayback_last_snapshot: string | null;
-  open_page_rank: number;
-  cert_history: boolean;
+  open_page_rank: number | null;
+  cert_history: boolean | null;
   previous_registrar: string | null;
   score: number;                   // 0–100
-  registrars: RegistrarLink[];     // popover render order = config order
+  registrars: RegistrarLink[];
+  // Persistent-list fields (optional in older payloads / sample data)
+  first_seen_date?: string | null;
+  last_validated_date?: string | null;
+  days_listed?: number;            // 0 = today, >0 = carryover
 }
 
 interface PipelinePayload {
-  generated_at: string;            // ISO 8601
+  generated_at: string;
   domain_count: number;
   domains: PipelineDomain[];
-  // Optional — present when the pipeline writes it (added 2026-04-28).
-  // The total count of candidates that entered enrichment that day, so the
-  // frontend can render "Showing N of M candidates evaluated today" without
-  // inventing a number. Older sample-data payloads don't include this; we
-  // fall back to domain_count when it's absent.
   total_candidates_evaluated?: number;
+  today_count?: number;
+  carryover_count?: number;
 }
 
 type Verdict = 'Clean' | 'Promising' | 'Caution';
 
 // --- Data source resolution ---------------------------------------------------
-// The pipeline writes src/data/daily-domains.json daily via GitHub Actions.
-// On cold start (day 1) it produces an empty domains array; if the workflow
-// fails entirely the file may be absent. Either way, fall back to the sample
-// preview so the page always renders.
-//
-// import.meta.glob handles the missing-file case gracefully (eager-loaded
-// matches yield {} when the path doesn't exist), unlike a static import.
+// Pipeline writes src/data/daily-domains.json; sample-domains.json is the
+// cold-start / pipeline-failed fallback so the page always renders.
+// import.meta.glob handles missing-file gracefully (eager-loaded matches
+// yield {} when the path doesn't exist), unlike a static import.
 const dailyMatches = import.meta.glob<{ default: PipelinePayload }>(
   '../data/daily-domains.json',
   { eager: true },
@@ -55,22 +55,26 @@ const isPreview = !dailyPayload || !dailyPayload.domains || dailyPayload.domains
 const payload: PipelinePayload = isPreview
   ? (samplePayload as PipelinePayload)
   : (dailyPayload as PipelinePayload);
-const domains = payload.domains;
+const allDomains = payload.domains;
+
+// Split into the two card buckets. days_listed === 0 → today; > 0 → carryover.
+// Missing / undefined days_listed (sample data, migration) → treated as today.
+const todayDomains = allDomains.filter((d) => (d.days_listed ?? 0) === 0);
+const carryoverDomains = allDomains.filter((d) => (d.days_listed ?? 0) > 0);
 
 const lastUpdatedLabel = isPreview
   ? 'Preview data'
   : new Date(payload.generated_at).toUTCString().replace('GMT', 'UTC');
 
-const tldsInData = Array.from(new Set(domains.map((d) => d.tld))).sort();
+const tldsInData = Array.from(new Set(allDomains.map((d) => d.tld))).sort();
 
-// Total candidates evaluated today (post-lexical, pre-publication-floor).
-// Pipeline writes this as `total_candidates_evaluated`; older sample-data
-// payloads don't have it and fall back to the rendered domain count. The
-// caption text uses this for the "of N candidates evaluated today" copy
-// — honest reporting that the daily list is filtered down from a larger pool.
+// "Evaluated today" — the count of candidates that entered availability
+// check today (the dominant filter). Pipeline writes
+// total_candidates_evaluated; older payloads / sample data fall back to
+// the today bucket size so we still report something honest.
 const totalEvaluated = (!isPreview && payload.total_candidates_evaluated)
   ? payload.total_candidates_evaluated
-  : domains.length;
+  : todayDomains.length;
 
 // --- Display helpers ----------------------------------------------------------
 
@@ -80,8 +84,6 @@ const verdictFromScore = (score: number): Verdict => {
   return 'Caution';
 };
 
-// Build-time relative-date label. Cloudflare Pages rebuilds when the pipeline
-// commits the daily JSON, so this stays accurate to the daily refresh.
 const droppedDaysAgo = (isoDate: string): string => {
   const dropped = new Date(`${isoDate}T00:00:00Z`);
   const now = new Date();
@@ -92,24 +94,20 @@ const droppedDaysAgo = (isoDate: string): string => {
   return `${days} days ago`;
 };
 
-// --- Null-safe formatters ----------------------------------------------------
-// Pipeline output can have null for any enrichment-derived field when the
-// corresponding source's circuit breaker opened mid-run (see day-2 incident).
-// Today's first-real-data run had 293/300 wayback_snapshots null, 298/300
-// cert_history null, 5/300 previous_registrar null. open_page_rank and score
-// were fully populated but we treat them defensively anyway. Em-dash ("—")
-// is the editorial convention for "data not available" — clearly distinct
-// from a value of zero or an empty string.
-const DASH = '—';
+// "Listed" column label — purely from days_listed (computed pipeline-side
+// at write time so the value is stable across browser timezones).
+const listedAgo = (days: number | undefined | null): string => {
+  if (days == null || days <= 0) return 'today';
+  if (days === 1) return '1 day ago';
+  return `${days} days ago`;
+};
 
+// --- Null-safe formatters ----------------------------------------------------
+const DASH = '—';
 const fmtInt = (v: number | null | undefined): string =>
   v == null ? DASH : v.toLocaleString('en-US');
-
 const fmtDecimal = (v: number | null | undefined, digits = 1): string =>
   v == null ? DASH : v.toFixed(digits);
-
-// Width % for the OPR progress bar. Null → 0% (empty bar) rather than
-// crashing the CSS calc. The em-dash next to the bar communicates "no data".
 const oprPct = (v: number | null | undefined): number =>
   v == null ? 0 : Math.max(0, Math.min(100, (v / 10) * 100));
 
@@ -133,10 +131,6 @@ const tldClass = (tld: string) => {
   }
 };
 
-// Registrar name → local logo path. Add new affiliates by dropping a PNG
-// into public/registrar-logos/ and adding the entry here. If a registrar
-// name isn't in this map the popover falls back to rendering the name as
-// text (graceful degradation — the link still works, just without a logo).
 const REGISTRAR_LOGOS: Record<string, string> = {
   'Namecheap': '/registrar-logos/namecheap.png',
   'NameSilo':  '/registrar-logos/namesilo.png',
@@ -152,13 +146,27 @@ const verdictClass = (verdict: Verdict) => {
       return 'bg-rose-50 text-rose-800 ring-rose-200';
   }
 };
+
+// Subheader sentences for each card — driven by counts so we don't lie.
+const todaySubheader = (n: number): string => {
+  if (n === 0) return 'No new drops yet today';
+  if (n === 1) return '1 domain added today';
+  return `${n.toLocaleString('en-US')} domains added today`;
+};
+const carryoverSubheader = (n: number): string => {
+  if (n === 0) return 'Up to 14 days, no carryover yet';
+  if (n === 1) return 'Up to 14 days, 1 domain';
+  return `Up to 14 days, ${n.toLocaleString('en-US')} domains`;
+};
 ---
 
 <section id="today" class="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
+  <!-- Shared header bar: title, last-updated, search, TLD filter.
+       Filter + search apply to BOTH cards simultaneously. -->
   <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
     <div>
       <div class="flex items-center gap-2">
-        <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">Today's drops</h2>
+        <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight">Drops</h2>
         {isPreview && (
           <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-200">
             Preview data
@@ -166,8 +174,8 @@ const verdictClass = (verdict: Verdict) => {
         )}
       </div>
       <p class="mt-2 text-sm text-stone-600">
-        <span data-result-count data-total-evaluated={totalEvaluated}>
-          Showing {domains.length} of {totalEvaluated.toLocaleString('en-US')} candidates evaluated today
+        <span data-total-evaluated={totalEvaluated}>
+          Evaluated {totalEvaluated.toLocaleString('en-US')} candidates today
         </span>
         <span class="text-stone-400"> • </span>
         <span>
@@ -211,338 +219,469 @@ const verdictClass = (verdict: Verdict) => {
     </div>
   </div>
 
-  {domains.length === 0 && !isPreview && (
-    <div class="rounded-lg border border-stone-200 bg-white px-6 py-12 text-center shadow-sm">
-      <p class="text-base font-medium text-ink">No domains met our quality bar today.</p>
-      <p class="mt-2 text-sm text-stone-600">
-        We evaluated {totalEvaluated.toLocaleString('en-US')} candidates and none passed the score and
-        completeness thresholds. Check back tomorrow.
+  <!-- =============== CARD 1: Today's drops =============== -->
+  <article
+    data-card-scope="today"
+    class="rounded-lg border border-stone-200 bg-white shadow-sm mb-6"
+  >
+    <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
+      <h3 class="text-lg font-semibold text-ink">Today's drops</h3>
+      <p class="mt-1 text-sm text-stone-600" data-today-subheader>
+        {todaySubheader(todayDomains.length)}
       </p>
-    </div>
-  )}
+    </header>
 
-  <!-- Desktop / tablet table.
-       NOTE: NOT using overflow-hidden here. The popover for the last row
-       anchors `top-full` (below its trigger) and would be clipped against
-       the table wrapper's bottom edge if overflow were hidden. The rounded
-       corners are still drawn via `rounded-lg` + `border`; the visual
-       penalty for omitting overflow-hidden is that table cells at the
-       extreme corners square slightly inside the border radius, which is
-       imperceptible at this corner size. -->
-  <div class:list={["hidden md:block rounded-lg border border-stone-200 bg-white shadow-sm", domains.length === 0 && !isPreview ? "md:!hidden" : ""]}>
-    <table class="w-full text-sm" data-domain-table>
-      <thead class="bg-stone-50 text-stone-600">
-        <tr>
-          <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
-              Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-            </button>
-          </th>
-          <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="tld">
-              TLD <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-            </button>
-          </th>
-          <th scope="col" class="text-right font-medium">
-            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
-              Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-            </button>
-          </th>
-          <th scope="col" class="text-right font-medium">
-            <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
-              Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-            </button>
-          </th>
-          <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
-              OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-            </button>
-          </th>
-          <th scope="col" class="text-left font-medium">
-            <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
-              Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-            </button>
-          </th>
-          <th scope="col" class="text-right font-medium px-4 py-3">Register</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-stone-100" data-table-body>
-        {
-          domains.map((d, i) => {
+    {/* Empty state for Card 1 — shown when no new drops cleared the bar today.
+        Real-data days when the pipeline returns 0 today_count are common
+        early in the project's life; this is the right copy for that case. */}
+    {todayDomains.length === 0 && !isPreview && (
+      <div class="px-4 sm:px-6 py-10 text-center" data-today-empty-real>
+        <p class="text-sm text-stone-700">
+          No new drops met our quality bar today. Check the still-available
+          list below.
+        </p>
+      </div>
+    )}
+
+    {todayDomains.length > 0 && (
+      <>
+        <!-- Desktop table — max-height + scroll for >20 rows. -->
+        <div class="hidden md:block max-h-[60rem] overflow-y-auto rounded-b-lg">
+          <table class="w-full text-sm" data-domain-table data-table-scope="today">
+            <thead class="bg-stone-50 text-stone-600 sticky top-0 z-10">
+              <tr>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
+                    Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="tld">
+                    TLD <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium">
+                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
+                    Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium">
+                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
+                    Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
+                    OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
+                    Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium px-4 py-3">Register</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100" data-table-body data-scope="today">
+              {todayDomains.map((d, i) => {
+                const verdict = verdictFromScore(d.score);
+                const popoverId = `pop-today-row-${i}`;
+                return (
+                  <tr
+                    data-row
+                    data-scope="today"
+                    data-name={d.name.toLowerCase()}
+                    data-tld={d.tld}
+                    data-dropped={d.dropped_date}
+                    data-wayback={d.wayback_snapshots}
+                    data-opr={d.open_page_rank}
+                    data-score={d.score}
+                  >
+                    <td class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></td>
+                    <td class="px-4 py-3">
+                      <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-2">
+                        <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                          <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
+                        </div>
+                        <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{fmtDecimal(d.open_page_rank)}</span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>{verdict}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right relative">
+                      <button
+                        type="button"
+                        data-popover-trigger={popoverId}
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls={popoverId}
+                        class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+                      >
+                        Register →
+                      </button>
+                      <div
+                        id={popoverId}
+                        data-popover={popoverId}
+                        role="menu"
+                        aria-label={`Register ${d.name} at`}
+                        hidden
+                        class="absolute right-0 top-full mt-1 z-20 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1.5 shadow-xl whitespace-nowrap w-max"
+                      >
+                        {d.registrars.map((r) => {
+                          const logo = REGISTRAR_LOGOS[r.name];
+                          return (
+                            <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
+                               class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
+                              {logo
+                                ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
+                                : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state data-empty-scope="today">
+            No domains in Today's drops match your filters.
+          </p>
+        </div>
+
+        <!-- Mobile cards for Card 1 -->
+        <ul class="md:hidden space-y-3 p-3 max-h-[80vh] overflow-y-auto" data-card-list data-scope="today">
+          {todayDomains.map((d, i) => {
             const verdict = verdictFromScore(d.score);
-            const popoverId = `pop-row-${i}`;
+            const popoverId = `pop-today-card-${i}`;
             return (
-              <tr
-                data-row
+              <li
+                data-card
+                data-scope="today"
                 data-name={d.name.toLowerCase()}
                 data-tld={d.tld}
                 data-dropped={d.dropped_date}
                 data-wayback={d.wayback_snapshots}
                 data-opr={d.open_page_rank}
                 data-score={d.score}
+                class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
               >
-                <td class="px-4 py-3">
-                  <span class="font-medium text-ink">{d.name}</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
-                    .{d.tld}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
-                <td class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
-                    <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
-                      <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
-                    </div>
-                    <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{fmtDecimal(d.open_page_rank)}</span>
-                  </div>
-                </td>
-                <td class="px-4 py-3">
-                  <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>
-                    {verdict}
-                  </span>
-                </td>
-                {/*
-                  STRUCTURAL INVARIANT: the popover <div> MUST be a child of
-                  this <td>, NOT a sibling. The td has `position: relative`
-                  which is the anchor for the popover's `position: absolute`
-                  + `right-full top-1/2`. If the div ends up outside the td
-                  (e.g., due to a misplaced closing tag), absolute positioning
-                  resolves to whatever positioned ancestor it finds — usually
-                  <body> — and the popover renders at the wrong screen
-                  location. Verified by tests/test_dom_structure (if added)
-                  and by html.parser-based smoke check in build CI.
-                */}
-                <td class="px-4 py-3 text-right relative">
-                  <button
-                    type="button"
-                    data-popover-trigger={popoverId}
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                    aria-controls={popoverId}
-                    class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
-                  >
+                <div class="flex items-start justify-between gap-3">
+                  <span class="font-medium text-ink break-all">{d.name}</span>
+                  <span class={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>{verdict}</span>
+                </div>
+                <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">TLD</dt><dd>
+                    <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
+                  </dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Dropped</dt>
+                    <dd class="text-stone-800 tabular-nums">{droppedDaysAgo(d.dropped_date)}</dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Wayback snapshots</dt>
+                    <dd class="text-stone-800 tabular-nums">{fmtInt(d.wayback_snapshots)}</dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">OpenPageRank</dt>
+                    <dd class="flex items-center gap-2">
+                      <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                        <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
+                      </div>
+                      <span class="text-stone-800 tabular-nums text-xs">{fmtDecimal(d.open_page_rank)}</span>
+                    </dd></div>
+                </dl>
+                <div class="relative mt-4">
+                  <button type="button" data-popover-trigger={popoverId} aria-haspopup="true" aria-expanded="false" aria-controls={popoverId}
+                          class="block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors">
                     Register →
                   </button>
-                  <div
-                    id={popoverId}
-                    data-popover={popoverId}
-                    role="menu"
-                    aria-label={`Register ${d.name} at`}
-                    hidden
-                    class="absolute right-0 top-full mt-1 z-20 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1.5 shadow-xl whitespace-nowrap w-max"
-                  >
+                  <div id={popoverId} data-popover={popoverId} role="menu" aria-label={`Register ${d.name} at`} hidden
+                       class="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-1 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap">
                     {d.registrars.map((r) => {
                       const logo = REGISTRAR_LOGOS[r.name];
                       return (
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noopener sponsored"
-                          role="menuitem"
-                          title={r.name}
-                          aria-label={`Register at ${r.name}`}
-                          class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40"
-                        >
-                          {logo ? (
-                            <img
-                              src={logo}
-                              alt=""
-                              width="20"
-                              height="20"
-                              class="block h-5 w-5 rounded-sm"
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          ) : (
-                            <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">
-                              {r.name}
-                            </span>
-                          )}
+                        <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
+                           class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
+                          {logo
+                            ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
+                            : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
                         </a>
                       );
                     })}
                   </div>
-                </td>
-              </tr>
+                </div>
+              </li>
             );
-          })
-        }
-      </tbody>
-    </table>
-
-    <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state>
-      No domains match your filters.
-    </p>
-  </div>
-
-  <!-- Mobile card layout -->
-  <ul class:list={["md:hidden space-y-3", domains.length === 0 && !isPreview ? "!hidden" : ""]} data-card-list>
-    {
-      domains.map((d, i) => {
-        const verdict = verdictFromScore(d.score);
-        const popoverId = `pop-card-${i}`;
-        return (
-          <li
-            data-card
-            data-name={d.name.toLowerCase()}
-            data-tld={d.tld}
-            data-dropped={d.dropped_date}
-            data-wayback={d.wayback_snapshots}
-            data-opr={d.open_page_rank}
-            data-score={d.score}
-            class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <span class="font-medium text-ink break-all">{d.name}</span>
-              <span class={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>
-                {verdict}
-              </span>
-            </div>
-
-            <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div class="flex items-center justify-between col-span-2">
-                <dt class="text-stone-500">TLD</dt>
-                <dd>
-                  <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>
-                    .{d.tld}
-                  </span>
-                </dd>
-              </div>
-              <div class="flex items-center justify-between col-span-2">
-                <dt class="text-stone-500">Dropped</dt>
-                <dd class="text-stone-800 tabular-nums">{droppedDaysAgo(d.dropped_date)}</dd>
-              </div>
-              <div class="flex items-center justify-between col-span-2">
-                <dt class="text-stone-500">Wayback snapshots</dt>
-                <dd class="text-stone-800 tabular-nums">{fmtInt(d.wayback_snapshots)}</dd>
-              </div>
-              <div class="flex items-center justify-between col-span-2">
-                <dt class="text-stone-500">OpenPageRank</dt>
-                <dd class="flex items-center gap-2">
-                  <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
-                    <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
-                  </div>
-                  <span class="text-stone-800 tabular-nums text-xs">{fmtDecimal(d.open_page_rank)}</span>
-                </dd>
-              </div>
-            </dl>
-
-            <div class="relative mt-4">
-              <button
-                type="button"
-                data-popover-trigger={popoverId}
-                aria-haspopup="true"
-                aria-expanded="false"
-                aria-controls={popoverId}
-                class="block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
-              >
-                Register →
-              </button>
-              <div
-                id={popoverId}
-                data-popover={popoverId}
-                role="menu"
-                aria-label={`Register ${d.name} at`}
-                hidden
-                class="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-1 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap"
-              >
-                {d.registrars.map((r) => {
-                  const logo = REGISTRAR_LOGOS[r.name];
-                  return (
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noopener sponsored"
-                      role="menuitem"
-                      title={r.name}
-                      aria-label={`Register at ${r.name}`}
-                      class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40"
-                    >
-                      {logo ? (
-                        <img
-                          src={logo}
-                          alt=""
-                          width="20"
-                          height="20"
-                          class="block h-5 w-5 rounded-sm"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">
-                          {r.name}
-                        </span>
-                      )}
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
+          })}
+          <li class="hidden text-center text-sm text-stone-500 py-6" data-empty-card data-empty-scope="today">
+            No domains in Today's drops match your filters.
           </li>
-        );
-      })
-    }
-    <li class="hidden text-center text-sm text-stone-500 py-6" data-empty-card>
-      No domains match your filters.
-    </li>
-  </ul>
+        </ul>
+      </>
+    )}
+  </article>
+
+  <!-- =============== CARD 2: Still available =============== -->
+  <article
+    data-card-scope="carryover"
+    class="rounded-lg border border-stone-200 bg-white shadow-sm"
+  >
+    <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
+      <h3 class="text-lg font-semibold text-ink">Still available</h3>
+      <p class="mt-1 text-sm text-stone-600" data-carryover-subheader>
+        {carryoverSubheader(carryoverDomains.length)}
+      </p>
+    </header>
+
+    {carryoverDomains.length === 0 && (
+      <div class="px-4 sm:px-6 py-10 text-center" data-carryover-empty-real>
+        <p class="text-sm text-stone-700">
+          The rolling list builds up over time — domains that survive
+          today's check stay here for up to 14 days.
+        </p>
+      </div>
+    )}
+
+    {carryoverDomains.length > 0 && (
+      <>
+        <!-- Desktop table for Card 2 — same columns as Card 1 plus "Listed". -->
+        <div class="hidden md:block max-h-[60rem] overflow-y-auto rounded-b-lg">
+          <table class="w-full text-sm" data-domain-table data-table-scope="carryover">
+            <thead class="bg-stone-50 text-stone-600 sticky top-0 z-10">
+              <tr>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
+                    Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="tld">
+                    TLD <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium">
+                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
+                    Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium">
+                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
+                    Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
+                    OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-left font-medium">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
+                    Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium">
+                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="listed">
+                    Listed <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </th>
+                <th scope="col" class="text-right font-medium px-4 py-3">Register</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-100" data-table-body data-scope="carryover">
+              {carryoverDomains.map((d, i) => {
+                const verdict = verdictFromScore(d.score);
+                const popoverId = `pop-carry-row-${i}`;
+                const days = d.days_listed ?? 0;
+                return (
+                  <tr
+                    data-row
+                    data-scope="carryover"
+                    data-name={d.name.toLowerCase()}
+                    data-tld={d.tld}
+                    data-dropped={d.dropped_date}
+                    data-wayback={d.wayback_snapshots}
+                    data-opr={d.open_page_rank}
+                    data-score={d.score}
+                    data-listed={days}
+                  >
+                    <td class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></td>
+                    <td class="px-4 py-3">
+                      <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</td>
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-2">
+                        <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                          <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
+                        </div>
+                        <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{fmtDecimal(d.open_page_rank)}</span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3">
+                      <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>{verdict}</span>
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums text-stone-500">{listedAgo(days)}</td>
+                    <td class="px-4 py-3 text-right relative">
+                      <button
+                        type="button"
+                        data-popover-trigger={popoverId}
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls={popoverId}
+                        class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+                      >
+                        Register →
+                      </button>
+                      <div
+                        id={popoverId}
+                        data-popover={popoverId}
+                        role="menu"
+                        aria-label={`Register ${d.name} at`}
+                        hidden
+                        class="absolute right-0 top-full mt-1 z-20 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1.5 shadow-xl whitespace-nowrap w-max"
+                      >
+                        {d.registrars.map((r) => {
+                          const logo = REGISTRAR_LOGOS[r.name];
+                          return (
+                            <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
+                               class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
+                              {logo
+                                ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
+                                : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state data-empty-scope="carryover">
+            No domains in Still available match your filters.
+          </p>
+        </div>
+
+        <!-- Mobile cards for Card 2 — extra "Listed" row in the dl -->
+        <ul class="md:hidden space-y-3 p-3 max-h-[80vh] overflow-y-auto" data-card-list data-scope="carryover">
+          {carryoverDomains.map((d, i) => {
+            const verdict = verdictFromScore(d.score);
+            const popoverId = `pop-carry-card-${i}`;
+            const days = d.days_listed ?? 0;
+            return (
+              <li
+                data-card
+                data-scope="carryover"
+                data-name={d.name.toLowerCase()}
+                data-tld={d.tld}
+                data-dropped={d.dropped_date}
+                data-wayback={d.wayback_snapshots}
+                data-opr={d.open_page_rank}
+                data-score={d.score}
+                data-listed={days}
+                class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <span class="font-medium text-ink break-all">{d.name}</span>
+                  <span class={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>{verdict}</span>
+                </div>
+                <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">TLD</dt><dd>
+                    <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
+                  </dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Dropped</dt>
+                    <dd class="text-stone-800 tabular-nums">{droppedDaysAgo(d.dropped_date)}</dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Listed</dt>
+                    <dd class="text-stone-800 tabular-nums">{listedAgo(days)}</dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Wayback snapshots</dt>
+                    <dd class="text-stone-800 tabular-nums">{fmtInt(d.wayback_snapshots)}</dd></div>
+                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">OpenPageRank</dt>
+                    <dd class="flex items-center gap-2">
+                      <div class="h-1.5 w-20 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
+                        <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
+                      </div>
+                      <span class="text-stone-800 tabular-nums text-xs">{fmtDecimal(d.open_page_rank)}</span>
+                    </dd></div>
+                </dl>
+                <div class="relative mt-4">
+                  <button type="button" data-popover-trigger={popoverId} aria-haspopup="true" aria-expanded="false" aria-controls={popoverId}
+                          class="block w-full text-center rounded-md border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors">
+                    Register →
+                  </button>
+                  <div id={popoverId} data-popover={popoverId} role="menu" aria-label={`Register ${d.name} at`} hidden
+                       class="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-1 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1 shadow-lg whitespace-nowrap">
+                    {d.registrars.map((r) => {
+                      const logo = REGISTRAR_LOGOS[r.name];
+                      return (
+                        <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
+                           class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
+                          {logo
+                            ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
+                            : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+          <li class="hidden text-center text-sm text-stone-500 py-6" data-empty-card data-empty-scope="carryover">
+            No domains in Still available match your filters.
+          </li>
+        </ul>
+      </>
+    )}
+  </article>
 </section>
 
 <script>
-  type SortKey = 'name' | 'tld' | 'dropped' | 'wayback' | 'opr' | 'score';
+  type SortKey = 'name' | 'tld' | 'dropped' | 'wayback' | 'opr' | 'score' | 'listed';
   type SortDir = 'asc' | 'desc';
+  type Scope = 'today' | 'carryover';
 
-  const totalCount = document.querySelectorAll<HTMLElement>('[data-row]').length;
+  // Sort state is per-scope so each card can sort independently. Default
+  // is null (preserve pipeline order, which is score desc within bucket).
+  const sortState: Record<Scope, { key: SortKey | null; dir: SortDir }> = {
+    today:     { key: null, dir: 'asc' },
+    carryover: { key: null, dir: 'asc' },
+  };
+
   const search = document.querySelector<HTMLInputElement>('#domain-search');
   const tldFilter = document.querySelector<HTMLSelectElement>('#tld-filter');
-  const tableBody = document.querySelector<HTMLElement>('[data-table-body]');
-  const cardList = document.querySelector<HTMLElement>('[data-card-list]');
-  const resultCount = document.querySelector<HTMLElement>('[data-result-count]');
-  const emptyTable = document.querySelector<HTMLElement>('[data-empty-state]');
-  const emptyCards = document.querySelector<HTMLElement>('[data-empty-card]');
 
-  let sortKey: SortKey | null = null;
-  let sortDir: SortDir = 'asc';
-
-  // Returns null for missing numeric attributes so the comparator can push
-  // them to the bottom regardless of sort direction. Astro renders null/
-  // undefined props as omitted attributes, so getAttribute returns null for
-  // any candidate whose pipeline-derived field was null (e.g., wayback when
-  // the breaker opened during enrichment).
   const readValue = (el: HTMLElement, key: SortKey): string | number | null => {
     const numOrNull = (attr: string): number | null => {
       const v = el.getAttribute(attr);
       return v === null || v === '' ? null : Number(v);
     };
     switch (key) {
-      case 'name':
-        return el.getAttribute('data-name') ?? '';
-      case 'tld':
-        return el.getAttribute('data-tld') ?? '';
-      case 'dropped':
-        // ISO YYYY-MM-DD sorts lexicographically the same as chronologically.
-        return el.getAttribute('data-dropped') ?? '';
-      case 'wayback':
-        return numOrNull('data-wayback');
-      case 'opr':
-        return numOrNull('data-opr');
-      case 'score':
-        return numOrNull('data-score');
+      case 'name':    return el.getAttribute('data-name') ?? '';
+      case 'tld':     return el.getAttribute('data-tld') ?? '';
+      case 'dropped': return el.getAttribute('data-dropped') ?? '';
+      case 'wayback': return numOrNull('data-wayback');
+      case 'opr':     return numOrNull('data-opr');
+      case 'score':   return numOrNull('data-score');
+      case 'listed':  return numOrNull('data-listed');
     }
   };
 
-  const sortContainer = (container: HTMLElement | null, selector: string) => {
-    if (!container || !sortKey) return;
+  const sortContainer = (
+    container: HTMLElement | null,
+    selector: string,
+    state: { key: SortKey | null; dir: SortDir },
+  ) => {
+    if (!container || !state.key) return;
     const items = Array.from(container.querySelectorAll<HTMLElement>(selector));
     items.sort((a, b) => {
-      const va = readValue(a, sortKey!);
-      const vb = readValue(b, sortKey!);
-      // Nulls sort to the BOTTOM regardless of sort direction. Sorting
-      // descending by Wayback should still surface the populated rows
-      // first; null rows are "no data" not "minimum value".
+      const va = readValue(a, state.key!);
+      const vb = readValue(b, state.key!);
       const aMissing = va === null || va === undefined;
       const bMissing = vb === null || vb === undefined;
       if (aMissing && bMissing) return 0;
@@ -554,32 +693,36 @@ const verdictClass = (verdict: Verdict) => {
       } else {
         cmp = String(va).localeCompare(String(vb));
       }
-      return sortDir === 'asc' ? cmp : -cmp;
+      return state.dir === 'asc' ? cmp : -cmp;
     });
     items.forEach((el) => container.appendChild(el));
   };
 
-  const updateIndicators = () => {
-    document.querySelectorAll<HTMLButtonElement>('[data-sort-key]').forEach((btn) => {
-      const indicator = btn.querySelector<HTMLElement>('.sort-indicator');
-      if (!indicator) return;
-      if (btn.dataset.sortKey === sortKey) {
-        indicator.textContent = sortDir === 'asc' ? '↑' : '↓';
-        indicator.classList.remove('text-stone-300');
-        indicator.classList.add('text-accent');
-      } else {
-        indicator.textContent = '↕';
-        indicator.classList.add('text-stone-300');
-        indicator.classList.remove('text-accent');
-      }
-    });
+  const updateIndicators = (scope: Scope) => {
+    const state = sortState[scope];
+    document
+      .querySelectorAll<HTMLButtonElement>(`[data-card-scope="${scope}"] [data-sort-key]`)
+      .forEach((btn) => {
+        const indicator = btn.querySelector<HTMLElement>('.sort-indicator');
+        if (!indicator) return;
+        if (btn.dataset.sortKey === state.key) {
+          indicator.textContent = state.dir === 'asc' ? '↑' : '↓';
+          indicator.classList.remove('text-stone-300');
+          indicator.classList.add('text-accent');
+        } else {
+          indicator.textContent = '↕';
+          indicator.classList.add('text-stone-300');
+          indicator.classList.remove('text-accent');
+        }
+      });
   };
 
+  // Filter (search + TLD) applies GLOBALLY to both scopes. Recount visible
+  // rows per scope so each card's empty-state and subheader stay accurate.
   const applyFilters = () => {
     const q = (search?.value ?? '').trim().toLowerCase();
     const tld = tldFilter?.value ?? 'all';
 
-    let visible = 0;
     const matches = (el: HTMLElement) => {
       const name = el.getAttribute('data-name') ?? '';
       const elTld = el.getAttribute('data-tld') ?? '';
@@ -588,44 +731,66 @@ const verdictClass = (verdict: Verdict) => {
       return matchesQuery && matchesTld;
     };
 
+    const visibleByScope: Record<Scope, number> = { today: 0, carryover: 0 };
+
     document.querySelectorAll<HTMLElement>('[data-row]').forEach((row) => {
       const show = matches(row);
       row.classList.toggle('hidden', !show);
-      if (show) visible++;
+      if (show) {
+        const scope = (row.getAttribute('data-scope') ?? 'today') as Scope;
+        visibleByScope[scope]++;
+      }
     });
 
     document.querySelectorAll<HTMLElement>('[data-card]').forEach((card) => {
       card.classList.toggle('hidden', !matches(card));
     });
 
-    if (resultCount) {
-      // Total-evaluated comes from the data attribute set in Astro markup
-      // (the count of candidates that entered enrichment today, not just
-      // those rendered in the table). Falls back to the table row count
-      // when the JSON payload didn't include the field.
-      const totalEvaluated = Number(resultCount.getAttribute('data-total-evaluated') ?? totalCount);
-      resultCount.textContent = `Showing ${visible} of ${totalEvaluated.toLocaleString('en-US')} candidates evaluated today`;
-    }
-    emptyTable?.classList.toggle('hidden', visible !== 0);
-    emptyCards?.classList.toggle('hidden', visible !== 0);
+    // Empty-state messages — only show when filters reduce a scope to zero
+    // AND that scope had data to begin with (otherwise the static
+    // "No new drops yet today" / "rolling list builds up" messages from the
+    // Astro template are the right copy).
+    (['today', 'carryover'] as Scope[]).forEach((scope) => {
+      const visible = visibleByScope[scope];
+      const total = document.querySelectorAll(`[data-row][data-scope="${scope}"]`).length;
+      const hadData = total > 0;
+      document
+        .querySelectorAll<HTMLElement>(`[data-empty-state][data-empty-scope="${scope}"], [data-empty-card][data-empty-scope="${scope}"]`)
+        .forEach((el) => {
+          el.classList.toggle('hidden', !(hadData && visible === 0));
+        });
+    });
   };
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  const handleSort = (scope: Scope, key: SortKey) => {
+    const state = sortState[scope];
+    if (state.key === key) {
+      state.dir = state.dir === 'asc' ? 'desc' : 'asc';
     } else {
-      sortKey = key;
-      sortDir = 'asc';
+      state.key = key;
+      state.dir = 'asc';
     }
-    sortContainer(tableBody, '[data-row]');
-    sortContainer(cardList, '[data-card]');
-    updateIndicators();
+    const tableBody = document.querySelector<HTMLElement>(
+      `[data-table-body][data-scope="${scope}"]`,
+    );
+    const cardList = document.querySelector<HTMLElement>(
+      `[data-card-list][data-scope="${scope}"]`,
+    );
+    sortContainer(tableBody, '[data-row]', state);
+    sortContainer(cardList,  '[data-card]', state);
+    updateIndicators(scope);
   };
 
+  // Each sort button lives inside an <article data-card-scope="..."> — derive
+  // the scope from the closest ancestor so the same button class works in
+  // both cards.
   document.querySelectorAll<HTMLButtonElement>('[data-sort-key]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.sortKey as SortKey | undefined;
-      if (key) handleSort(key);
+      if (!key) return;
+      const article = btn.closest<HTMLElement>('[data-card-scope]');
+      const scope = (article?.getAttribute('data-card-scope') ?? 'today') as Scope;
+      handleSort(scope, key);
     });
   });
 
@@ -633,21 +798,10 @@ const verdictClass = (verdict: Verdict) => {
   tldFilter?.addEventListener('change', applyFilters);
 
   // --- Register popover ---------------------------------------------------
-  // Click a Register button → its popover opens (and any other open one
-  // closes). Click outside any trigger/popover → close. Escape → close.
-  // Tap-friendly on touch devices (no hover behaviour).
-  //
-  // Implementation: ONE delegated click listener on document. We stopped
-  // using per-trigger listeners after a regression where the visual layout
-  // change to leftward-anchored popovers exposed the underlying fragility:
-  // any element added or replaced after page load would get no listener.
-  // Delegation removes that whole class of bug.
-  //
-  // Display toggle uses BOTH the HTML `hidden` attribute AND a `flex` class.
-  // The popover's horizontal layout is `display: flex`; the `hidden`
-  // attribute alone (`display: none` from the UA stylesheet) loses to any
-  // author-stylesheet `display` rule. By gating `flex` on open-state we
-  // guarantee `display: none` wins when closed and `display: flex` when open.
+  // One delegated click listener for ALL popovers across both cards.
+  // Tap-to-open / tap-outside / Escape to close. Display toggle uses both
+  // the HTML `hidden` attribute AND a `flex` class so the popover's
+  // horizontal layout (display: flex) is in effect only when open.
   const closeAllPopovers = () => {
     document.querySelectorAll<HTMLElement>('[data-popover]').forEach((p) => {
       p.hidden = true;
@@ -662,7 +816,6 @@ const verdictClass = (verdict: Verdict) => {
     const target = e.target as Element | null;
     if (!target) return;
 
-    // Hit a trigger? Toggle its popover.
     const trigger = target.closest('[data-popover-trigger]');
     if (trigger) {
       const id = trigger.getAttribute('data-popover-trigger');
@@ -679,11 +832,8 @@ const verdictClass = (verdict: Verdict) => {
       return;
     }
 
-    // Click landed inside an OPEN popover (e.g., on a registrar logo link).
-    // Don't close — the click is meaningful, let it through.
     if (target.closest('[data-popover]')) return;
 
-    // Click outside everything popover-related → close.
     closeAllPopovers();
   });
 
