@@ -1,19 +1,42 @@
 ---
+// Six-stage walkthrough of the actual pipeline. Reading order
+// (top-to-bottom, left-to-right at the 3-col breakpoint) matches
+// the pipeline data flow:
+//   1. catch    → 2. filter  → 3. verify
+//   4. enrich   → 5. score   → 6. publish
+// Icons are inline SVGs (Lucide-style stroke geometry) so we don't
+// need a runtime icon library; matches the existing antenna/sift/check
+// treatment from the prior 3-card version.
 const steps = [
   {
-    title: 'Catch the drop',
-    body: 'We monitor ICANN zone files daily to catch every domain the moment it expires. No middlemen, no delays.',
     icon: 'antenna',
+    title: 'Catch the drop',
+    body: 'We monitor ICANN zone files across 13 TLDs every day. The moment a domain expires, we see it.',
   },
   {
-    title: 'Filter the noise',
-    body: 'Each day we evaluate every dropped domain across 13 TLDs. Structural filters remove abuse patterns, punycode, and pure-numeric junk. Lexical filters remove random-string spam and unpronounceable noise. Survivors are scored against Wayback Machine history, OpenPageRank authority, certificate transparency logs, and three spam blocklists.',
-    icon: 'sift',
+    icon: 'filter',
+    title: 'Filter the obvious junk',
+    body: 'Punycode, gibberish, and known abuse keywords are rejected on sight. Most of the daily noise stops here.',
   },
   {
+    icon: 'shield-check',
+    title: 'Verify availability',
+    body: 'Most domains absent from a zone file aren’t actually free — they’re in transfer, on hold, or paused. We check each one via RDAP before publishing.',
+  },
+  {
+    icon: 'database',
+    title: 'Enrich with real data',
+    body: 'Each survivor gets checked against Wayback Machine, OpenPageRank, certificate transparency logs, and three spam blocklists.',
+  },
+  {
+    icon: 'bar-chart',
+    title: 'Score and rank',
+    body: 'We weight historical authority, certificate history, and domain quality into a single score. Junk and weak candidates get rejected at the quality floor.',
+  },
+  {
+    icon: 'file-check',
     title: 'Publish what’s left',
-    body: 'The strongest candidates — up to 300 per day — make the daily list. Clean, register-ready, no surprises.',
-    icon: 'check',
+    body: 'The strongest candidates make today’s list. Clean, register-ready, no surprises.',
   },
 ];
 ---
@@ -27,7 +50,16 @@ const steps = [
       </h2>
     </div>
 
-    <ol class="mt-12 grid gap-8 sm:grid-cols-3 sm:gap-6">
+    {/*
+      Grid sizing:
+        mobile (default):  1 column, 6 rows
+        sm (≥640px):       2 columns × 3 rows
+        lg (≥1024px):      3 columns × 2 rows
+      Reading order top→bottom, left→right matches pipeline order at every
+      breakpoint. Equal heights via stretch (default for grid items) keep
+      the cards visually parallel even when copy lengths differ slightly.
+    */}
+    <ol class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {
         steps.map((step, idx) => (
           <li class="relative rounded-lg border border-stone-200 bg-paper p-6">
@@ -41,14 +73,37 @@ const steps = [
                     <path d="M12 13v8" />
                   </svg>
                 )}
-                {step.icon === 'sift' && (
+                {step.icon === 'filter' && (
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 6h18l-7 8v6l-4-2v-4Z" />
+                    <path d="M3 5h18l-7 9v5l-4-2v-3Z" />
                   </svg>
                 )}
-                {step.icon === 'check' && (
+                {step.icon === 'shield-check' && (
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M20 6 9 17l-5-5" />
+                    <path d="M12 3 4 6v6c0 4.5 3.5 8 8 9 4.5-1 8-4.5 8-9V6Z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                )}
+                {step.icon === 'database' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <ellipse cx="12" cy="5" rx="8" ry="3" />
+                    <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+                    <path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+                  </svg>
+                )}
+                {step.icon === 'bar-chart' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 21h18" />
+                    <path d="M7 17v-5" />
+                    <path d="M12 17V7" />
+                    <path d="M17 17v-8" />
+                  </svg>
+                )}
+                {step.icon === 'file-check' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+                    <path d="M14 3v6h6" />
+                    <path d="m9 15 2 2 4-4" />
                   </svg>
                 )}
               </span>
