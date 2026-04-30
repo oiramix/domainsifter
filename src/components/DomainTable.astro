@@ -248,55 +248,64 @@ const carryoverSubheader = (n: number): string => {
         <!-- Desktop table — max-height + scroll for >20 rows. -->
         <div class="hidden md:block max-h-[60rem] overflow-y-auto rounded-b-lg">
           {/*
-            Column-width strategy: explicit Tailwind widths on every non-Domain
-            <th>. With table-layout:auto (default) the browser treats these as
-            min-widths and lets Domain absorb the slack so it grows for longer
-            apex names. Without the hints the browser distributes excess card
-            width evenly across all 7 columns, producing the "huge gap"
-            symptom seen on cards with sparse content.
+            CSS Grid replaces the <table> markup. Each row is its own grid
+            container with the SAME explicit grid-cols template, so columns
+            align across rows. Column widths are content-sized fixed pixels
+            for everything except the last (Register), which uses 1fr to
+            absorb all card slack — that empty space on the right of the
+            Register button is intentional, and it's where the registrar-icon
+            popover renders INLINE when the button is clicked. No absolute
+            positioning, no scroll-clip issues, no <td>-as-containing-block
+            inconsistencies.
+
+            Semantics: role="table"/"row"/"cell"/"columnheader" so screen
+            readers still treat this as tabular data even though the markup
+            is divs. Tested with VoiceOver — announces as table with N
+            columns / M rows.
           */}
-          <table class="w-full text-sm" data-domain-table data-table-scope="today">
-            <thead class="bg-stone-50 text-stone-600 sticky top-0 z-10">
-              <tr>
-                <th scope="col" class="text-left font-medium">
+          <div role="table" class="w-full text-sm" data-domain-table data-table-scope="today">
+            <div role="rowgroup" class="sticky top-0 z-10 bg-stone-50 text-stone-600 border-b border-stone-100">
+              <div role="row" class="grid grid-cols-[200px_80px_110px_110px_180px_120px_1fr] font-medium">
+                <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
                     Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-left font-medium w-20">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="tld">
                     TLD <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-right font-medium w-28">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
                     Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-right font-medium w-24">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
                     Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-left font-medium w-44">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
                     OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-left font-medium w-28">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
                     Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-right font-medium px-4 py-3 w-28">Register</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-stone-100" data-table-body data-scope="today">
+                </div>
+                <div role="columnheader" class="px-4 py-3 text-left">Register</div>
+              </div>
+            </div>
+            <div role="rowgroup" class="divide-y divide-stone-100" data-table-body data-scope="today">
               {todayDomains.map((d, i) => {
                 const verdict = verdictFromScore(d.score);
                 const popoverId = `pop-today-row-${i}`;
                 return (
-                  <tr
+                  <div
+                    role="row"
                     data-row
                     data-scope="today"
                     data-name={d.name.toLowerCase()}
@@ -305,74 +314,71 @@ const carryoverSubheader = (n: number): string => {
                     data-wayback={d.wayback_snapshots}
                     data-opr={d.open_page_rank}
                     data-score={d.score}
+                    class="grid grid-cols-[200px_80px_110px_110px_180px_120px_1fr] items-center"
                   >
-                    <td class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></td>
-                    <td class="px-4 py-3">
+                    <div role="cell" class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></div>
+                    <div role="cell" class="px-4 py-3">
                       <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
-                    </td>
-                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
-                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</td>
-                    <td class="px-4 py-3">
+                    </div>
+                    <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</div>
+                    <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</div>
+                    <div role="cell" class="px-4 py-3">
                       <div class="flex items-center gap-2">
                         <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
                           <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
                         </div>
                         <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{fmtDecimal(d.open_page_rank)}</span>
                       </div>
-                    </td>
-                    <td class="px-4 py-3">
+                    </div>
+                    <div role="cell" class="px-4 py-3">
                       <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>{verdict}</span>
-                    </td>
+                    </div>
                     {/*
-                      The popover is wrapped in an inline-block <div class="relative">
-                      INSIDE the <td>, not anchored on the <td> itself. <td>
-                      with position:relative is famously inconsistent as a
-                      containing block for absolute children — Firefox + Safari
-                      have edge cases that Astro hydration can hit. A plain
-                      <div class="relative inline-block"> is rock-solid. The
-                      popover anchors LEFT of the button (right-full mr-2,
-                      vertically centered) so it appears in-row adjacent to
-                      the button instead of dangling below in empty card space.
+                      Register cell: flex container with the button at left
+                      and the popover (icons) immediately to its right.
+                      Popover starts hidden (HTML hidden attribute → display:
+                      none); JS toggles `flex` class on open so it lays out
+                      INLINE inside the cell, in the 1fr slack space. No
+                      absolute positioning — no overflow-clip, no overlap
+                      with neighbouring columns.
                     */}
-                    <td class="px-4 py-3 text-right">
-                      <div class="relative inline-block">
-                        <button
-                          type="button"
-                          data-popover-trigger={popoverId}
-                          aria-haspopup="true"
-                          aria-expanded="false"
-                          aria-controls={popoverId}
-                          class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
-                        >
-                          Register →
-                        </button>
-                        <div
-                          id={popoverId}
-                          data-popover={popoverId}
-                          role="menu"
-                          aria-label={`Register ${d.name} at`}
-                          hidden
-                          class="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-20 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1.5 shadow-xl whitespace-nowrap w-max"
-                        >
-                          {d.registrars.map((r) => {
-                            const logo = REGISTRAR_LOGOS[r.name];
-                            return (
-                              <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
-                                 class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
-                                {logo
-                                  ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
-                                  : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
-                              </a>
-                            );
-                          })}
-                        </div>
+                    <div role="cell" class="px-4 py-3 flex items-center gap-3">
+                      <button
+                        type="button"
+                        data-popover-trigger={popoverId}
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls={popoverId}
+                        class="inline-flex shrink-0 items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+                      >
+                        Register →
+                      </button>
+                      <div
+                        id={popoverId}
+                        data-popover={popoverId}
+                        role="menu"
+                        aria-label={`Register ${d.name} at`}
+                        hidden
+                        class="items-center gap-2"
+                      >
+                        {d.registrars.map((r) => {
+                          const logo = REGISTRAR_LOGOS[r.name];
+                          return (
+                            <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
+                               class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
+                              {logo
+                                ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
+                                : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
+                            </a>
+                          );
+                        })}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </div>
           <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state data-empty-scope="today">
             No domains in Today's drops match your filters.
           </p>
@@ -471,55 +477,63 @@ const carryoverSubheader = (n: number): string => {
       <>
         <!-- Desktop table for Card 2 — same columns as Card 1 plus "Listed". -->
         <div class="hidden md:block max-h-[60rem] overflow-y-auto rounded-b-lg">
-          {/* Same column-width hints as Card 1 plus the Listed column (w-24). */}
-          <table class="w-full text-sm" data-domain-table data-table-scope="carryover">
-            <thead class="bg-stone-50 text-stone-600 sticky top-0 z-10">
-              <tr>
-                <th scope="col" class="text-left font-medium">
+          {/*
+            Same grid pattern as Card 1, with the Listed column inserted at
+            position 4 (between Dropped and Wayback). Listed groups
+            naturally with Dropped — both are temporal — so this ordering
+            reads better than putting Listed at the far right next to
+            Register. 8 columns total; Register column still 1fr to host
+            the inline popover.
+          */}
+          <div role="table" class="w-full text-sm" data-domain-table data-table-scope="carryover">
+            <div role="rowgroup" class="sticky top-0 z-10 bg-stone-50 text-stone-600 border-b border-stone-100">
+              <div role="row" class="grid grid-cols-[200px_80px_110px_110px_110px_180px_120px_1fr] font-medium">
+                <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
                     Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-left font-medium w-20">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="tld">
                     TLD <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-right font-medium w-28">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
                     Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-right font-medium w-24">
-                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
-                    Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-                  </button>
-                </th>
-                <th scope="col" class="text-left font-medium w-44">
-                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
-                    OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-                  </button>
-                </th>
-                <th scope="col" class="text-left font-medium w-28">
-                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
-                    Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-                  </button>
-                </th>
-                <th scope="col" class="text-right font-medium w-24">
+                </div>
+                <div role="columnheader">
                   <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="listed">
                     Listed <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
-                </th>
-                <th scope="col" class="text-right font-medium px-4 py-3 w-28">Register</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-stone-100" data-table-body data-scope="carryover">
+                </div>
+                <div role="columnheader">
+                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="wayback">
+                    Wayback <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </div>
+                <div role="columnheader">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="opr">
+                    OpenPageRank <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </div>
+                <div role="columnheader">
+                  <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="score">
+                    Verdict <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
+                  </button>
+                </div>
+                <div role="columnheader" class="px-4 py-3 text-left">Register</div>
+              </div>
+            </div>
+            <div role="rowgroup" class="divide-y divide-stone-100" data-table-body data-scope="carryover">
               {carryoverDomains.map((d, i) => {
                 const verdict = verdictFromScore(d.score);
                 const popoverId = `pop-carry-row-${i}`;
                 const days = d.days_listed ?? 0;
                 return (
-                  <tr
+                  <div
+                    role="row"
                     data-row
                     data-scope="carryover"
                     data-name={d.name.toLowerCase()}
@@ -529,65 +543,63 @@ const carryoverSubheader = (n: number): string => {
                     data-opr={d.open_page_rank}
                     data-score={d.score}
                     data-listed={days}
+                    class="grid grid-cols-[200px_80px_110px_110px_110px_180px_120px_1fr] items-center"
                   >
-                    <td class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></td>
-                    <td class="px-4 py-3">
+                    <div role="cell" class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></div>
+                    <div role="cell" class="px-4 py-3">
                       <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
-                    </td>
-                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</td>
-                    <td class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</td>
-                    <td class="px-4 py-3">
+                    </div>
+                    <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</div>
+                    <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-500">{listedAgo(days)}</div>
+                    <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</div>
+                    <div role="cell" class="px-4 py-3">
                       <div class="flex items-center gap-2">
                         <div class="h-1.5 w-24 rounded-full bg-stone-100 overflow-hidden" aria-hidden="true">
                           <div class="h-full bg-accent" style={`width: ${oprPct(d.open_page_rank)}%`}></div>
                         </div>
                         <span class="text-stone-700 tabular-nums text-xs w-8 text-right">{fmtDecimal(d.open_page_rank)}</span>
                       </div>
-                    </td>
-                    <td class="px-4 py-3">
+                    </div>
+                    <div role="cell" class="px-4 py-3">
                       <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${verdictClass(verdict)}`}>{verdict}</span>
-                    </td>
-                    <td class="px-4 py-3 text-right tabular-nums text-stone-500">{listedAgo(days)}</td>
-                    {/* Same containment-block fix as Card 1: wrapper div, not <td>. */}
-                    <td class="px-4 py-3 text-right">
-                      <div class="relative inline-block">
-                        <button
-                          type="button"
-                          data-popover-trigger={popoverId}
-                          aria-haspopup="true"
-                          aria-expanded="false"
-                          aria-controls={popoverId}
-                          class="inline-flex items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
-                        >
-                          Register →
-                        </button>
-                        <div
-                          id={popoverId}
-                          data-popover={popoverId}
-                          role="menu"
-                          aria-label={`Register ${d.name} at`}
-                          hidden
-                          class="absolute right-full top-1/2 -translate-y-1/2 mr-2 z-20 items-center gap-2 rounded-md border border-stone-200 bg-white px-2 py-1.5 shadow-xl whitespace-nowrap w-max"
-                        >
-                          {d.registrars.map((r) => {
-                            const logo = REGISTRAR_LOGOS[r.name];
-                            return (
-                              <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
-                                 class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
-                                {logo
-                                  ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
-                                  : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
-                              </a>
-                            );
-                          })}
-                        </div>
+                    </div>
+                    <div role="cell" class="px-4 py-3 flex items-center gap-3">
+                      <button
+                        type="button"
+                        data-popover-trigger={popoverId}
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        aria-controls={popoverId}
+                        class="inline-flex shrink-0 items-center rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:border-accent hover:text-accent transition-colors"
+                      >
+                        Register →
+                      </button>
+                      <div
+                        id={popoverId}
+                        data-popover={popoverId}
+                        role="menu"
+                        aria-label={`Register ${d.name} at`}
+                        hidden
+                        class="items-center gap-2"
+                      >
+                        {d.registrars.map((r) => {
+                          const logo = REGISTRAR_LOGOS[r.name];
+                          return (
+                            <a href={r.url} target="_blank" rel="noopener sponsored" role="menuitem" title={r.name} aria-label={`Register at ${r.name}`}
+                               class="shrink-0 block rounded hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent/40">
+                              {logo
+                                ? <img src={logo} alt="" width="20" height="20" class="block h-5 w-5 rounded-sm" loading="lazy" decoding="async" />
+                                : <span class="px-1.5 py-0.5 text-xs text-stone-700 hover:text-accent">{r.name}</span>}
+                            </a>
+                          );
+                        })}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </div>
           <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state data-empty-scope="carryover">
             No domains in Still available match your filters.
           </p>
