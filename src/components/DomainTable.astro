@@ -154,9 +154,9 @@ const todaySubheader = (n: number): string => {
   return `${n.toLocaleString('en-US')} domains added today`;
 };
 const carryoverSubheader = (n: number): string => {
-  if (n === 0) return 'Up to 14 days, no carryover yet';
-  if (n === 1) return 'Up to 14 days, 1 domain';
-  return `Up to 14 days, ${n.toLocaleString('en-US')} domains`;
+  if (n === 0) return 'Listed up to 14 days, no entries yet';
+  if (n === 1) return 'Listed up to 14 days, 1 domain';
+  return `Listed up to 14 days, ${n.toLocaleString('en-US')} domains`;
 };
 ---
 
@@ -455,13 +455,13 @@ const carryoverSubheader = (n: number): string => {
     )}
   </article>
 
-  <!-- =============== CARD 2: Still available =============== -->
+  <!-- =============== CARD 2: Recent drops =============== -->
   <article
     data-card-scope="carryover"
     class="rounded-lg border border-stone-200 bg-white shadow-sm"
   >
     <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
-      <h3 class="text-lg font-semibold text-ink">Still available</h3>
+      <h3 class="text-lg font-semibold text-ink">Recent drops</h3>
       <p class="mt-1 text-sm text-stone-600" data-carryover-subheader>
         {carryoverSubheader(carryoverDomains.length)}
       </p>
@@ -604,7 +604,7 @@ const carryoverSubheader = (n: number): string => {
             </div>
           </div>
           <p class="hidden px-4 py-8 text-center text-sm text-stone-500" data-empty-state data-empty-scope="carryover">
-            No domains in Still available match your filters.
+            No domains in Recent drops match your filters.
           </p>
         </div>
 
@@ -673,7 +673,7 @@ const carryoverSubheader = (n: number): string => {
             );
           })}
           <li class="hidden text-center text-sm text-stone-500 py-6" data-empty-card data-empty-scope="carryover">
-            No domains in Still available match your filters.
+            No domains in Recent drops match your filters.
           </li>
         </ul>
       </>
