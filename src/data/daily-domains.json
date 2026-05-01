@@ -1,8 +1,8 @@
 {
   "generated_at": "2026-05-01T05:22:02Z",
   "domain_count": 5,
-  "today_count": 5,
-  "carryover_count": 0,
+  "today_count": 4,
+  "carryover_count": 1,
   "domains": [
     {
       "name": "blanchot.org",
@@ -54,9 +54,9 @@
       "rdap_status": [],
       "rdap_expiration": null,
       "availability_verified_at": "2026-04-30T07:44:41Z",
-      "first_seen_date": "2026-05-01",
+      "first_seen_date": "2026-04-30",
       "last_validated_date": "2026-05-01",
-      "days_listed": 0
+      "days_listed": 1
     },
     {
       "name": "nontongp.xyz",
