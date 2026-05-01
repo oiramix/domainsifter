@@ -91,7 +91,11 @@
     "wayback": 3.0,
     "crtsh": 3.0,
     "open_page_rank": 1.0,
-    "rdap": 0.4
+    "rdap": 0.4,
+    "rdap_per_host": {
+      "_doc": "Per-host overrides for RDAP. Falls through to api_min_interval_seconds.rdap when host not listed. GMO Registry tolerates ~0.33 req/sec sustained; calibrated 2026-05-01 from a 25-request probe (5s gaps → 80% 429, 30s gaps → clean recovery). Today's pipeline lost 51 .shop candidates to persistent 429s under the global 0.4s interval.",
+      "rdap.gmoregistry.net": 3.0
+    }
   },
   "output_path": "src/data/daily-domains.json"
 }

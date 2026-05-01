@@ -271,7 +271,15 @@ def check_availability(domain: str, config: dict) -> dict:
     url = f"{base}/domain/{domain}"
     from urllib.parse import urlparse
     rdap_host = urlparse(base).hostname or "rdap"
-    min_interval = float(config.get("api_min_interval_seconds", {}).get("rdap", 0.2))
+    # Per-host override falls through to the global `rdap` interval when the
+    # host isn't listed. Added 2026-05-01 because GMO Registry
+    # (rdap.gmoregistry.net, serving .shop + 46 other TLDs) rate-limits much
+    # more aggressively than Verisign / PIR — see config.json _doc for the
+    # probe data. Order: per-host override → global rdap → 0.2 final fallback.
+    intervals = config.get("api_min_interval_seconds", {})
+    min_interval = float(
+        intervals.get("rdap_per_host", {}).get(rdap_host, intervals.get("rdap", 0.2))
+    )
 
     try:
         response = request_with_429_backoff(
@@ -296,7 +304,13 @@ def check_availability(domain: str, config: dict) -> dict:
         }
 
     if response.status_code == 429:
-        logger.warning("RDAP persistent 429 for %s", domain)
+        # Surface the registry's Retry-After header (if any) so future
+        # diagnostics don't need a manual probe to discover it.
+        retry_after = response.headers.get("Retry-After") if hasattr(response, "headers") else None
+        logger.warning(
+            "RDAP persistent 429 for %s (Retry-After: %s)",
+            domain, retry_after if retry_after is not None else "absent",
+        )
         _BREAKER.record_failure()
         return {**_empty_unknown(), "rdap_http": 429}
 

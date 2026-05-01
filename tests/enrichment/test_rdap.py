@@ -337,6 +337,63 @@ def test_check_availability_extracts_registrar_expiration_when_no_registry_expir
 
 
 @responses.activate
+def test_check_availability_uses_per_host_throttle_override(monkeypatch):
+    """rdap_per_host overrides the global rdap interval for the matching host;
+    unlisted hosts fall through to the global rdap value, which itself falls
+    through to the 0.2 final default. Verifies the lookup chain end-to-end by
+    capturing the min_interval that ends up at request_with_429_backoff.
+
+    Calibrated 2026-05-01 for rdap.gmoregistry.net (.shop and 46 other GMO
+    Registry TLDs); other RDAP hosts are unaffected by this override.
+    """
+    captured: list[float] = []
+
+    def fake_request_with_429_backoff(call_fn, *, host, min_interval, **_kw):
+        captured.append(min_interval)
+        # Return a synthetic 200 with empty body so the rest of check_availability
+        # runs to completion without making a real network call.
+        from unittest.mock import MagicMock
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json = lambda: {"status": [], "events": [], "entities": []}
+        resp.headers = {}
+        return resp
+
+    monkeypatch.setattr(rdap, "request_with_429_backoff", fake_request_with_429_backoff)
+
+    bootstrap = {
+        "services": [
+            [["shop"], ["https://rdap.gmoregistry.net/rdap/"]],
+            [["com"], ["https://rdap.verisign-grs.com/com/v1/"]],
+        ]
+    }
+
+    # Stub the bootstrap fetch so we don't hit the network for IANA either.
+    monkeypatch.setattr(
+        rdap, "_load_bootstrap",
+        lambda _cfg, _to: {tld: tuple(urls) for entry in bootstrap["services"] for tld, urls in [(t, entry[1]) for t in entry[0]]},
+    )
+
+    cfg_with_override = {
+        "api_min_interval_seconds": {
+            "rdap": 0.4,
+            "rdap_per_host": {"rdap.gmoregistry.net": 3.0},
+        },
+    }
+
+    rdap.check_availability("anything.shop", cfg_with_override)
+    rdap.check_availability("other.com", cfg_with_override)
+
+    # GMO host gets the override; verisign host falls through to 0.4.
+    assert captured == [3.0, 0.4]
+
+    # Unlisted host with no rdap_per_host map at all → falls through to global
+    # rdap, then to the 0.2 final fallback when global is also missing.
+    captured.clear()
+    rdap.check_availability("solo.com", {})
+    assert captured == [0.2]
+
+
 def test_check_availability_breaker_open_returns_unknown_immediately(monkeypatch):
     """When the module breaker is open, no network call is made and the
     response is unknown. The autouse conftest fixture resets the breaker
