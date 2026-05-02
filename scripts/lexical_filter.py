@@ -347,9 +347,21 @@ def keep_lexical(name: str, config: dict) -> tuple[bool, str | None]:
     return True, None
 
 
-def filter_candidates(candidates: list[dict], config: dict) -> list[dict]:
+def filter_candidates(
+    candidates: list[dict],
+    config: dict,
+    *,
+    rejections_out: list[tuple[str, str]] | None = None,
+) -> list[dict]:
     """Apply `keep_lexical` to every candidate, log per-rule rejection counts,
-    return survivors. Same logging pattern as filter.filter_candidates."""
+    return survivors. Same logging pattern as filter.filter_candidates.
+
+    `rejections_out` is an optional side-channel for the --debug-export flag.
+    When provided (a list), each rejected candidate is appended as
+    `(name, rule_key)` where rule_key is the rejection rule grouped by name
+    (digit_ratio, vowel_ratio, ...). Default None means no allocation — the
+    production path holds nothing extra in memory.
+    """
     kept: list[dict] = []
     reasons: dict[str, int] = {}
     for cand in candidates:
@@ -359,6 +371,8 @@ def filter_candidates(candidates: list[dict], config: dict) -> list[dict]:
         else:
             key = (reason or "unknown").split("(", 1)[0]  # group by rule, not value
             reasons[key] = reasons.get(key, 0) + 1
+            if rejections_out is not None:
+                rejections_out.append((cand.get("name", ""), key))
     if reasons:
         logger.info("Lexical rejections: %s", dict(sorted(reasons.items())))
     logger.info("Lexical filter kept %d / %d candidates", len(kept), len(candidates))

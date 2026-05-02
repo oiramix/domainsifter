@@ -51,3 +51,7 @@ venv/
 # future local runs that materialise state on disk.
 scripts/state/*
 !scripts/state/.gitkeep
+
+# --debug-export dumps (local pipeline runs only — see scripts/debug_export.py).
+# Already covered by scripts/state/* but listed explicitly for visibility.
+scripts/state/debug-exports/

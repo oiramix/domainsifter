@@ -702,3 +702,117 @@ def test_main_propagates_spam_check_config_error(monkeypatch, cfg, tmp_path):
 
     with pytest.raises(SpamCheckConfigError):
         pipeline.main(["--config", str(cfg_path)])
+
+
+# --- --debug-export flag ----------------------------------------------------
+
+
+def _wire_debug_export_pipeline(monkeypatch, cfg_path, today):
+    """Common stub harness: env vars, auth, three drops (one passes lexical,
+    one fails lexical, one fails structural), enrichers populate fields, RDAP
+    says everyone available. Returns nothing — caller invokes pipeline.main."""
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(
+        pipeline,
+        "collect_drops",
+        lambda _cfg, _tok, today, **_kw: ([
+            {"name": "great.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "78win012.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "xn--bad.com", "tld": "com", "dropped_date": today.isoformat()},
+        ], []),
+    )
+
+    def fake_enrich_all(cands, _cfg):
+        for c in cands:
+            c.update({
+                "wayback_snapshots": 50,
+                "wayback_last_snapshot": "2024-01-01",
+                "open_page_rank": 3.0,
+                "cert_history": True,
+                "spam_flagged": False,
+                "surbl_listed": False,
+                "spamhaus_listed": False,
+                "previous_registrar": "Acme",
+            })
+        return cands
+
+    monkeypatch.setattr(pipeline, "enrich_all", fake_enrich_all)
+
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(
+        rdap_mod, "check_availability",
+        lambda d, _c: {"is_available": True, "rdap_http": 404,
+                       "rdap_status": [], "rdap_expiration": None,
+                       "previous_registrar": None},
+    )
+
+
+def test_main_does_not_call_debug_export_when_flag_unset(monkeypatch, cfg, tmp_path):
+    """Hard guarantee: when --debug-export is not set, debug_export.write_dumps
+    is never called and no dump files are created. Production runs are
+    unaffected by the new flag."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    _wire_debug_export_pipeline(monkeypatch, cfg_path, date.today())
+
+    calls: list[tuple] = []
+
+    def fake_write_dumps(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(pipeline.debug_export, "write_dumps", fake_write_dumps)
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+    assert calls == []  # the dump function was never invoked
+
+
+def test_main_writes_all_debug_export_files_when_flag_set(monkeypatch, cfg, tmp_path):
+    """End-to-end: --debug-export PATH causes all five plain-text files (and
+    _meta.json) to land in PATH with the expected per-stage contents."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    dump_dir = tmp_path / "debug-out"
+
+    _wire_debug_export_pipeline(monkeypatch, cfg_path, date.today())
+
+    rc = pipeline.main([
+        "--config", str(cfg_path),
+        "--debug-export", str(dump_dir),
+    ])
+    assert rc == 0
+
+    # All five required files exist.
+    rejects = (dump_dir / "lexical_rejects.txt").read_text(encoding="utf-8")
+    survivors = (dump_dir / "lexical_survivors.txt").read_text(encoding="utf-8")
+    kept = (dump_dir / "trim_kept.txt").read_text(encoding="utf-8")
+    discards = (dump_dir / "trim_discards.txt").read_text(encoding="utf-8")
+    published = (dump_dir / "published.txt").read_text(encoding="utf-8")
+
+    # Lexical reject: 78win012.com fails digit_ratio (5 digits / 8 chars > 0.30).
+    # xn--bad.com is rejected at the structural stage, BEFORE lexical, so it
+    # does NOT appear in lexical_rejects (the structural filter runs first).
+    assert "78win012.com,digit_ratio" in rejects
+    assert "xn--bad.com" not in rejects
+
+    # great.com survives lexical and the trim cap (cap=1000 >> 1 candidate).
+    assert survivors.strip() == "great.com"
+    assert kept.strip() == "great.com"
+    assert discards.strip() == ""
+    # great.com is the sole published name.
+    assert published.strip() == "great.com"
+
+    # _meta.json with counts and trim_threshold.
+    meta = json.loads((dump_dir / "_meta.json").read_text(encoding="utf-8"))
+    assert meta["trim_threshold"] == cfg["max_candidates_for_enrichment"]
+    assert meta["counts"]["lexical_survivors"] == 1
+    assert meta["counts"]["trim_kept"] == 1
+    assert meta["counts"]["trim_discards"] == 0
+    assert meta["counts"]["published"] == 1
+    assert "generated_at" in meta

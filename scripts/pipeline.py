@@ -67,6 +67,7 @@ from typing import Callable
 from scripts import (
     carryover,
     czds_client,
+    debug_export,
     diff,
     env_check,
     filter as filter_mod,
@@ -466,7 +467,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override output path (default: from config)",
     )
+    parser.add_argument(
+        "--debug-export",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Optional directory to dump intermediate filter/trim lists to "
+            "(lexical_rejects, lexical_survivors, trim_kept, trim_discards, "
+            "published). Off by default; production runs are unaffected."
+        ),
+    )
     args = parser.parse_args(argv)
+    debug_export_dir = args.debug_export
 
     logging.basicConfig(
         level=logging.INFO,
@@ -531,8 +543,15 @@ def main(argv: list[str] | None = None) -> int:
     # they were first published; their data is stable.
     structural_kept = filter_mod.filter_candidates_structural(drops, config)
 
-    # Stage 2: lexical filter (cheap; pre-network)
-    lexical_kept = lexical_filter.filter_candidates(structural_kept, config)
+    # Stage 2: lexical filter (cheap; pre-network). When --debug-export is
+    # set, capture per-rejection (name, rule) tuples through the side-channel
+    # kwarg; otherwise pass None so nothing extra is allocated.
+    lexical_rejections: list[tuple[str, str]] | None = (
+        [] if debug_export_dir else None
+    )
+    lexical_kept = lexical_filter.filter_candidates(
+        structural_kept, config, rejections_out=lexical_rejections,
+    )
 
     # Safety net before paying for ANY network calls. Caps the availability
     # check below; with confirmed-available domains then flowing into
@@ -573,7 +592,7 @@ def main(argv: list[str] | None = None) -> int:
     # publication cap. The payload includes today_count + carryover_count
     # so the frontend can split into the two-card layout. total_evaluated
     # is what entered availability check today (the dominant filter).
-    output.write_output(
+    written_path = output.write_output(
         final_list,
         config,
         output_path=args.output,
@@ -586,6 +605,43 @@ def main(argv: list[str] | None = None) -> int:
         total_evaluated, len(available), len(enriched), len(survivors),
         len(retained_carryover), len(final_list), publication_cap,
     )
+
+    # Optional intermediate-list dumps for manual quality audits. Strictly
+    # gated on --debug-export; production runs that don't pass the flag never
+    # collect the lists or call into debug_export.
+    if debug_export_dir:
+        from datetime import datetime, timezone
+
+        trim_kept_set = {c.get("name", "") for c in candidates_to_evaluate}
+        published_payload = json.loads(written_path.read_text(encoding="utf-8"))
+        published_names = [d.get("name", "") for d in published_payload.get("domains", [])]
+        meta = {
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "trim_threshold": eval_cap,
+            "counts": {
+                "structural_kept": len(structural_kept),
+                "lexical_rejects": len(lexical_rejections or []),
+                "lexical_survivors": len(lexical_kept),
+                "trim_kept": len(candidates_to_evaluate),
+                "trim_discards": max(0, len(lexical_kept) - len(candidates_to_evaluate)),
+                "available": len(available),
+                "enriched": len(enriched),
+                "post_enrichment_survivors": len(survivors),
+                "published": len(published_names),
+            },
+        }
+        debug_export.write_dumps(
+            debug_export_dir,
+            lexical_rejects=lexical_rejections or [],
+            lexical_survivors=[c.get("name", "") for c in lexical_kept],
+            trim_kept=list(trim_kept_set),
+            trim_discards=[
+                c.get("name", "") for c in lexical_kept if c.get("name", "") not in trim_kept_set
+            ],
+            published=published_names,
+            meta=meta,
+        )
+
     return 0
 
 
