@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: 2026-04-30 (Wave 1.5 — 14-day persistent rolling list shipped; two-card frontend; CSS-grid table; cron migrated to Cloudflare Worker; 13 active TLDs; 325/325 tests passing)
+Last updated: 2026-05-03 (Wave 1.5 + ops hardening — per-host RDAP throttle (.shop) and per-host RDAP concurrency shipped; legal pages live; --debug-export filter audit tooling; workflow timeout 45→60 min; 333/333 tests passing)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -744,3 +744,46 @@ Detailed commit-by-commit log lives in `WORK_LOG_2026-04-30.md`. Cross-cutting s
 - Cron is paused. Trigger workflow_dispatch manually after the next Cloudflare Pages deploy to validate the new persistence flow on real data; then re-enable the Worker schedule.
 - Tomorrow's first persistent-list run should keep `nomoda.org` as a carryover entry showing "Listed: 1 day ago" in Card 2 (assuming it stays absent from the .org zone overnight).
 - DMARC remains `p=none` — calendar reminder for 2026-05-24 to consider stricter policy.
+
+---
+
+## Operational changes since 2026-04-30
+
+Source: `git log` between `4956e95` (the 2026-04-30 STATE refresh) and HEAD. Each entry tagged with `[from git log: <hash>]`. Provenance for every claim is the linked commit-message body — chat-only context that didn't make the commit message is **not** included here; Mario fills those gaps in review.
+
+### 2026-04-30 — Compliance / SEO add-ons (same-day after STATE refresh)
+
+- **Privacy Policy and Terms of Service pages added** at `/privacy` and `/terms` with `noindex`. `[from git log: d2e8509]` Reason not in commit body — `[needs context]`. Likely required ahead of the impact.com (Namecheap affiliate) integration that landed minutes later.
+- **`impact.com` site-verification meta tag added** to the global Layout. `[from git log: 8c4dca5]` Reason not in commit body — `[needs context]`. (Affiliate-network identity verification is the conventional reason for such a tag.)
+
+### 2026-05-01 — Persistent-list polish, GMO Registry rate-limit fix, copy honesty
+
+- **First-run schema migration glitch on `nomoda.org`** surgically backfilled in `daily-domains.json`: `first_seen_date 2026-05-01 → 2026-04-30`, `days_listed 0 → 1`, top-level `today_count 5 → 4` and `carryover_count 0 → 1`. `[from git log: 1479693]` This was a one-shot data fix for the cutover from the old schema to the new persistent-list schema; the entry would otherwise have been mis-attributed to "today" instead of carryover.
+- **Honesty disclaimer added** beneath the "Last updated" timestamp on the homepage. `[from git log: a895bfd]` Reason not in commit body — `[needs context]` (commit body empty beyond subject). The subject ("availability-staleness disclaimer") implies the user-facing acknowledgement that the listed-as-available status of a domain may have changed between cron run and the visitor reading it.
+- **Card 2 renamed "Still available" → "Recent drops"** to avoid an implicit availability claim. `[from git log: b983b2f]` Subject explicitly cites the *why*: the previous label asserted current availability, but the list is a snapshot — a domain may be re-registered between cron runs. "Recent drops" is descriptive without making a real-time guarantee.
+- **Per-host RDAP throttle override added for `rdap.gmoregistry.net` (3.0 s, vs the 0.4 s global)**. `[from git log: c0799a1]`
+  - Empirical probe on 2026-05-01 measured: 5 s gaps → 80 % 429s; 30 s+ gaps → clean recovery.
+  - Today's pipeline lost 51 `.shop` candidates to persistent 429s under the global 0.4 s interval before this fix.
+  - GMO Registry serves `.shop` plus 46 other TLDs, so the override has broad reach despite being a single host.
+  - Same commit also adds a `Retry-After`-header log line on exhausted backoff so future rate-limit diagnostics don't need a manual probe to discover the registry's hint.
+  - The fix is configuration only; the existing `rdap_per_host` lookup chain (added earlier) handled this without code changes.
+
+### 2026-05-02 — Filter-audit tooling
+
+- **`--debug-export PATH` flag added to `scripts/pipeline.py`**. `[from git log: 86cbb8b]` (Commit body is just the subject; the *why* lives in the new module's [scripts/debug_export.py](scripts/debug_export.py) header rather than the commit message.) Module header explains: when the flag is set, the orchestrator dumps five intermediate plain-text lists (`lexical_rejects.txt` with reason suffix, `lexical_survivors.txt`, `trim_kept.txt`, `trim_discards.txt`, `published.txt`) plus an optional `_meta.json` to the given directory. Production runs that don't pass the flag never collect or hold the lists in memory — gating is at collection-time, not write-time, because `lexical_survivors` alone can be 17k+ strings on a tight 7 GB GHA runner. Also adds an additive `rejections_out` kwarg to `lexical_filter.filter_candidates` (default `None` ⇒ no allocation) so per-rejection `(name, rule_key)` pairs can be captured via side-channel without changing production behaviour. Output dir `scripts/state/debug-exports/` added to `.gitignore`.
+
+### 2026-05-03 — Per-host RDAP concurrency + ops headroom
+
+- **Per-host RDAP concurrency landed.** `[from git log: 1bb33d9]` Replaces the previous strictly-sequential availability loop with one `ThreadPoolExecutor` per distinct RDAP host, all pools running concurrently. Per-host workers serialise on the existing thread-safe `HostThrottle` so per-host request rate is unchanged; total wall-clock is cut by `N-1` where `N` = number of distinct hosts touched. Today's 1000-candidate sequential run was ~25 min; with 8 host buckets in parallel at default concurrency=1 the projection is ~10–12 min. New config: `rdap_concurrency.{default_workers_per_host=1, per_host={}}` — defaults are safe, per-host overrides remain empty until empirically validated. **Architectural note from the commit body:** this design scales to `.com` / `.net` joining the fleet (Verisign single host) without code changes — only config tuning if/when we want >1 worker on Verisign's bucket. Adds `resolve_rdap_host(domain, config)` helper to `scripts/enrichment/rdap.py` (used by the orchestrator to bucket candidates without touching `check_availability` itself). 333/333 tests pass (5 new: 1 throttle thread-safety, 4 pipeline concurrency).
+- **GitHub Actions workflow `timeout-minutes: 45 → 60`**. `[from git log: 53f55a1]` Belt-and-suspenders headroom while the new RDAP concurrency validates naturally on tomorrow's 05:17 UTC cron. Today's sequential run was 33 min at the 1000-cap; with `.com` / `.net` joining in 1–3 weeks plus an eventual trim-cap bump, 60 min gives margin to absorb both without workflow cancellation. The commit body explicitly notes the timeout *can* revisit downward once steady-state is measured.
+
+### Test surface (delta since 2026-04-30)
+
+- 325 → **333 tests passing** (`+8`). New tests cover: filter-audit gating (`+2` in `test_pipeline.py`), per-host RDAP throttle override (`+1` in `test_rdap.py`), per-host RDAP concurrency (`+4` in `test_pipeline.py`), `HostThrottle` thread-safety under concurrent acquirers on the same host (`+1` in `test_circuit_breaker.py`).
+
+### New known follow-ups (additive to the 2026-04-30 list above)
+
+- Tomorrow's 05:17 UTC cron is the natural validation for both the per-host RDAP concurrency (target: <15 min total RDAP phase, vs. ~25 min sequential today) and the `.shop` throttle override (target: zero `.shop` candidates lost to 429s).
+- Workflow timeout bump can be revisited downward once steady-state runtime under the new concurrency is measured.
+- Trim-cap bump above 1000 is contemplated as a separate config-only change after the RDAP runtime is empirically below the new 60 min ceiling.
+- The `rdap_concurrency.per_host` map ships empty. Populate only with empirically-validated overrides — the config doc-string explicitly warns against speculative tuning.
