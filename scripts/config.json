@@ -67,6 +67,10 @@
     {
       "name": "NameSilo",
       "link_template": "https://www.namesilo.com/domain/search-domains?query={name}&rid=36a0644du"
+    },
+    {
+      "name": "Dynadot",
+      "link_template": "https://www.dynadot.com/domain/search?domain={name}&rscreg=domainsifter"
     }
   ],
   "api_endpoints": {
