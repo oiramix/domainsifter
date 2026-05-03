@@ -57,6 +57,7 @@ import logging
 import os
 import sys
 import tempfile
+import threading
 import time
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import date
@@ -356,6 +357,113 @@ def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
     return enriched
 
 
+def _check_availability_concurrent(
+    candidates: list[dict],
+    config: dict,
+    deadline: float,
+) -> dict[str, int]:
+    """Run RDAP availability checks in per-host buckets, all buckets in
+    parallel.
+
+    Architecture:
+      - Group candidates by their resolved RDAP host (one bucket per host).
+        Unknown / unresolvable TLDs share an "_unknown" bucket; they still
+        run through `check_availability`, which returns is_available=None.
+      - Each bucket gets its own ThreadPoolExecutor sized via
+        `rdap_concurrency.per_host[host]` → `rdap_concurrency.default_workers_per_host` → 1.
+      - All bucket pools run simultaneously. Within a bucket, workers
+        serialise on the existing thread-safe HostThrottle, so per-host
+        request rate never exceeds the configured min_interval regardless
+        of worker count.
+
+    Mutates each candidate dict in place: merges check_availability result
+    + sets availability_verified_at. Candidates that hit the deadline get
+    is_available=None and no availability_verified_at — same shape as the
+    previous sequential implementation.
+
+    Returns counts dict {available, not_available, unknown, skipped_budget};
+    the caller derives `kept` by filtering the original candidate list.
+    """
+    from datetime import datetime, timezone
+
+    from scripts.enrichment import rdap
+
+    cc = config.get("rdap_concurrency", {}) or {}
+    default_workers = max(1, int(cc.get("default_workers_per_host", 1) or 1))
+    per_host_workers = cc.get("per_host", {}) or {}
+
+    # Bucket candidates by host BEFORE submission so we can size each pool
+    # correctly. Unknown / unresolved hosts share "_unknown" — they're still
+    # processed (check_availability handles the None-host case internally).
+    buckets: dict[str, list[dict]] = {}
+    for cand in candidates:
+        host = rdap.resolve_rdap_host(cand.get("name", ""), config) or "_unknown"
+        buckets.setdefault(host, []).append(cand)
+
+    counts = {"available": 0, "not_available": 0, "unknown": 0, "skipped_budget": 0}
+    counts_lock = threading.Lock()
+
+    def _process_one(cand: dict) -> None:
+        # Deadline check is intra-worker so each candidate sees the latest
+        # clock — different from a one-shot pre-check, which would skip the
+        # whole bucket if the deadline elapsed during submission.
+        if time.monotonic() >= deadline:
+            cand["is_available"] = None
+            with counts_lock:
+                counts["skipped_budget"] += 1
+            return
+        result = rdap.check_availability(cand.get("name", ""), config)
+        cand.update(result)
+        cand["availability_verified_at"] = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        v = result.get("is_available")
+        with counts_lock:
+            if v is True:
+                counts["available"] += 1
+            elif v is False:
+                counts["not_available"] += 1
+            else:
+                counts["unknown"] += 1
+
+    # Submit every bucket's work to its own pool first — pools are alive and
+    # threads are scheduled the moment we call submit(), so all buckets run
+    # concurrently. The wait loop afterwards just collects completion.
+    pools_meta: list[tuple[str, ThreadPoolExecutor, list, float, list[dict]]] = []
+    for host, group in buckets.items():
+        workers = max(1, int(per_host_workers.get(host, default_workers) or default_workers))
+        pool = ThreadPoolExecutor(
+            max_workers=workers, thread_name_prefix=f"rdap-{host}",
+        )
+        logger.info(
+            "RDAP host bucket [%s]: %d candidates, %d workers",
+            host, len(group), workers,
+        )
+        host_start = time.monotonic()
+        futures = [pool.submit(_process_one, c) for c in group]
+        pools_meta.append((host, pool, futures, host_start, group))
+
+    # Drain. Each pool is independent — earlier pools may finish while we
+    # still wait on later ones; no head-of-line blocking across hosts.
+    for host, pool, futures, host_start, group in pools_meta:
+        for f in futures:
+            try:
+                f.result()
+            except Exception as exc:  # pragma: no cover — check_availability is contracted not to raise
+                logger.warning("RDAP availability check raised on host %s: %s", host, exc)
+        pool.shutdown(wait=True)
+        elapsed = time.monotonic() - host_start
+        host_avail = sum(1 for c in group if c.get("is_available") is True)
+        host_unavail = sum(1 for c in group if c.get("is_available") is False)
+        host_unknown = len(group) - host_avail - host_unavail
+        logger.info(
+            "RDAP host bucket [%s] done in %.1fs: %d available, %d not_available, %d unknown",
+            host, elapsed, host_avail, host_unavail, host_unknown,
+        )
+
+    return counts
+
+
 def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
     """RDAP-validate each candidate; keep only the ones registry says are
     actually available (HTTP 404).
@@ -384,39 +492,23 @@ def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
     Sets `availability_verified_at` (ISO 8601 Z) on every candidate that
     actually had an RDAP attempt — useful for downstream debugging and
     surfacing "checked at HH:MM" in the JSON payload.
+
+    Concurrency: candidates run through `_check_availability_concurrent`,
+    which buckets by RDAP host and runs each bucket in its own
+    ThreadPoolExecutor (all buckets in parallel). Per-host request rate is
+    unchanged — the existing HostThrottle serialises within a bucket. See
+    `scripts/config.json` → `rdap_concurrency`.
     """
-    from datetime import datetime, timezone
-
-    from scripts.enrichment import rdap
-
     if not candidates:
         return list(candidates)
 
     budget = float(config.get("availability_budget_seconds", 600))
     deadline = time.monotonic() + budget
 
-    kept: list[dict] = []
-    counts = {"available": 0, "not_available": 0, "unknown": 0, "skipped_budget": 0}
+    counts = _check_availability_concurrent(candidates, config, deadline)
 
-    for cand in candidates:
-        if time.monotonic() >= deadline:
-            counts["skipped_budget"] += 1
-            cand["is_available"] = None
-            continue
-
-        result = rdap.check_availability(cand["name"], config)
-        cand.update(result)
-        cand["availability_verified_at"] = datetime.now(timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-
-        if result.get("is_available") is True:
-            counts["available"] += 1
-            kept.append(cand)
-        elif result.get("is_available") is False:
-            counts["not_available"] += 1
-        else:
-            counts["unknown"] += 1
+    # Preserve input order in the kept list (callers sort upstream by score).
+    kept = [c for c in candidates if c.get("is_available") is True]
 
     logger.info(
         "Availability check: %d available, %d not available, %d unknown, %d skipped (budget) — kept %d / %d",

@@ -225,6 +225,39 @@ def _empty_unknown() -> dict:
     }
 
 
+def resolve_rdap_host(domain: str, config: dict) -> str | None:
+    """Return the RDAP server hostname that would be queried for `domain`.
+
+    Used by the pipeline orchestrator to partition candidates into per-host
+    buckets BEFORE calling `check_availability`. Walks the same bootstrap
+    + urlparse path `check_availability` uses internally so the partitioning
+    is guaranteed consistent with the actual lookup.
+
+    Returns None when:
+      - the IANA bootstrap is unreachable (callers bucket under "_unknown")
+      - the TLD has no RDAP server in the bootstrap
+      - the domain has no TLD label
+      - the bootstrap URL has no parseable host
+
+    None-bucketed candidates still go through `check_availability` normally
+    — that function handles the same cases and returns is_available=None.
+    The pipeline rejects them like any other unknown.
+    """
+    timeout = config.get("request_timeout_seconds", 10)
+    bootstrap = _load_bootstrap(config, timeout)
+    if bootstrap is None or not bootstrap:
+        return None
+    tld = domain.rsplit(".", 1)[-1].lower() if "." in domain else ""
+    if not tld:
+        return None
+    bases = bootstrap.get(tld)
+    if not bases:
+        return None
+    base = bases[0].rstrip("/")
+    from urllib.parse import urlparse
+    return urlparse(base).hostname or None
+
+
 def check_availability(domain: str, config: dict) -> dict:
     """Verify whether a domain is actually available to register.
 

@@ -318,6 +318,57 @@ def test_request_with_429_backoff_accepts_host_and_interval():
     assert sleeps == []
 
 
+def test_throttle_serialises_concurrent_acquirers_on_same_host():
+    """Five threads acquire the same host with interval=0.1s and deterministic
+    jitter (1.0×). The HostThrottle's reserve-then-sleep pattern must
+    serialise them so total wall-clock is at least (n-1)*interval — proves
+    that the per-host RDAP concurrency design (multiple workers per host)
+    cannot exceed the configured per-host rate.
+    """
+    import threading
+    import time as _time
+
+    from scripts.enrichment._circuit_breaker import HostThrottle
+
+    throttle = HostThrottle()
+    n = 5
+    interval = 0.1
+    barrier = threading.Barrier(n)
+    finish_times: list[float] = []
+    finish_lock = threading.Lock()
+
+    def worker():
+        barrier.wait()  # release all five at once
+        throttle.acquire(
+            "shared.example",
+            interval,
+            jitter_factor_range=(1.0, 1.0),  # deterministic for assertion
+        )
+        with finish_lock:
+            finish_times.append(_time.monotonic())
+
+    start = _time.monotonic()
+    threads = [threading.Thread(target=worker) for _ in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    elapsed = max(finish_times) - start
+
+    # First acquirer returns ~immediately; each subsequent one waits the
+    # interval after the previous reservation. Minimum wall-clock for n
+    # serialised acquires = (n-1) * interval. Allow a small slack for
+    # scheduler jitter on the lower bound; upper bound proves we're not
+    # accidentally ×2 sleeping.
+    minimum = (n - 1) * interval
+    assert elapsed >= minimum * 0.9, (
+        f"throttle did not serialise: elapsed={elapsed:.3f}s, expected >= {minimum:.3f}s"
+    )
+    assert elapsed < minimum * 3.0, (
+        f"throttle over-slept: elapsed={elapsed:.3f}s, expected ~{minimum:.3f}s"
+    )
+
+
 # --- retry_on_timeout --------------------------------------------------------
 
 

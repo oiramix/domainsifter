@@ -86,6 +86,11 @@
   },
   "download_timeout_seconds": 120,
   "max_concurrent_enrichments": 1,
+  "rdap_concurrency": {
+    "_doc": "Per-host concurrency for the RDAP availability check. The pipeline buckets candidates by RDAP host and runs each bucket in its own ThreadPoolExecutor; all buckets execute simultaneously. Within a bucket, workers serialize on the existing thread-safe HostThrottle so per-host request rate never exceeds api_min_interval_seconds.rdap (or rdap_per_host) — concurrency only ever fans out *across* hosts. Defaults are safe (1 worker per host); per_host stays empty until empirically validated against a specific registry. Lookup: per_host[host] → default_workers_per_host → 1.",
+    "default_workers_per_host": 1,
+    "per_host": {}
+  },
   "api_min_interval_seconds": {
     "_doc": "Minimum interval between requests to each API host. With max_concurrent_enrichments=1 (sequential) and multiplicative 0.75-1.25× jitter applied per call, actual rates are ~25% slower than the nominal value. Tightened 2026-04-30 after 503/502 storms with the previous 1.0s/0.4s/0.2s settings.",
     "wayback": 3.0,

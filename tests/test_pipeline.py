@@ -46,6 +46,26 @@ def _no_such_key():
     )
 
 
+@pytest.fixture(autouse=True)
+def _stub_resolve_rdap_host(monkeypatch):
+    """Block the live IANA bootstrap fetch that resolve_rdap_host would do
+    in any test exercising validate_availability / pipeline.main. Returns a
+    synthetic per-TLD host so each TLD lands in its own bucket — this keeps
+    the per-host concurrency orchestration exercised in tests without
+    introducing a network dependency. Tests that need bucket-collapsing or
+    specific hostnames patch resolve_rdap_host themselves; the autouse
+    fixture is a no-op for those (the explicit patch wins).
+    """
+    from scripts.enrichment import rdap as _rdap
+
+    def _stub(name, _c):
+        if not name or "." not in name:
+            return None
+        return f"rdap.{name.rsplit('.', 1)[-1]}.example"
+
+    monkeypatch.setattr(_rdap, "resolve_rdap_host", _stub)
+
+
 @pytest.fixture
 def cfg(tmp_path):
     config = {
@@ -364,6 +384,205 @@ def test_validate_availability_respects_budget(monkeypatch, cfg):
 
 def test_validate_availability_empty_input_short_circuits():
     assert pipeline.validate_availability([], {}) == []
+
+
+# --- per-host concurrency (rdap_concurrency) --------------------------------
+
+
+def test_check_availability_concurrent_buckets_by_host(monkeypatch, cfg):
+    """Candidates with different hosts go to separate ThreadPoolExecutors;
+    each pool is sized via the per-host worker count. We assert host
+    bucketing by capturing the host each candidate's _process_one was
+    routed through (visible via the worker thread's name_prefix)."""
+    import threading as _thr
+
+    from scripts.enrichment import rdap as rdap_mod
+
+    cfg = {
+        **cfg,
+        "rdap_concurrency": {
+            "default_workers_per_host": 2,
+            "per_host": {"rdap.com.example": 4},
+        },
+    }
+
+    # Override the autouse synthetic host with a TLD-keyed pattern that
+    # actually maps to the per_host override key for ".com".
+    monkeypatch.setattr(
+        rdap_mod, "resolve_rdap_host",
+        lambda name, _c: f"rdap.{name.rsplit('.', 1)[-1]}.example",
+    )
+
+    seen_hosts: list[str] = []
+    seen_lock = _thr.Lock()
+
+    def fake_check(domain, _c):
+        # Worker thread name has the host bucket as prefix; capture it.
+        with seen_lock:
+            seen_hosts.append(_thr.current_thread().name)
+        return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                "rdap_expiration": None, "previous_registrar": None}
+
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+
+    cands = [
+        {"name": "a.com", "score": 50}, {"name": "b.com", "score": 50},
+        {"name": "c.org", "score": 50}, {"name": "d.org", "score": 50},
+        {"name": "e.dev", "score": 50},
+    ]
+    kept = pipeline.validate_availability(cands, cfg)
+    assert len(kept) == 5
+
+    com_threads = {n for n in seen_hosts if n.startswith("rdap-rdap.com.example")}
+    org_threads = {n for n in seen_hosts if n.startswith("rdap-rdap.org.example")}
+    dev_threads = {n for n in seen_hosts if n.startswith("rdap-rdap.dev.example")}
+    # All three buckets actually executed work.
+    assert com_threads
+    assert org_threads
+    assert dev_threads
+    # No cross-pollination — a com candidate never ran on an org thread.
+    other = {n for n in seen_hosts if not (
+        n.startswith("rdap-rdap.com.example")
+        or n.startswith("rdap-rdap.org.example")
+        or n.startswith("rdap-rdap.dev.example")
+    )}
+    assert other == set()
+
+
+def test_check_availability_concurrent_per_host_override_resolves(monkeypatch, cfg):
+    """rdap_concurrency.per_host[host] overrides default_workers_per_host
+    for that specific host; unknown hosts fall back to the default; the
+    default itself falls back to 1 when missing."""
+    import threading as _thr
+
+    from scripts.enrichment import rdap as rdap_mod
+
+    captured_pool_sizes: dict[str, int] = {}
+
+    # We can't intercept the ThreadPoolExecutor sizing directly without
+    # patching concurrent.futures, but we CAN observe the maximum
+    # concurrency a host's bucket actually uses. Each fake_check holds a
+    # barrier briefly so we see the pool's true max in-flight count.
+    def make_observer():
+        in_flight: dict[str, int] = {}
+        peak: dict[str, int] = {}
+        lock = _thr.Lock()
+
+        def fake_check(domain, _c):
+            host_bucket = _thr.current_thread().name.rsplit("_", 1)[0]
+            with lock:
+                in_flight[host_bucket] = in_flight.get(host_bucket, 0) + 1
+                peak[host_bucket] = max(peak[host_bucket] if host_bucket in peak else 0, in_flight[host_bucket])
+            # Hold briefly so other workers in the same bucket overlap.
+            import time as _t
+            _t.sleep(0.05)
+            with lock:
+                in_flight[host_bucket] -= 1
+            return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                    "rdap_expiration": None, "previous_registrar": None}
+        return fake_check, peak
+
+    fake_check, peak = make_observer()
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+    monkeypatch.setattr(
+        rdap_mod, "resolve_rdap_host",
+        lambda name, _c: f"rdap.{name.rsplit('.', 1)[-1]}.example",
+    )
+
+    cfg = {
+        **cfg,
+        "rdap_concurrency": {
+            "default_workers_per_host": 2,
+            "per_host": {"rdap.com.example": 5},  # override only for .com
+        },
+    }
+
+    # 8 .com candidates and 8 .org candidates — enough that each bucket can
+    # plausibly run all its workers concurrently.
+    cands = (
+        [{"name": f"a{i}.com", "score": 50} for i in range(8)]
+        + [{"name": f"b{i}.org", "score": 50} for i in range(8)]
+    )
+    pipeline.validate_availability(cands, cfg)
+
+    # .com bucket peak <= 5 (its override) — the test is loose because the
+    # actual peak depends on scheduling; the strict assertion is the
+    # fallback bucket's peak <= default_workers_per_host=2.
+    com_keys = [k for k in peak if "rdap.com.example" in k]
+    org_keys = [k for k in peak if "rdap.org.example" in k]
+    assert com_keys, "No com worker observed"
+    assert org_keys, "No org worker observed"
+    com_peak = max(peak[k] for k in com_keys)
+    org_peak = max(peak[k] for k in org_keys)
+    assert com_peak <= 5
+    assert org_peak <= 2  # fallback default
+    # And per-host override actually fanned out beyond the default.
+    assert com_peak > org_peak or com_peak >= 3, (
+        f"per_host override didn't increase com concurrency (com_peak={com_peak}, org_peak={org_peak})"
+    )
+
+
+def test_check_availability_concurrent_skips_remaining_after_deadline(monkeypatch, cfg):
+    """Once time.monotonic() crosses the deadline mid-run, every still-
+    pending candidate is marked is_available=None and counted under
+    skipped_budget instead of executing check_availability."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    cfg = {
+        **cfg,
+        "availability_budget_seconds": 0.0,  # deadline is "now"
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+
+    calls: list[str] = []
+
+    def fake_check(domain, _c):
+        calls.append(domain)
+        return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                "rdap_expiration": None, "previous_registrar": None}
+
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+    monkeypatch.setattr(rdap_mod, "resolve_rdap_host",
+                        lambda name, _c: f"rdap.{name.rsplit('.', 1)[-1]}.example")
+
+    cands = [
+        {"name": "a.com", "score": 50},
+        {"name": "b.org", "score": 50},
+        {"name": "c.dev", "score": 50},
+    ]
+    kept = pipeline.validate_availability(cands, cfg)
+    assert kept == []  # everything skipped
+    assert calls == []  # no RDAP attempt at all
+    # Every candidate marked None.
+    assert all(c.get("is_available") is None for c in cands)
+
+
+def test_check_availability_concurrent_unknown_host_bucket(monkeypatch, cfg):
+    """Candidates whose TLD has no RDAP server (resolve_rdap_host returns
+    None) are bucketed under '_unknown' and STILL go through
+    check_availability (which itself returns is_available=None)."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    cfg = {
+        **cfg,
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+
+    seen_domains: list[str] = []
+
+    def fake_check(domain, _c):
+        seen_domains.append(domain)
+        return {"is_available": None, "rdap_http": None, "rdap_status": [],
+                "rdap_expiration": None, "previous_registrar": None}
+
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+    monkeypatch.setattr(rdap_mod, "resolve_rdap_host", lambda *_a, **_k: None)
+
+    cands = [{"name": f"d{i}.unknown", "score": 50} for i in range(3)]
+    kept = pipeline.validate_availability(cands, cfg)
+    assert kept == []
+    # The '_unknown' bucket still ran every candidate through check_availability.
+    assert sorted(seen_domains) == ["d0.unknown", "d1.unknown", "d2.unknown"]
 
 
 def test_main_persists_carryover_across_runs(monkeypatch, cfg, tmp_path):
