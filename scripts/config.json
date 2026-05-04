@@ -52,7 +52,11 @@
     "min_alpha_trigram_matches": 3,
     "min_apex_length": 3
   },
-  "max_candidates_for_enrichment": 1000,
+  "availability_check": {
+    "_doc": "Per-host bucket caps for the RDAP availability stage, derived from a runtime budget. For each distinct RDAP host bucket, cap = floor(max_runtime_per_host_seconds * workers / effective_throttle), where effective_throttle comes from api_min_interval_seconds.rdap_per_host[host] -> rdap -> 0.4, and workers from rdap_concurrency.per_host[host] -> default_workers_per_host -> 1. Buckets exceeding their cap are random-shuffled (seed = today's date int) then truncated. global_cap is a safety net against pathological days where filter behaviour leaks far more survivors than expected; today's typical 14k lexical survivors fits below it. Replaced the prior length-asc trim (max_candidates_for_enrichment=1000) on 2026-05-04 — that heuristic biased toward already-registered short names without improving Wayback-signal density.",
+    "max_runtime_per_host_seconds": 900,
+    "global_cap": 15000
+  },
   "max_candidates_for_publication": 300,
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,

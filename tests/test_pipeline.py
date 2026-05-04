@@ -76,7 +76,10 @@ def cfg(tmp_path):
             "czds_api_base": "https://czds-api.icann.org",
         },
         "max_concurrent_enrichments": 4,
-        "max_candidates_for_enrichment": 1000,
+        "availability_check": {
+            "max_runtime_per_host_seconds": 900,
+            "global_cap": 15000,
+        },
         "max_candidates_for_publication": 100,
         "enrichment_time_budget_seconds": 60,  # tests don't actually wait — short keeps the wait() ceilings small
         "registrars": [
@@ -274,20 +277,126 @@ def test_enrich_all_returns_empty_when_no_candidates(cfg):
     assert pipeline.enrich_all([], cfg) == []
 
 
-def test_trim_for_enrichment_no_op_when_under_cap():
-    cands = [{"name": "a.com"}, {"name": "bbb.com"}]
-    assert pipeline._trim_for_enrichment(cands, 10) == cands
+# --- per-host availability caps (replaces length-asc trim) ----------------
 
 
-def test_trim_for_enrichment_keeps_shortest_names_first():
-    cands = [
-        {"name": "longerdomain.com"},
-        {"name": "ab.com"},
-        {"name": "medium.com"},
-        {"name": "abcd.com"},
-    ]
-    trimmed = pipeline._trim_for_enrichment(cands, 2)
-    assert [c["name"] for c in trimmed] == ["ab.com", "abcd.com"]
+def test_per_host_cap_calculation_from_runtime_budget(cfg):
+    """cap = floor(max_runtime_per_host_seconds * workers / effective_throttle).
+    Verifies the lookup chain (rdap_per_host → rdap → 0.4) AND the
+    workers chain (per_host → default_workers_per_host → 1)."""
+    cfg = {
+        **cfg,
+        "availability_check": {"max_runtime_per_host_seconds": 900, "global_cap": 15000},
+        "api_min_interval_seconds": {
+            "rdap": 0.4,
+            "rdap_per_host": {"rdap.gmoregistry.net": 3.0},
+        },
+        "rdap_concurrency": {
+            "default_workers_per_host": 1,
+            "per_host": {"rdap.fast.example": 5},
+        },
+    }
+    # Global rdap (0.4s) × 1 worker → 900 / 0.4 = 2250
+    assert pipeline._per_host_cap("rdap.someregistry.example", cfg) == 2250
+    # GMO override (3.0s) × 1 worker → 900 / 3 = 300
+    assert pipeline._per_host_cap("rdap.gmoregistry.net", cfg) == 300
+    # Per-host concurrency override → 900 × 5 / 0.4 = 11250
+    assert pipeline._per_host_cap("rdap.fast.example", cfg) == 11250
+
+
+def test_bucket_overflow_triggers_random_shuffle_not_length_asc(monkeypatch, cfg):
+    """When a host bucket exceeds its cap, the cut is random (deterministic
+    via the today=date seed), not length-asc. Asserted by checking that the
+    survivors are NOT the alphabetically/length-shortest subset."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    monkeypatch.setattr(
+        rdap_mod, "resolve_rdap_host",
+        lambda name, _c: "rdap.solo.example",  # everything in one bucket
+    )
+
+    cfg = {
+        **cfg,
+        "availability_check": {"max_runtime_per_host_seconds": 1.0, "global_cap": 10000},
+        "api_min_interval_seconds": {"rdap": 0.5},  # cap = floor(1 / 0.5) = 2
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+    # 8 candidates, names sortable (length-asc would yield "a", "b", "c", ...).
+    cands = [{"name": f"{c}.com"} for c in "abcdefgh"]
+    final, stats = pipeline._bucket_and_cap_for_availability(cands, cfg, today=date(2026, 5, 4))
+
+    # Cap = 2; one bucket over its cap.
+    assert stats["rdap.solo.example"]["before"] == 8
+    assert stats["rdap.solo.example"]["after"] == 2
+    assert stats["rdap.solo.example"]["cap"] == 2
+    assert len(final) == 2
+    kept_names = sorted(c["name"] for c in final)
+    # Length-asc would deterministically pick a.com + b.com. Random-shuffle
+    # with a fixed seed yields a different pair.
+    assert kept_names != ["a.com", "b.com"]
+
+
+def test_global_cap_applies_before_bucketing_when_over_total(monkeypatch, cfg):
+    """global_cap is a safety net engaged BEFORE per-host bucketing. When
+    total survivors exceed it, random-shuffle and trim to global_cap, then
+    bucket what remains."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    # Two TLDs → two distinct hosts.
+    monkeypatch.setattr(
+        rdap_mod, "resolve_rdap_host",
+        lambda name, _c: f"rdap.{name.rsplit('.', 1)[-1]}.example",
+    )
+
+    cfg = {
+        **cfg,
+        "availability_check": {"max_runtime_per_host_seconds": 900, "global_cap": 5},
+        "api_min_interval_seconds": {"rdap": 0.4},
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+    # 12 candidates, total > global_cap=5.
+    cands = (
+        [{"name": f"a{i}.com"} for i in range(6)]
+        + [{"name": f"b{i}.org"} for i in range(6)]
+    )
+    final, stats = pipeline._bucket_and_cap_for_availability(cands, cfg, today=date(2026, 5, 4))
+    # Global cap engaged: total post-cap is exactly 5.
+    assert len(final) == 5
+    # The remaining candidates split across two host buckets, neither over the
+    # per-host cap (2250) — so per-host stats reflect the post-global-cap
+    # split, not the original 6/6.
+    total_after = sum(s["after"] for s in stats.values())
+    assert total_after == 5
+    # And no bucket got individually re-trimmed past its per-host cap.
+    for s in stats.values():
+        assert s["before"] == s["after"], "per-host trim ran inappropriately"
+
+
+def test_bucket_cap_is_deterministic_per_day(monkeypatch, cfg):
+    """Same date ⇒ same shuffle ⇒ same survivors. Different date ⇒ may
+    differ. This is the property that lets us reproduce a day's run from
+    the same input data when debugging."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    monkeypatch.setattr(
+        rdap_mod, "resolve_rdap_host", lambda name, _c: "rdap.solo.example",
+    )
+    cfg = {
+        **cfg,
+        "availability_check": {"max_runtime_per_host_seconds": 1.0, "global_cap": 10000},
+        "api_min_interval_seconds": {"rdap": 0.5},  # cap = 2
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+    cands = [{"name": f"{c}.com"} for c in "abcdefgh"]
+
+    a, _ = pipeline._bucket_and_cap_for_availability(list(cands), cfg, today=date(2026, 5, 4))
+    b, _ = pipeline._bucket_and_cap_for_availability(list(cands), cfg, today=date(2026, 5, 4))
+    assert sorted(c["name"] for c in a) == sorted(c["name"] for c in b)
+    # Different day MAY produce a different cut. Loose assertion: at least
+    # don't crash; concrete equality not guaranteed by Random.shuffle for
+    # small sets, so we just verify the function returns the right shape.
+    c_diff, _ = pipeline._bucket_and_cap_for_availability(list(cands), cfg, today=date(2026, 5, 5))
+    assert len(c_diff) == 2
 
 
 def test_enrich_all_respects_time_budget(monkeypatch, cfg):
@@ -1027,9 +1136,12 @@ def test_main_writes_all_debug_export_files_when_flag_set(monkeypatch, cfg, tmp_
     # great.com is the sole published name.
     assert published.strip() == "great.com"
 
-    # _meta.json with counts and trim_threshold.
+    # _meta.json with counts and availability_check shape.
     meta = json.loads((dump_dir / "_meta.json").read_text(encoding="utf-8"))
-    assert meta["trim_threshold"] == cfg["max_candidates_for_enrichment"]
+    assert meta["availability_check"]["max_runtime_per_host_seconds"] == (
+        cfg["availability_check"]["max_runtime_per_host_seconds"]
+    )
+    assert meta["availability_check"]["global_cap"] == cfg["availability_check"]["global_cap"]
     assert meta["counts"]["lexical_survivors"] == 1
     assert meta["counts"]["trim_kept"] == 1
     assert meta["counts"]["trim_discards"] == 0

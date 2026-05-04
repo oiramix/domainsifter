@@ -55,6 +55,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import sys
 import tempfile
 import threading
@@ -361,6 +362,8 @@ def _check_availability_concurrent(
     candidates: list[dict],
     config: dict,
     deadline: float,
+    *,
+    per_host_stats: dict[str, dict] | None = None,
 ) -> dict[str, int]:
     """Run RDAP availability checks in per-host buckets, all buckets in
     parallel.
@@ -435,10 +438,20 @@ def _check_availability_concurrent(
         pool = ThreadPoolExecutor(
             max_workers=workers, thread_name_prefix=f"rdap-{host}",
         )
-        logger.info(
-            "RDAP host bucket [%s]: %d candidates, %d workers",
-            host, len(group), workers,
-        )
+        # When the orchestrator pre-computed bucket caps, surface the
+        # original (pre-cap) bucket size in the log so production runs show
+        # whether any host actually hit its cap.
+        host_stats = (per_host_stats or {}).get(host)
+        if host_stats and host_stats.get("before", 0) > host_stats.get("after", 0):
+            logger.info(
+                "RDAP host bucket [%s]: %d candidates (capped from %d), %d workers",
+                host, len(group), host_stats["before"], workers,
+            )
+        else:
+            logger.info(
+                "RDAP host bucket [%s]: %d candidates, %d workers",
+                host, len(group), workers,
+            )
         host_start = time.monotonic()
         futures = [pool.submit(_process_one, c) for c in group]
         pools_meta.append((host, pool, futures, host_start, group))
@@ -464,7 +477,12 @@ def _check_availability_concurrent(
     return counts
 
 
-def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
+def validate_availability(
+    candidates: list[dict],
+    config: dict,
+    *,
+    per_host_stats: dict[str, dict] | None = None,
+) -> list[dict]:
     """RDAP-validate each candidate; keep only the ones registry says are
     actually available (HTTP 404).
 
@@ -505,7 +523,9 @@ def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
     budget = float(config.get("availability_budget_seconds", 600))
     deadline = time.monotonic() + budget
 
-    counts = _check_availability_concurrent(candidates, config, deadline)
+    counts = _check_availability_concurrent(
+        candidates, config, deadline, per_host_stats=per_host_stats,
+    )
 
     # Preserve input order in the kept list (callers sort upstream by score).
     kept = [c for c in candidates if c.get("is_available") is True]
@@ -535,16 +555,125 @@ def validate_availability(candidates: list[dict], config: dict) -> list[dict]:
     return kept
 
 
-def _trim_for_enrichment(candidates: list[dict], cap: int) -> list[dict]:
-    """Safety net: if more candidates survived the lexical filter than we're
-    willing to enrich, take the shortest names (proxy for higher quality)."""
-    if len(candidates) <= cap:
-        return candidates
-    logger.warning(
-        "Lexical survivors (%d) exceed enrichment cap (%d); trimming by length asc",
-        len(candidates), cap,
+def _resolve_host_throttle(host: str, config: dict) -> float:
+    """Effective per-request throttle for a given RDAP host. Order:
+    rdap_per_host[host] → global rdap → 0.4 final fallback. Mirrors the
+    same lookup chain rdap.check_availability uses internally so cap math
+    matches actual runtime pacing."""
+    intervals = config.get("api_min_interval_seconds", {}) or {}
+    return float(
+        intervals.get("rdap_per_host", {}).get(host, intervals.get("rdap", 0.4))
     )
-    return sorted(candidates, key=lambda c: (len(c.get("name", "")), c.get("name", "")))[:cap]
+
+
+def _resolve_host_workers(host: str, config: dict) -> int:
+    """Effective per-host worker count. Order: rdap_concurrency.per_host[host]
+    → rdap_concurrency.default_workers_per_host → 1. Same lookup chain
+    _check_availability_concurrent uses to size each ThreadPoolExecutor."""
+    cc = config.get("rdap_concurrency", {}) or {}
+    default = max(1, int(cc.get("default_workers_per_host", 1) or 1))
+    per_host = cc.get("per_host", {}) or {}
+    return max(1, int(per_host.get(host, default) or default))
+
+
+def _per_host_cap(host: str, config: dict) -> int:
+    """How many candidates this host's bucket can hold within the configured
+    runtime budget. With N concurrent workers serialising on one HostThrottle
+    queue at interval I, wall-clock for K candidates ≈ K/N × I (large-K
+    approximation). Solving for K at the runtime budget:
+        cap = floor(max_runtime_per_host_seconds / (throttle / workers))
+            = floor(max_runtime_per_host_seconds × workers / throttle)
+    The floor ensures we never schedule a bucket whose math implies running
+    past the budget.
+    """
+    ac = config.get("availability_check", {}) or {}
+    runtime = float(ac.get("max_runtime_per_host_seconds", 900))
+    throttle = _resolve_host_throttle(host, config)
+    workers = _resolve_host_workers(host, config)
+    if throttle <= 0:
+        # Degenerate: no throttle means no cap (defer to global cap).
+        return 10**9
+    return max(1, int(runtime * workers / throttle))
+
+
+def _bucket_and_cap_for_availability(
+    candidates: list[dict], config: dict, *, today: date | None = None,
+) -> tuple[list[dict], dict[str, dict]]:
+    """Replace the prior length-asc trim with per-host bucket caps derived
+    from a runtime budget.
+
+    Algorithm:
+      1. Apply global_cap as a safety net first (today's lexical-survivor
+         counts ~14k fit comfortably; this guards pathological days when
+         filter behaviour changes upstream and survivors balloon).
+      2. Bucket the remaining candidates by RDAP host using the same
+         resolve_rdap_host() the orchestrator uses — guarantees bucketing
+         is consistent with later host-pool sizing.
+      3. For each bucket, compute a cap = floor(runtime × workers / throttle).
+         If the bucket exceeds its cap, RANDOM-SHUFFLE within the bucket and
+         truncate. Random not length-asc: the 2026-05-04 audit showed the
+         length-asc heuristic was quality-neutral on Wayback signal but
+         biased toward already-registered names (shorter ⇒ more likely
+         already taken). Random sampling removes that bias without claiming
+         to add quality.
+      4. Same shuffle seed across buckets ⇒ reproducible per-day for
+         debugging. Seed = today's date as int (YYYYMMDD).
+
+    Returns (final_candidates, per_host_stats) where per_host_stats maps
+    host → {"before": int, "after": int, "cap": int, "throttle": float,
+    "workers": int}. The orchestrator passes per_host_stats into the
+    concurrent runner so its log lines can report 'capped from N' shape
+    without recomputing.
+    """
+    today = today or date.today()
+    seed = int(today.strftime("%Y%m%d"))
+
+    ac = config.get("availability_check", {}) or {}
+    global_cap = int(ac.get("global_cap", 15000))
+
+    pool: list[dict] = list(candidates)
+    if global_cap > 0 and len(pool) > global_cap:
+        logger.warning(
+            "Lexical survivors (%d) exceed global_cap (%d); random-shuffle trim before bucketing",
+            len(pool), global_cap,
+        )
+        rng = random.Random(seed)
+        rng.shuffle(pool)
+        pool = pool[:global_cap]
+
+    from scripts.enrichment import rdap
+
+    buckets: dict[str, list[dict]] = {}
+    for cand in pool:
+        host = rdap.resolve_rdap_host(cand.get("name", ""), config) or "_unknown"
+        buckets.setdefault(host, []).append(cand)
+
+    final: list[dict] = []
+    stats: dict[str, dict] = {}
+    for host, group in buckets.items():
+        cap = _per_host_cap(host, config)
+        throttle = _resolve_host_throttle(host, config)
+        workers = _resolve_host_workers(host, config)
+        before = len(group)
+        if before > cap:
+            rng = random.Random(seed)
+            rng.shuffle(group)
+            group = group[:cap]
+            logger.warning(
+                "RDAP host bucket [%s]: %d candidates exceed cap %d (throttle=%.2fs, workers=%d); "
+                "random-shuffle trim",
+                host, before, cap, throttle, workers,
+            )
+        final.extend(group)
+        stats[host] = {
+            "before": before,
+            "after": len(group),
+            "cap": cap,
+            "throttle": throttle,
+            "workers": workers,
+        }
+
+    return final, stats
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -645,18 +774,27 @@ def main(argv: list[str] | None = None) -> int:
         structural_kept, config, rejections_out=lexical_rejections,
     )
 
-    # Safety net before paying for ANY network calls. Caps the availability
-    # check below; with confirmed-available domains then flowing into
-    # enrichment, this also caps enrichment indirectly.
-    eval_cap = int(config.get("max_candidates_for_enrichment", 1000))
-    candidates_to_evaluate = _trim_for_enrichment(lexical_kept, eval_cap)
+    # Bucket lexical survivors by RDAP host and apply per-host caps derived
+    # from the configured runtime budget (availability_check.max_runtime_per_host_seconds).
+    # Replaces the prior 1000-cap length-asc trim; today's ~14k survivors all
+    # flow through availability check, modulo per-host caps that bound
+    # any single bucket's wall-clock at ~15 min.
+    candidates_to_evaluate, per_host_stats = _bucket_and_cap_for_availability(
+        lexical_kept, config, today=today,
+    )
     total_evaluated = len(candidates_to_evaluate)
+    logger.info(
+        "Availability buckets: %d candidates across %d hosts after capping",
+        total_evaluated, len(per_host_stats),
+    )
 
     # Stage 3: AUTHORITATIVE availability check via RDAP — the gate that
     # eliminates owned/in-redemption domains BEFORE we burn enrichment
     # budget on them. Only HTTP 404 passes through. ~95% of zone-diff
     # "drops" reject here on a typical day.
-    available = validate_availability(candidates_to_evaluate, config)
+    available = validate_availability(
+        candidates_to_evaluate, config, per_host_stats=per_host_stats,
+    )
 
     # Stage 4: enrichment (sequential, paced) — runs only on confirmed-
     # available candidates. Set is typically small (5-50).
@@ -707,9 +845,14 @@ def main(argv: list[str] | None = None) -> int:
         trim_kept_set = {c.get("name", "") for c in candidates_to_evaluate}
         published_payload = json.loads(written_path.read_text(encoding="utf-8"))
         published_names = [d.get("name", "") for d in published_payload.get("domains", [])]
+        ac_cfg = config.get("availability_check", {}) or {}
         meta = {
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "trim_threshold": eval_cap,
+            "availability_check": {
+                "max_runtime_per_host_seconds": ac_cfg.get("max_runtime_per_host_seconds"),
+                "global_cap": ac_cfg.get("global_cap"),
+                "per_host_stats": per_host_stats,
+            },
             "counts": {
                 "structural_kept": len(structural_kept),
                 "lexical_rejects": len(lexical_rejections or []),
