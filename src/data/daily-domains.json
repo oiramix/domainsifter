@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-05-03T05:51:06Z",
+  "generated_at": "2026-05-04T05:39:37Z",
   "domain_count": 5,
-  "today_count": 1,
-  "carryover_count": 4,
+  "today_count": 0,
+  "carryover_count": 5,
   "domains": [
     {
       "name": "blanchot.org",
@@ -22,14 +22,18 @@
         {
           "name": "NameSilo",
           "url": "https://www.namesilo.com/domain/search-domains?query=blanchot.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=blanchot.org&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:19:48Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-03",
-      "days_listed": 2
+      "last_validated_date": "2026-05-04",
+      "days_listed": 3
     },
     {
       "name": "nontongp.xyz",
@@ -49,14 +53,18 @@
         {
           "name": "NameSilo",
           "url": "https://www.namesilo.com/domain/search-domains?query=nontongp.xyz&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=nontongp.xyz&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:23:57Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-03",
-      "days_listed": 2
+      "last_validated_date": "2026-05-04",
+      "days_listed": 3
     },
     {
       "name": "helloco.info",
@@ -76,14 +84,18 @@
         {
           "name": "NameSilo",
           "url": "https://www.namesilo.com/domain/search-domains?query=helloco.info&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=helloco.info&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-03",
-      "days_listed": 2
+      "last_validated_date": "2026-05-04",
+      "days_listed": 3
     },
     {
       "name": "ettan.shop",
@@ -103,14 +115,18 @@
         {
           "name": "NameSilo",
           "url": "https://www.namesilo.com/domain/search-domains?query=ettan.shop&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=ettan.shop&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-03",
-      "days_listed": 2
+      "last_validated_date": "2026-05-04",
+      "days_listed": 3
     },
     {
       "name": "awkert.shop",
@@ -130,14 +146,18 @@
         {
           "name": "NameSilo",
           "url": "https://www.namesilo.com/domain/search-domains?query=awkert.shop&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=awkert.shop&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-03",
-      "days_listed": 0
+      "last_validated_date": "2026-05-04",
+      "days_listed": 1
     }
   ],
   "total_candidates_evaluated": 1000
