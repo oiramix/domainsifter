@@ -53,8 +53,8 @@
     "min_apex_length": 3
   },
   "availability_check": {
-    "_doc": "Per-host bucket caps for the RDAP availability stage, derived from a runtime budget. For each distinct RDAP host bucket, cap = floor(max_runtime_per_host_seconds * workers / effective_throttle), where effective_throttle comes from api_min_interval_seconds.rdap_per_host[host] -> rdap -> 0.4, and workers from rdap_concurrency.per_host[host] -> default_workers_per_host -> 1. Buckets exceeding their cap are random-shuffled (seed = today's date int) then truncated. global_cap is a safety net against pathological days where filter behaviour leaks far more survivors than expected; today's typical 14k lexical survivors fits below it. Replaced the prior length-asc trim (max_candidates_for_enrichment=1000) on 2026-05-04 — that heuristic biased toward already-registered short names without improving Wayback-signal density.",
-    "max_runtime_per_host_seconds": 900,
+    "_doc": "Per-host bucket caps for the RDAP availability stage, derived from a runtime budget. For each distinct RDAP host bucket, cap = floor(max_runtime_per_host_seconds * workers / effective_throttle), where effective_throttle comes from api_min_interval_seconds.rdap_per_host[host] -> rdap -> 2.0, and workers from rdap_concurrency.per_host[host] -> default_workers_per_host -> 1. Buckets exceeding their cap are random-shuffled (seed = today's date int) then truncated. global_cap is a safety net against pathological days where filter behaviour leaks far more survivors than expected; today's typical 14k lexical survivors fits below it. Replaced the prior length-asc trim (max_candidates_for_enrichment=1000) on 2026-05-04 — that heuristic biased toward already-registered short names without improving Wayback-signal density. max_runtime_per_host_seconds bumped 900 -> 2700 on 2026-05-05 to compensate for slower throttles after the ban events; per-host candidate volume stays similar (each bucket still wall-clock-bounded, now at 45 min not 15 min). Total RDAP phase wall-clock = max(bucket_runtimes) since all buckets run concurrently, so the slowest bucket caps total at ~45 min.",
+    "max_runtime_per_host_seconds": 2700,
     "global_cap": 15000
   },
   "max_candidates_for_publication": 300,
@@ -100,14 +100,20 @@
     "per_host": {}
   },
   "api_min_interval_seconds": {
-    "_doc": "Minimum interval between requests to each API host. With max_concurrent_enrichments=1 (sequential) and multiplicative 0.75-1.25× jitter applied per call, actual rates are ~25% slower than the nominal value. Tightened 2026-04-30 after 503/502 storms with the previous 1.0s/0.4s/0.2s settings.",
+    "_doc": "Minimum interval between requests to each API host. With max_concurrent_enrichments=1 (sequential) and multiplicative 0.75-1.25× jitter applied per call, actual rates are ~25% slower than the nominal value. Tightened 2026-04-30 after 503/502 storms with the previous 1.0s/0.4s/0.2s settings. RDAP global default raised 0.4 → 2.0 on 2026-05-05 after multiple registries banned us (identitydigital 24h, PIR 1h) under the previous default — a new/unknown registry must default to a safe rate.",
     "wayback": 3.0,
     "crtsh": 3.0,
     "open_page_rank": 1.0,
-    "rdap": 0.4,
+    "rdap": 2.0,
     "rdap_per_host": {
-      "_doc": "Per-host overrides for RDAP. Falls through to api_min_interval_seconds.rdap when host not listed. GMO Registry tolerates ~0.33 req/sec sustained; calibrated 2026-05-01 from a 25-request probe (5s gaps → 80% 429, 30s gaps → clean recovery). Today's pipeline lost 51 .shop candidates to persistent 429s under the global 0.4s interval.",
-      "rdap.gmoregistry.net": 3.0
+      "_doc": "Per-host overrides for RDAP. Falls through to api_min_interval_seconds.rdap when host not listed. Recalibrated 2026-05-05 after the first uncapped run produced multiple Retry-After bans: identitydigital.services 24-hour (1069 checked, 949 unknown), publicinterestregistry.org 1-hour (1966 checked, 1628 unknown), GMO 49 unknowns at 3.0s. Conservative empirical settings with safety margin — accept reduced volume in exchange for zero ban risk going forward, because a permanent ban from any registry would block the pipeline for that TLD entirely. Sources per host: identitydigital banned today → 5.0s (most cautious); PIR banned today → 3.0s (matches GMO caution); GMO 49 unknowns at 3.0s → 4.0s defensive bump; Google + nic.biz degraded but not banned → 2.0s; centralnic + radix clean at 0.4s but only 2250 candidates each so 1.0s defensive margin.",
+      "rdap.gmoregistry.net": 4.0,
+      "rdap.identitydigital.services": 5.0,
+      "rdap.publicinterestregistry.org": 3.0,
+      "pubapi.registry.google": 2.0,
+      "rdap.nic.biz": 2.0,
+      "rdap.centralnic.com": 1.0,
+      "rdap.radix.host": 1.0
     }
   },
   "output_path": "src/data/daily-domains.json"
