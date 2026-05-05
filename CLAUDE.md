@@ -69,6 +69,10 @@ Phase 1 — V1 Foundation. See PLAN.md for full scope and STATE.md for what's bu
 
 19. Do not modify the existing site components (Header.astro, Footer.astro, DomainTable.astro, etc.) when working on the pipeline. The integration point is src/data/daily-domains.json. Pipeline writes that file, site consumes it. No other coupling.
 
+### Operational rules
+
+20. NEVER move the daily cron trigger earlier than 06:30 UTC without verifying that no recent registry RDAP ban events would still be active at the new time. Registry RDAP servers can return Retry-After bans up to 24 hours (e.g., identitydigital returned 86397s = 24h on 2026-05-05). The 06:30 UTC schedule provides 1+ hour buffer past any 24h cooldown started during the previous day's run. Earlier triggers risk hitting registries before their cooldown expires, which can extend bans or escalate to permanent blocks. Cron is controlled by the Cloudflare Worker domainsifter-cron-trigger, NOT by GitHub Actions schedule:.
+
 ---
 
 ## Coding conventions
@@ -210,7 +214,7 @@ pytest tests/
 
 ### GitHub Actions
 
-The workflow daily-diff.yml runs at 06:00 UTC daily and on manual trigger. Secrets are read from repo settings.
+The workflow daily-diff.yml runs at 06:30 UTC daily via Cloudflare Worker domainsifter-cron-trigger (changed from 05:17 UTC on 2026-05-05 after registry ban events; see Hard rule 20) and on manual trigger. Secrets are read from repo settings.
 
 To manually trigger: GitHub repo → Actions tab → "Daily Domain Diff" workflow → "Run workflow" button.
 

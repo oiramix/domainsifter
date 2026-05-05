@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: 2026-05-04 (Length-asc trim retired — per-host availability caps derived from runtime budget, full ~14k lexical survivors flow through RDAP for the first time since launch; workflow timeout 60→150 min for the first uncapped run; 335/335 tests passing)
+Last updated: 2026-05-05 (First-publish day under the new architecture — 7 publishes including the first Promising-tier candidate (multimediadesigns.org, 888 Wayback). Also produced multi-hour Retry-After bans from identitydigital and PIR; per-host RDAP throttles recalibrated and cron moved 05:17 UTC → 06:30 UTC. New CLAUDE.md operational rule (20) pins the new cron timing. 335/335 tests passing)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -808,3 +808,30 @@ Source: `git log` between `4956e95` (the 2026-04-30 STATE refresh) and HEAD. Eac
   - If steady-state runtime is well under 150 min, lower the workflow timeout — kept high deliberately for the first uncapped run.
   - If a single bucket consistently runs near its cap, evaluate raising `max_runtime_per_host_seconds` or adding a per-host concurrency override for that host. Both config-only.
   - The 2026-05-04 trim-discards Wayback audit ran into a 503 storm at 39/200 attempts — an unrelated Wayback availability concern. Re-run on a clean Wayback day to get full 200-sample resolution if we want firmer numbers on the audit ratio.
+
+### 2026-05-05 — First publish day under the new architecture; registry ban response
+
+- **First Promising-tier candidate published since the architecture switch.** Today's run produced **7 publishes**, including `multimediadesigns.org` with 888 Wayback snapshots — the first time the new uncapped-availability + per-host-bucket pipeline (`1a5ba36`, `1bb33d9`) surfaced a strong candidate at scale. Confirms the design intent of the 2026-05-04 trim retirement: removing the length-asc bias toward already-registered short names did surface higher-quality candidates in the discards, the audit's optimism caveat notwithstanding.
+- **Registry RDAP ban events triggered emergency throttle recalibration.** `[from git log: b98fb63]` Today's first uncapped run produced multi-hour `Retry-After` bans from registry RDAP servers, all observed in production logs:
+  - `rdap.identitydigital.services` returned `Retry-After: 86397s` (~24 hours): 1069 candidates checked, 949 came back unknown.
+  - `rdap.publicinterestregistry.org` returned `Retry-After: 3600s` (1 hour): 1966 candidates checked, 1628 came back unknown.
+  - `rdap.gmoregistry.net` produced 49 `unknown` results at the previous 3.0s throttle — slightly stressed, no ban.
+  - `pubapi.registry.google` and `rdap.nic.biz` showed degraded response times but did not ban.
+  - `rdap.centralnic.com` and `rdap.radix.host` were clean at the previous 0.4s default.
+- **Throttle calibration shipped (commit `b98fb63`):** conservative empirical settings with safety margin, accepting reduced volume in exchange for zero ban risk going forward, because a permanent ban from any registry would block the pipeline for that TLD entirely.
+  - `rdap.identitydigital.services`: `0.4s → 5.0s` (banned today, most cautious)
+  - `rdap.publicinterestregistry.org`: `0.4s → 3.0s` (banned today, matches GMO caution)
+  - `rdap.gmoregistry.net`: `3.0s → 4.0s` (defensive bump after 49 unknowns)
+  - `pubapi.registry.google`, `rdap.nic.biz`: `0.4s → 2.0s` (degraded today)
+  - `rdap.centralnic.com`, `rdap.radix.host`: `0.4s → 1.0s` (clean today, defensive margin since they only ran 2250 candidates each — not a stress test)
+  - **Default `rdap` throttle: `0.4s → 2.0s`** — protects against new/unknown registries (e.g. Verisign when `.com`/`.net` land).
+  - `availability_check.max_runtime_per_host_seconds`: `900 → 2700` to compensate for slower throttles. Per-host candidate volume stays similar; each bucket now wall-clock-bounded at 45 min instead of 15 min. Total RDAP phase still `max(bucket_runtimes)` (concurrent), so worst-case wall-clock ~45 min.
+- **Cloudflare Worker cron moved `05:17 UTC → 06:30 UTC`.** No repo commit — configured in the Cloudflare dashboard on the `domainsifter-cron-trigger` Worker. Reason: the previous 05:17 UTC trigger was inside the 24-hour `Retry-After` window of any registry banned during the previous day's run. 06:30 UTC provides 1+ hour buffer past any 24h cooldown started during the previous day's run. The bumped GHA `timeout-minutes: 150` from yesterday is unaffected — it's a job-level ceiling, independent of the trigger time.
+- **New CLAUDE.md operational rule.** [CLAUDE.md](CLAUDE.md) gained a new `### Operational rules` sub-category under `## Hard rules — never violate`. **Rule 20** pins the cron-timing constraint: never move the daily trigger earlier than 06:30 UTC without verifying that no recent registry RDAP ban events would still be active at the new time. Same commit also fixes the stale "06:00 UTC" reference in the file's `### GitHub Actions` how-to section to match current reality (06:30 UTC, controlled by Cloudflare Worker not GHA `schedule:`).
+- **Decisions explicitly NOT made:** (a) `rdap_concurrency.per_host` stays empty — the ban events were rate-limit problems, not concurrency problems, so adding per-host workers would have made things worse not better; (b) `global_cap` of 15000 unchanged — lexical-survivor throttling stays at the gate, not the bucket; (c) `rdap.check_availability` and `HostThrottle` untouched — the recalibration is config-only.
+- **Trade-off accepted:** ~3–4 publishes/day projected at the new throttles, vs. today's 7. A permanent registry ban would block the pipeline for that TLD entirely, which is unrecoverable. Conservative settings buy back ban risk; future tightening should be empirical-from-logs, not speculative.
+- **New known follow-ups (additive):**
+  - identitydigital's 24-hour ban from today expires around 05:30 UTC tomorrow — just before the new 06:30 UTC cron fires. Watch tomorrow's first identitydigital bucket log line: if `Retry-After` still appears, the actual ban window is longer than the documented 24h and we'd want to bump 5.0s further (or skip identitydigital TLDs for one cycle).
+  - PIR's 1-hour ban from today expired hours ago; tomorrow's first PIR bucket should run cleanly at 3.0s. If still bans, escalate to 5.0s.
+  - Worker cron schedule lives in Cloudflare dashboard, NOT in repo — there is no source-of-truth file to grep for it. Document the current schedule in CLAUDE.md (rule 20 + the how-to line) so future sessions know the actual trigger time without checking the dashboard.
+  - If steady-state under the new throttles stabilises at ~3 publishes/day, evaluate (a) tightening lexical filter pre-conditions to reduce lexical-survivor count, or (b) loosening the most aggressive per-host throttles after a 1–2-week clean-log streak.
