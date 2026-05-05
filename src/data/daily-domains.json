@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-05-04T05:39:37Z",
-  "domain_count": 5,
-  "today_count": 0,
+  "generated_at": "2026-05-05T06:05:16Z",
+  "domain_count": 7,
+  "today_count": 2,
   "carryover_count": 5,
   "domains": [
     {
@@ -32,8 +32,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:19:48Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-04",
-      "days_listed": 3
+      "last_validated_date": "2026-05-05",
+      "days_listed": 4
     },
     {
       "name": "nontongp.xyz",
@@ -63,8 +63,39 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:23:57Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-04",
-      "days_listed": 3
+      "last_validated_date": "2026-05-05",
+      "days_listed": 4
+    },
+    {
+      "name": "multimediadesigns.org",
+      "tld": "org",
+      "dropped_date": "2026-05-05",
+      "wayback_snapshots": 888,
+      "wayback_last_snapshot": "2026-03-17",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmultimediadesigns.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=multimediadesigns.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=multimediadesigns.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-05T05:30:08Z",
+      "first_seen_date": "2026-05-05",
+      "last_validated_date": "2026-05-05",
+      "days_listed": 0
     },
     {
       "name": "helloco.info",
@@ -94,8 +125,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-04",
-      "days_listed": 3
+      "last_validated_date": "2026-05-05",
+      "days_listed": 4
     },
     {
       "name": "ettan.shop",
@@ -125,8 +156,39 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-04",
-      "days_listed": 3
+      "last_validated_date": "2026-05-05",
+      "days_listed": 4
+    },
+    {
+      "name": "repelis.app",
+      "tld": "app",
+      "dropped_date": "2026-05-05",
+      "wayback_snapshots": 167,
+      "wayback_last_snapshot": "2025-01-16",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 38,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Drepelis.app"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=repelis.app&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=repelis.app&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-05T05:34:33Z",
+      "first_seen_date": "2026-05-05",
+      "last_validated_date": "2026-05-05",
+      "days_listed": 0
     },
     {
       "name": "awkert.shop",
@@ -156,9 +218,9 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-04",
-      "days_listed": 1
+      "last_validated_date": "2026-05-05",
+      "days_listed": 2
     }
   ],
-  "total_candidates_evaluated": 1000
+  "total_candidates_evaluated": 9829
 }
