@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-05-05T06:05:16Z",
+  "generated_at": "2026-05-06T07:10:31Z",
   "domain_count": 7,
-  "today_count": 2,
-  "carryover_count": 5,
+  "today_count": 0,
+  "carryover_count": 7,
   "domains": [
     {
       "name": "blanchot.org",
@@ -32,8 +32,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:19:48Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 4
+      "last_validated_date": "2026-05-06",
+      "days_listed": 5
     },
     {
       "name": "nontongp.xyz",
@@ -63,8 +63,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:23:57Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 4
+      "last_validated_date": "2026-05-06",
+      "days_listed": 5
     },
     {
       "name": "multimediadesigns.org",
@@ -94,8 +94,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:30:08Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 0
+      "last_validated_date": "2026-05-06",
+      "days_listed": 1
     },
     {
       "name": "helloco.info",
@@ -125,8 +125,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 4
+      "last_validated_date": "2026-05-06",
+      "days_listed": 5
     },
     {
       "name": "ettan.shop",
@@ -156,8 +156,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 4
+      "last_validated_date": "2026-05-06",
+      "days_listed": 5
     },
     {
       "name": "repelis.app",
@@ -187,8 +187,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:34:33Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 0
+      "last_validated_date": "2026-05-06",
+      "days_listed": 1
     },
     {
       "name": "awkert.shop",
@@ -218,9 +218,9 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-05",
-      "days_listed": 2
+      "last_validated_date": "2026-05-06",
+      "days_listed": 3
     }
   ],
-  "total_candidates_evaluated": 9829
+  "total_candidates_evaluated": 8090
 }
