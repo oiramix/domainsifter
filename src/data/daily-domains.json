@@ -1,40 +1,9 @@
 {
-  "generated_at": "2026-05-06T07:10:31Z",
-  "domain_count": 7,
-  "today_count": 0,
-  "carryover_count": 7,
+  "generated_at": "2026-05-07T07:08:35Z",
+  "domain_count": 8,
+  "today_count": 2,
+  "carryover_count": 6,
   "domains": [
-    {
-      "name": "blanchot.org",
-      "tld": "org",
-      "dropped_date": "2026-05-01",
-      "wayback_snapshots": 1095,
-      "wayback_last_snapshot": "2025-02-25",
-      "open_page_rank": 1.13,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 62,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dblanchot.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=blanchot.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=blanchot.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-01T04:19:48Z",
-      "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 5
-    },
     {
       "name": "nontongp.xyz",
       "tld": "xyz",
@@ -63,8 +32,70 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:23:57Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 5
+      "last_validated_date": "2026-05-07",
+      "days_listed": 6
+    },
+    {
+      "name": "livetrackerpro.xyz",
+      "tld": "xyz",
+      "dropped_date": "2026-05-07",
+      "wayback_snapshots": 122,
+      "wayback_last_snapshot": "2026-05-04",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 47,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlivetrackerpro.xyz"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=livetrackerpro.xyz&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=livetrackerpro.xyz&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-07T06:57:19Z",
+      "first_seen_date": "2026-05-07",
+      "last_validated_date": "2026-05-07",
+      "days_listed": 0
+    },
+    {
+      "name": "ipstresser.xyz",
+      "tld": "xyz",
+      "dropped_date": "2026-05-07",
+      "wayback_snapshots": 915,
+      "wayback_last_snapshot": "2026-03-11",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dipstresser.xyz"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=ipstresser.xyz&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=ipstresser.xyz&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-07T06:39:24Z",
+      "first_seen_date": "2026-05-07",
+      "last_validated_date": "2026-05-07",
+      "days_listed": 0
     },
     {
       "name": "multimediadesigns.org",
@@ -94,8 +125,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:30:08Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 1
+      "last_validated_date": "2026-05-07",
+      "days_listed": 2
     },
     {
       "name": "helloco.info",
@@ -125,8 +156,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 5
+      "last_validated_date": "2026-05-07",
+      "days_listed": 6
     },
     {
       "name": "ettan.shop",
@@ -156,8 +187,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 5
+      "last_validated_date": "2026-05-07",
+      "days_listed": 6
     },
     {
       "name": "repelis.app",
@@ -187,8 +218,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:34:33Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 1
+      "last_validated_date": "2026-05-07",
+      "days_listed": 2
     },
     {
       "name": "awkert.shop",
@@ -218,9 +249,9 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-06",
-      "days_listed": 3
+      "last_validated_date": "2026-05-07",
+      "days_listed": 4
     }
   ],
-  "total_candidates_evaluated": 8090
+  "total_candidates_evaluated": 7955
 }
