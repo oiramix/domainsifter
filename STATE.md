@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: 2026-05-05 (First-publish day under the new architecture — 7 publishes including the first Promising-tier candidate (multimediadesigns.org, 888 Wayback). Also produced multi-hour Retry-After bans from identitydigital and PIR; per-host RDAP throttles recalibrated and cron moved 05:17 UTC → 06:30 UTC. New CLAUDE.md operational rule (20) pins the new cron timing. 335/335 tests passing)
+Last updated: 2026-05-08 (Best week of the launch arc — first clean post-calibration run on 2026-05-06, first fresh Promising-tier publishes on 2026-05-07 (`ipstresser.xyz` 915 Wayback, `livetrackerpro.xyz` 122), best day yet on 2026-05-08 (75 RDAP-available, top score 67, 18 publishes incl. 5 Promising). Surfaced + fixed the vestigial 1500s availability_budget_seconds ceiling, swapped Wayback enrichment to the EDGI Python package after a 30-of-75 enrichment-skip incident, bumped enrichment_time_budget_seconds 2100→3000. Wave 2 / Common Crawl backlink integration scoped as the next planned milestone. 335/335 tests passing)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -835,3 +835,70 @@ Source: `git log` between `4956e95` (the 2026-04-30 STATE refresh) and HEAD. Eac
   - PIR's 1-hour ban from today expired hours ago; tomorrow's first PIR bucket should run cleanly at 3.0s. If still bans, escalate to 5.0s.
   - Worker cron schedule lives in Cloudflare dashboard, NOT in repo — there is no source-of-truth file to grep for it. Document the current schedule in CLAUDE.md (rule 20 + the how-to line) so future sessions know the actual trigger time without checking the dashboard.
   - If steady-state under the new throttles stabilises at ~3 publishes/day, evaluate (a) tightening lexical filter pre-conditions to reduce lexical-survivor count, or (b) loosening the most aggressive per-host throttles after a 1–2-week clean-log streak.
+
+### 2026-05-06 to 2026-05-08 — Pipeline stability and the enrichment bottleneck
+
+The arc this week: from "post-calibration, will it hold?" (Wed) → first fresh Promising-tier publishes (Thu) → best day yet (Fri), interrupted by an enrichment-budget bottleneck that produced two coordinated fixes (Wayback package swap + budget bump). Daily refresh commits (`a1755e7`, `ca7eeab`, `f9dcfa8`) are mechanical; the substantive entries below.
+
+- **2026-05-06 — first clean run after the Tuesday recalibration.** No new commits. Production log: zero `Retry-After` warnings across all RDAP buckets (identitydigital's 24-hour ban from 2026-05-05 cleared as expected, throttles holding at the new conservative settings). 22 RDAP-available, top score 47, 7 publishes (carryover-driven — only ~3 fresh today's-drops met the publish floor). Empirical confirmation that the conservative throttle calibration in commit `b98fb63` was correctly sized.
+- **2026-05-07 — first fresh Promising-tier publishes under the new architecture.** Production log: `ipstresser.xyz` (Wayback 915) and `livetrackerpro.xyz` (Wayback 122) both scored above the Promising threshold. First time the post-trim-retirement architecture surfaced *fresh* (not carryover) Promising candidates — confirming the 2026-05-04 design intent (commit `1a5ba36`) that random-sampling across all lexical survivors would surface high-Wayback names the length-asc trim was systematically discarding.
+- **Same day (2026-05-07): vestigial budget knob discovered, fixed.** `[from git log: c0b2440]` All RDAP host buckets completed at exactly 1500s (25 min) despite `max_runtime_per_host_seconds = 2700` (45 min). Diagnostic identified `availability_budget_seconds = 1500` as a separate, older deadline knob from the pre-per-host-bucketing era (commit `7a43190`, before commit `1a5ba36` introduced the per-host budget) — never reconciled. The single global deadline was firing as a guillotine before any bucket finished its planned 2700s of work — **3,350 candidates `skipped (budget)`** on that run despite per-host caps being correctly sized for 2700s. Fix: `availability_budget_seconds: 1500 → 2700` to match. The global deadline now acts as a redundant safety net rather than the binding constraint. The diagnostic also surfaced that the `validate_availability` doc-string still described the old single-stage model; left in place because it's accurate as a fail-safe description of the now-redundant deadline.
+- **2026-05-08 — best day of the launch arc to date.** Production log: 75 RDAP-available (vs Tuesday's 44), top score 67, **median 39 (above the 30 publish floor)**, 18 published total = 10 fresh today's-drops + 8 carryover. **5 Promising-tier publishes**, including:
+  - `collegelabor.org` — Wayback 3293, OpenPageRank 2.5
+  - `thereedgroup.org` — Wayback 656, OpenPageRank 2.2
+  - First time we've seen meaningful OpenPageRank values in the published cohort. Wayback signal alone is "did this site ever exist"; combined with non-zero OpenPageRank it becomes the real "businesses that lapsed" signal the project was designed to surface.
+- **Same day (2026-05-08): Wayback degradation surfaced an enrichment-phase bottleneck.** Production log: only **30 of 75** RDAP-available candidates got enriched (45 skipped budget). Multiple 200-second Wayback timeouts (3 attempts × 60s under the legacy 5s+15s backoff) ate ~20 minutes of the 35-min enrichment phase. Total enrichment phase wall-clock 2,243s vs the configured `2100s + 60s` grace ceiling. Two coordinated fixes shipped in sequence:
+- **Fix #1: Wayback package swap.** `[from git log: 82c574c]` Replaced the hand-rolled `requests`-based CDX client in `scripts/enrichment/wayback.py` with the canonical EDGI / `internetarchive` `wayback` Python package (BSD-3-Clause; pinned `wayback>=0.4.5` in `requirements.txt`). Same public function signature, same return shape (`wayback_snapshots`, `wayback_last_snapshot`), same logging conventions — drop-in at the call boundary. Why the package handles this better:
+  - 60-second adaptive delay on rate-limit errors (vs the previous 5s + 15s)
+  - Built-in connection pooling and session reuse
+  - Polite defaults designed for IA's documented 60-req/min limit
+  - No API key required, used in production by EDGI for environmental data archiving
+  - Conservative session settings: `WaybackSession(retries=2, backoff=2, timeout=60s, search_calls_per_second=1/min_interval)` — worst-case ~75s per call instead of the previous 200s.
+  - The orchestrator-level `CircuitBreaker("wayback")` is preserved on top of the package's own retry behaviour; the two layers don't conflict because the package's retries reduce per-call failure rate, while the breaker still trips after N consecutive call failures so the whole pipeline doesn't burn budget on a definitively-down host.
+  - Test surface unchanged (335 → 335) but tests rewritten to mock at the `WaybackClient` boundary instead of the previous `responses`-based HTTP layer. The old fixtures used partial CDX rows (`["timestamp"]` + `["20200101000000"]`) that wouldn't deserialise under the package; new fixtures mock at the package's `client.search(...)` seam, which is the semantically-correct test boundary.
+- **Fix #2: enrichment budget bump.** `[from git log: 19f813b]` `enrichment_time_budget_seconds: 2100 → 3000`. Today's run hit the 2,100s + 60s grace ceiling at 2,243s actual; even with the package swap reducing per-call worst-case timeouts, headroom is cheap and external degradation is unpredictable. 3,000s gives ~12 min margin against the next Wayback or crt.sh slowdown event. Workflow timeout 150 min still has ~50% headroom; on a bad day the total run could approach 100–110 min.
+- **Decisions explicitly NOT made:** (a) did not change `crt.sh`, OpenPageRank, RDAP, or the blocklist enrichers — degradation was Wayback-specific; (b) did not bypass the orchestrator-level breaker (the package's retries reduce noise but the breaker remains the ultimate cutoff); (c) did not narrow the catch in the new `wayback.py` to just `WaybackException` — added a defensive `except Exception` that also returns `{}` and records breaker failure, in case the package surfaces urllib3/requests errors that don't subclass its own exception hierarchy. If first-cron logs after the swap show a generic-exception warning we'd have the actual type and could narrow.
+- **Cumulative arc this week — qualitative.** From the architecture pre-2026-05-04 (1000-candidate length-asc trim, occasional 0-publish days) to the architecture post-2026-05-08 (8000+ candidates evaluated, top scores in the 60s, consistent fresh-Promising publishes), the discipline that worked: diagnostics before fixes, generous defensive throttles on first calibration, ship one architectural change at a time and validate naturally on next cron. Every week-day this week produced data that validated or invalidated the previous day's configuration; nothing speculative shipped.
+- **Test surface (delta since 2026-05-05):** 335 → **335** (net zero). Wayback test count unchanged; their internals were rewritten to mock at the package boundary (12 tests covering success path, multiple failure modes, breaker integration, config wiring).
+- **New known follow-ups (additive):**
+  - Watch tomorrow's first cron under the package + budget changes. Targets: ≥60 of 75 RDAP-available enriched (vs today's 30/75); total enrichment phase ~25–30 min (vs today's 35+); zero generic-exception warnings from the new defensive catch in `wayback.py` (if any appear, narrow the catch to the actual surfaced exception types).
+  - If the package's `WaybackException` catch produces noisier logs than expected (e.g. `BlockedByRobotsError` per-domain), consider downgrading those specific subclasses from WARNING to DEBUG — they're "nothing wrong with our code" signals rather than failure events.
+  - Common Crawl backlink integration (Wave 2): see new section below. Trigger to start: this week's stability holding through one more clean cron.
+
+---
+
+## Wave 2 — Common Crawl backlink integration (planned, not started)
+
+**Status:** scoped, not started. Trigger to start: this week's stability holding through at least one more clean cron run (i.e., the 2026-05-09 cron should produce no new bottlenecks or ban events). Listed already in [PLAN.md](PLAN.md) Phase 2 scope as a one-line bullet; this section makes the work concrete.
+
+**Motivation.** Wayback and Common Crawl are independent quality signals on orthogonal axes:
+
+- **Wayback (already integrated)** answers *"did this site exist over time?"* — temporal evidence of a site that was actually crawled and archived.
+- **Common Crawl host-graph (planned)** answers *"did other sites think this site mattered?"* — link evidence of a site that other webmasters chose to point at.
+
+Two independent signals combine into a more credible "real domain that lapsed" score than either alone. Specifically, a name with high Wayback **and** non-trivial inbound-host count is much harder to fake than a name with just one signal. This week's published cohort surfaced the first OpenPageRank-positive Promising candidates (`collegelabor.org`, `thereedgroup.org` on 2026-05-08) — the kind of authority signal Common Crawl would corroborate independently and at higher resolution than OpenPageRank's coarse 0–10 bucketing.
+
+**Implementation shape (NOT detailed engineering — scope only):**
+
+- Quarterly download of Common Crawl's host-graph edges file (~50 GB, free at `data.commoncrawl.org/projects/hyperlinkgraph/...`) into Cloudflare R2 (the same R2 bucket already used for zone-snapshot state, so no new infrastructure).
+- Convert downloaded WAT/WARC slices to **Parquet** (columnar, compressed) for efficient point-lookup queries via **DuckDB** over R2 range reads. DuckDB can query Parquet files remotely without downloading the whole file each time — same query model used by other "host-graph as a public dataset" tooling.
+- New enrichment field `cc_inbound_hosts: int` produced by `scripts/enrichment/common_crawl.py`, alongside the existing `wayback_snapshots`. Plugin contract preserved (uniform `enrich(domain, config) → dict`, returns empty dict on failure, never raises).
+- New scoring term in `scripts/score.py` using `cc_inbound_hosts` with a tunable weight in `scripts/config.json`. Same null-aware normalisation as existing components (commit `7a43190`'s scoring fix) so a domain with missing CC data scores on what's actually populated.
+- Quarterly refresh script (`scripts/refresh_commoncrawl.py`) — manual or scheduled, ~30 min runtime once per quarter. Does NOT live on the daily cron path; quarterly refresh is the right cadence because Common Crawl publishes monthly and the host-graph topology shifts slowly.
+
+**Why now is the right time to consider it.**
+
+1. The pipeline is stable enough this week to build on. Pre-2026-05-04 we'd have been adding signal to a flaky base.
+2. Pre-Verisign approval is the right window. When `.com` / `.net` land (anticipated 1–3 weeks per the existing 2026-05-03 STATE entry), candidate volume jumps ~10× and the marginal value of an independent quality signal is much higher at scale than at today's 14k-survivor baseline. We want CC integrated before that volume change, not after.
+3. No new infrastructure required: R2 bucket exists, DuckDB ships as a `pip` dependency (~25 MB), Parquet is well-supported.
+
+**Estimated scope: 4–5 hours of focused work spread over a day.** Not a multi-day project. Concrete deliverable list:
+
+- `scripts/refresh_commoncrawl.py` — download + convert + upload to R2 (~1.5h, mostly waiting for the download)
+- `scripts/enrichment/common_crawl.py` — DuckDB point-lookup wrapper, plugin-contract-compliant (~1h)
+- `scripts/score.py` — new term + config wiring (~0.5h)
+- `tests/enrichment/test_common_crawl.py` — mock the DuckDB connection, verify counts flow through (~1h)
+- Update `enrichment/__init__.py` order, frontend column if/when we surface it (~0.5h)
+- Buffer for unknown unknowns (~0.5h)
+
+**NOT acted on yet.** This is a "next week if this week's stability holds" item. Adding it here so future sessions can resume it without re-discovering the scope.

@@ -296,3 +296,19 @@ Why: When something breaks in week 8, we want to read logs, not guess.
 | V2 Authority and Coverage | 5 to 10 | End of June 2026 | Newsletter + 50 TLDs + searchable archive |
 | V3 Premium Tier | 11 to 22 | End of September 2026 | First 1k EUR MRR, OÜ registered |
 | V4 Scale | 23+ | TBD | Decision point at 5k EUR MRR |
+
+---
+
+## Next milestone — Common Crawl backlink integration (Phase 2 first deliverable)
+
+Phase 2's bullet list above includes Common Crawl integration as item 2. This section makes that bullet concrete: it's the next planned deliverable after V1 Foundation finishes, scoped at 4–5 hours of focused work, **planned, not started**.
+
+**Description.** Add an independent quality signal to the enrichment chain by querying Common Crawl's host-graph edges file for the count of inbound hosts that link to each candidate apex. Quarterly refresh of the host-graph into Cloudflare R2 (~50 GB Parquet); per-domain point-lookups via DuckDB over R2 range reads. New `cc_inbound_hosts` field flows through the existing plugin-contract enrichment pipeline; a new term in the scoring function (with a tunable weight in `scripts/config.json`) combines it with the existing Wayback signal.
+
+**Rationale.** Wayback answers *"did this site exist over time?"* (temporal evidence). Common Crawl answers *"did other sites think this site mattered?"* (link evidence). The two are independent — a name with high Wayback AND non-trivial inbound-host count is much harder to fake than either signal alone. The 2026-05-08 published cohort surfaced the first OpenPageRank-positive Promising candidates; Common Crawl would corroborate that authority signal independently and at higher resolution than OpenPageRank's coarse 0–10 bucketing.
+
+**Status.** Planned, scoped, not started. Architecture matches Principle 1 (plugin enrichment) and Principle 3 (thresholds in config); no infrastructure additions beyond a `pip install duckdb`.
+
+**Trigger to start.** This week's pipeline stability (week ending 2026-05-08) holding through at least one more clean cron run. See [STATE.md Wave 2 section](STATE.md) for the empirical state.
+
+**Anti-trigger (do NOT start before this).** If Verisign / `.com` `.net` land in CZDS during the trigger window, finish CC integration FIRST so the 10× volume jump benefits from the additional signal. If a regression appears in the existing pipeline, fix that first.
