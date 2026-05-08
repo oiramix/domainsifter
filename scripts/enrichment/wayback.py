@@ -1,8 +1,9 @@
 """Wayback Machine CDX enrichment.
 
-Queries the Wayback CDX API for snapshot history of the domain. We hit the
-host alone (no path) with `matchType=domain` to count snapshots across all
-URLs ever archived under that domain.
+Counts the snapshots IA's CDX API holds for the apex domain (matchType=domain
+so all paths and subdomains roll up under the apex). Snapshot count is the
+only field the scorer reads; `wayback_last_snapshot` ships in the published
+JSON for human display only.
 
 Returned fields:
     {
@@ -10,12 +11,24 @@ Returned fields:
         "wayback_last_snapshot": "YYYY-MM-DD",   # date of most recent snapshot, or None
     }
 
-Endpoint: https://web.archive.org/cdx/search/cdx
-Docs: https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server
+Implementation: uses the EDGI / `internetarchive` `wayback` Python package
+(BSD-3-Clause; pinned in requirements.txt). Replaced the hand-rolled
+requests-based CDX client on 2026-05-08 because the previous implementation's
+5s+15s timeout backoff was burning ~200 seconds per failed call when Wayback
+degraded — 45 of 75 RDAP-available candidates skipped enrichment that day.
 
-Returns empty dict on any failure (network, 5xx, malformed JSON, OR an open
-circuit breaker — see scripts.enrichment._circuit_breaker for the why).
-429 responses are retried with exponential backoff before counting as failure.
+The package handles 429 responses with the documented 60-second adaptive
+delay (per `DEFAULT_RATE_LIMIT_DELAY` in wayback._client). Its retry policy
+is configured per-`WaybackSession` (retries × backoff schedule); we set
+conservative values so a stuck call returns to the orchestrator within ~75
+seconds rather than blocking the whole enrichment phase.
+
+Returns empty dict on any failure (network, 5xx, malformed response, OR an
+open circuit breaker — see scripts.enrichment._circuit_breaker for the why).
+The orchestrator's circuit breaker is preserved on top of the package's own
+retry behaviour: per-session retries reduce per-call failure rate; the
+orchestrator-level breaker still trips after N consecutive call failures so
+the whole pipeline doesn't burn budget on a definitively-down host.
 """
 
 from __future__ import annotations
@@ -23,88 +36,96 @@ from __future__ import annotations
 import logging
 import time
 
-import requests
+from wayback import WaybackClient, WaybackSession
+from wayback.exceptions import WaybackException
 
-from scripts.enrichment._circuit_breaker import (
-    CircuitBreaker,
-    request_with_429_backoff,
-    retry_on_timeout,
-)
+from scripts.enrichment._circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_ENDPOINT = "https://web.archive.org/cdx/search/cdx"
 _BREAKER = CircuitBreaker("wayback")
+
+
+def _format_timestamp(ts) -> str | None:
+    """`CdxRecord.timestamp` is a `datetime.datetime` per the package's
+    parser. Format to YYYY-MM-DD for the published-payload schema. Defensive
+    against the package returning a string (older versions) or None."""
+    if ts is None:
+        return None
+    if hasattr(ts, "strftime"):
+        return ts.strftime("%Y-%m-%d")
+    s = str(ts)
+    return s[:10] if len(s) >= 10 else None
 
 
 def enrich(domain: str, config: dict) -> dict:
     if _BREAKER.is_open():
         return {}
 
-    endpoint = config.get("api_endpoints", {}).get("wayback_cdx", _DEFAULT_ENDPOINT)
-    # Wayback CDX is slow under peak load — 60s default, overridable via config.
     timeout = config.get("api_request_timeout_seconds", {}).get(
-        "wayback", config.get("request_timeout_seconds", 10)
+        "wayback", config.get("request_timeout_seconds", 60)
     )
-    params = {
-        "url": domain,
-        "matchType": "domain",
-        "output": "json",
-        "fl": "timestamp",
-        "limit": 10000,
-    }
+    # The legacy hand-rolled client read api_min_interval_seconds.wayback as a
+    # min-interval (seconds between calls); the package wants the same idea
+    # expressed as max calls per second. Translate so existing config keeps
+    # the same per-host pacing meaning.
     min_interval = float(config.get("api_min_interval_seconds", {}).get("wayback", 1.0))
+    cps = (1.0 / min_interval) if min_interval > 0 else 0  # 0 disables rate-limit
+
+    session = WaybackSession(
+        retries=2,           # 3 total attempts; package's 60s 429-delay applies between them
+        backoff=2,           # exponential: 0s, 2s, 4s on consecutive non-429 failures
+        timeout=timeout,
+        search_calls_per_second=cps,
+    )
+    client = WaybackClient(session=session)
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("wayback request initiated host=web.archive.org domain=%s", domain)
     request_started_at = time.monotonic()
 
-    def _do_request():
-        # Each attempt re-acquires the throttle slot so retries respect
-        # per-host pacing exactly like first-attempt requests.
-        return request_with_429_backoff(
-            lambda: requests.get(endpoint, params=params, timeout=timeout),
-            host="web.archive.org",
-            min_interval=min_interval,
-        )
-
     try:
-        response = retry_on_timeout(
-            _do_request, label=f"wayback[{domain}]", log=logger,
+        # match_type='domain' rolls up all subdomains and paths under the apex.
+        # limit=10000 matches the prior implementation; we only use the count
+        # and the latest timestamp, so capping at 10k is fine.
+        snapshot_count = 0
+        latest_ts = None
+        for record in client.search(domain, match_type="domain", limit=10000):
+            snapshot_count += 1
+            ts = getattr(record, "timestamp", None)
+            if ts is not None and (latest_ts is None or ts > latest_ts):
+                latest_ts = ts
+    except WaybackException as exc:
+        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+        logger.warning(
+            "Wayback enrich failed for %s after %.0fms: %s", domain, elapsed_ms, exc,
         )
-        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "wayback response host=web.archive.org domain=%s status=%s elapsed=%.0fms",
-                domain, response.status_code, elapsed_ms,
-            )
-        if response.status_code == 429:
-            logger.warning("Wayback persistent 429 for %s", domain)
-            _BREAKER.record_failure()
-            return {}
-        response.raise_for_status()
-        rows = response.json()
-    except (requests.RequestException, ValueError) as exc:
-        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
-        logger.warning("Wayback enrich failed for %s after %.0fms: %s", domain, elapsed_ms, exc)
         _BREAKER.record_failure()
         return {}
+    except Exception as exc:  # defence-in-depth — package may surface urllib3 / requests errors
+        elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+        logger.warning(
+            "Wayback enrich failed for %s after %.0fms: %s", domain, elapsed_ms, exc,
+        )
+        _BREAKER.record_failure()
+        return {}
+    finally:
+        # Close the session's connection pool. Cheap and safe.
+        try:
+            session.close()
+        except Exception:  # pragma: no cover
+            pass
+
+    elapsed_ms = (time.monotonic() - request_started_at) * 1000.0
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "wayback response host=web.archive.org domain=%s snapshots=%d elapsed=%.0fms",
+            domain, snapshot_count, elapsed_ms,
+        )
 
     _BREAKER.record_success()
 
-    if not isinstance(rows, list) or len(rows) <= 1:
-        return {"wayback_snapshots": 0, "wayback_last_snapshot": None}
-
-    data_rows = rows[1:]
-    snapshot_count = len(data_rows)
-    timestamps = [row[0] for row in data_rows if row and isinstance(row[0], str)]
-    last_snapshot = None
-    if timestamps:
-        latest = max(timestamps)
-        if len(latest) >= 8:
-            last_snapshot = f"{latest[0:4]}-{latest[4:6]}-{latest[6:8]}"
-
     return {
         "wayback_snapshots": snapshot_count,
-        "wayback_last_snapshot": last_snapshot,
+        "wayback_last_snapshot": _format_timestamp(latest_ts),
     }
