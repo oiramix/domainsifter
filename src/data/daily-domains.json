@@ -1,9 +1,102 @@
 {
-  "generated_at": "2026-05-07T07:08:35Z",
-  "domain_count": 8,
-  "today_count": 2,
-  "carryover_count": 6,
+  "generated_at": "2026-05-08T07:57:40Z",
+  "domain_count": 18,
+  "today_count": 10,
+  "carryover_count": 8,
   "domains": [
+    {
+      "name": "collegelabor.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 3293,
+      "wayback_last_snapshot": "2024-11-19",
+      "open_page_rank": 2.52,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 67,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcollegelabor.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=collegelabor.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=collegelabor.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:53:36Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
+    {
+      "name": "thereedgroup.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 656,
+      "wayback_last_snapshot": "2026-03-06",
+      "open_page_rank": 2.2,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 63,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dthereedgroup.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=thereedgroup.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=thereedgroup.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:44:59Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
+    {
+      "name": "directpage.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 1270,
+      "wayback_last_snapshot": "2025-04-11",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 57,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddirectpage.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=directpage.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=directpage.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:54:52Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
     {
       "name": "nontongp.xyz",
       "tld": "xyz",
@@ -32,8 +125,101 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:23:57Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 6
+      "last_validated_date": "2026-05-08",
+      "days_listed": 7
+    },
+    {
+      "name": "fraizerdesigns.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 517,
+      "wayback_last_snapshot": "2026-02-20",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 53,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dfraizerdesigns.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=fraizerdesigns.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=fraizerdesigns.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T07:14:39Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
+    {
+      "name": "earthlingsunited.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 354,
+      "wayback_last_snapshot": "2025-07-14",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 51,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dearthlingsunited.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=earthlingsunited.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=earthlingsunited.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:44:29Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
+    {
+      "name": "linkvillage.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 192,
+      "wayback_last_snapshot": "2025-07-19",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlinkvillage.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=linkvillage.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=linkvillage.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:51:51Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
     },
     {
       "name": "livetrackerpro.xyz",
@@ -63,8 +249,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-07T06:57:19Z",
       "first_seen_date": "2026-05-07",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 0
+      "last_validated_date": "2026-05-08",
+      "days_listed": 1
     },
     {
       "name": "ipstresser.xyz",
@@ -94,7 +280,69 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-07T06:39:24Z",
       "first_seen_date": "2026-05-07",
-      "last_validated_date": "2026-05-07",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 1
+    },
+    {
+      "name": "chillody.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 54,
+      "wayback_last_snapshot": "2022-07-02",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dchillody.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=chillody.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=chillody.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T07:01:12Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
+    {
+      "name": "mkproperties.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 44,
+      "wayback_last_snapshot": "2025-07-15",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmkproperties.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=mkproperties.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=mkproperties.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:52:01Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
       "days_listed": 0
     },
     {
@@ -125,8 +373,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:30:08Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 2
+      "last_validated_date": "2026-05-08",
+      "days_listed": 3
     },
     {
       "name": "helloco.info",
@@ -156,8 +404,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 6
+      "last_validated_date": "2026-05-08",
+      "days_listed": 7
     },
     {
       "name": "ettan.shop",
@@ -187,8 +435,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 6
+      "last_validated_date": "2026-05-08",
+      "days_listed": 7
     },
     {
       "name": "repelis.app",
@@ -218,8 +466,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:34:33Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 2
+      "last_validated_date": "2026-05-08",
+      "days_listed": 3
     },
     {
       "name": "awkert.shop",
@@ -249,9 +497,71 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-07",
-      "days_listed": 4
+      "last_validated_date": "2026-05-08",
+      "days_listed": 5
+    },
+    {
+      "name": "rainydaysfoundation.org",
+      "tld": "org",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 10,
+      "wayback_last_snapshot": "2024-07-29",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 34,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Drainydaysfoundation.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=rainydaysfoundation.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=rainydaysfoundation.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:50:26Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
+    },
+    {
+      "name": "melissawest.shop",
+      "tld": "shop",
+      "dropped_date": "2026-05-08",
+      "wayback_snapshots": 1,
+      "wayback_last_snapshot": "2025-07-14",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 30,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmelissawest.shop"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=melissawest.shop&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=melissawest.shop&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-08T06:56:02Z",
+      "first_seen_date": "2026-05-08",
+      "last_validated_date": "2026-05-08",
+      "days_listed": 0
     }
   ],
-  "total_candidates_evaluated": 7955
+  "total_candidates_evaluated": 8045
 }
