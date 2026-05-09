@@ -902,7 +902,7 @@ The arc this week: from "post-calibration, will it hold?" (Wed) → first fresh 
 
 ## Wave 2 — Common Crawl backlink integration (planned, not started)
 
-**Status:** scoped, not started. Trigger to start: this week's stability holding through at least one more clean cron run (i.e., the 2026-05-09 cron should produce no new bottlenecks or ban events). Listed already in [PLAN.md](PLAN.md) Phase 2 scope as a one-line bullet; this section makes the work concrete.
+**Status:** scoped, not started. Trigger to start: post-Verisign-rollout stability for 2–3 days (i.e., 2026-05-10 through 2026-05-12 crons should produce no Verisign-related ban events or new bottlenecks). Listed already in [PLAN.md](PLAN.md) Phase 2 scope as a one-line bullet; this section makes the work concrete.
 
 **Motivation.** Wayback and Common Crawl are independent quality signals on orthogonal axes:
 
@@ -933,5 +933,53 @@ Two independent signals combine into a more credible "real domain that lapsed" s
 - `tests/enrichment/test_common_crawl.py` — mock the DuckDB connection, verify counts flow through (~1h)
 - Update `enrichment/__init__.py` order, frontend column if/when we surface it (~0.5h)
 - Buffer for unknown unknowns (~0.5h)
+
+### Architecture refinements (2026-05-09 design review)
+
+Two refinements surfaced in tonight's design review that the original Wave 2 spec above did not capture. Both are additive — the enricher / score-function / quarterly-refresh shapes above remain correct, just with more nuance in the field set and pipeline ordering.
+
+**Three-state output, not a single integer.** The original spec described `cc_inbound_hosts: int` as the only enrichment field. That conflates two semantically different "zero" cases:
+
+1. **Domain not in CC host graph at all** — no data available, score must treat as missing (null component, falls out of normalisation).
+2. **Domain in CC graph, zero inbound but has outbound** — real "no one linked to this" signal, score = 0.
+3. **Domain in CC graph with N inbound** — positive quality signal, score scales with N.
+
+The CC host-graph file is a list of edges (`from_host TAB to_host`). Distinguishing State 1 from State 2 requires checking whether the domain appears as either endpoint of any edge, not just counting inbound edges. The enricher must therefore query both directions and surface three fields:
+
+- `cc_seen_in_graph: bool` — appears as source or target of any edge
+- `cc_inbound_hosts: int` — distinct hosts linking to this domain (target-side count)
+- `cc_outbound_hosts: int` — distinct hosts this domain links to (source-side count)
+
+State 1 will be the common case for our candidate set. CC undersamples newer / smaller / long-tail sites — exactly the lapsed-small-business profile this project exists to surface. Treating CC absence as "score zero" would systematically bias against the very candidates we care about.
+
+**Score function logic, three-way branch:**
+
+```python
+if not cc_seen_in_graph:
+    cc_signal = None  # missing data, score on what is populated
+elif cc_inbound_hosts == 0 and cc_outbound_hosts > 0:
+    cc_signal = 0  # CC saw this domain, found no inbound — real negative
+elif cc_inbound_hosts > 0:
+    cc_signal = scaled(cc_inbound_hosts)  # real positive signal
+```
+
+The score function already handles missing-data cases correctly for OpenPageRank (null-aware normalisation per commit `7a43190`'s scoring fix). Same pattern applies here.
+
+**CC as priority queue, not filter.** A natural extension once CC data is flowing: use it to **order** candidates entering the (slow, externally-degradable) Wayback enrichment phase. This converts CC's value from "additional signal" to **resilience to Wayback outages** — when Wayback degrades mid-run (as on 2026-05-08 and again on 2026-05-09), the cuts hit lower-priority candidates that were less likely to score well anyway.
+
+Priority order for the enrichment phase:
+
+1. **First priority — `cc_inbound_hosts > 0`.** Real positive CC signal. Highest-confidence "domain that mattered" candidates; we want Wayback data on them before the budget can run out.
+2. **Second priority — `cc_seen_in_graph == false`.** No CC data either direction. CC undersamples the long tail; absence is uninformative, so we still need Wayback to tell us anything about these candidates.
+3. **Third priority — `cc_seen_in_graph == true and cc_inbound_hosts == 0 and cc_outbound_hosts > 0`.** CC positively saw this domain and found no inbound links. Weakest of the three states; if budget binds, these are the ones we'd skip first.
+
+**Hard rule: never discard, only deprioritise.** Every RDAP-available candidate still enters the enrichment phase. The CC priority just orders them. If enrichment budget binds, lower-priority candidates may not get Wayback signal — but they're still in the candidate set with whatever signals they did get (RDAP, blocklists, OpenPageRank if reachable).
+
+**Sequencing (when work starts):**
+
+- **Phase 1 (~4 hours)** — three-state CC enricher + score-function update. CC runs as a parallel enricher in the existing enrichment phase ordering. No pipeline-shape changes; just one more enricher writing three fields.
+- **Phase 2 (~1 hour, 1–2 weeks after Phase 1)** — convert CC to a pre-enrichment priority queue once we have empirical data showing the actual three-state distribution across our candidates. Wait until we have a week of CC data before changing pipeline ordering — premature priority-queue could mask whether the CC signal actually correlates with publish-worthiness.
+
+Total scope estimate now ~5–6 hours (was 4–5 in the original spec above): three-state output adds ~30 min vs single-integer output, priority-queue wiring adds another ~30 min on top of the original `enrichment/__init__.py` ordering work.
 
 **NOT acted on yet.** This is a "next week if this week's stability holds" item. Adding it here so future sessions can resume it without re-discovering the scope.
