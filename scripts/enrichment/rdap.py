@@ -45,6 +45,18 @@ logger = logging.getLogger(__name__)
 _BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json"
 _BREAKER = CircuitBreaker("rdap")
 
+# Identify ourselves on every outbound RDAP request. The default
+# `python-requests/X.Y.Z` UA is a heavily-flagged automated-client signal in
+# WAFs (Cloudflare Bot Management in particular), and the 2026-05-05
+# identitydigital 24h ban happened at a rate 4× under their documented WHOIS
+# limit — fingerprint-based detection is a plausible secondary contributor
+# that throttle calibration alone cannot address. Named, contactable UA is
+# industry practice for legitimate scrapers.
+USER_AGENT = (
+    "DomainSifter/1.0 (+https://domainsifter.com; contact: hello@domainsifter.com)"
+)
+_DEFAULT_HEADERS = {"User-Agent": USER_AGENT}
+
 
 @lru_cache(maxsize=8)
 def _fetch_bootstrap(url: str, timeout: int) -> tuple[tuple[str, tuple[str, ...]], ...] | None:
@@ -52,7 +64,7 @@ def _fetch_bootstrap(url: str, timeout: int) -> tuple[tuple[str, tuple[str, ...]
     return value is hashable (lru_cache requirement). Returns None on failure;
     failures are NOT cached (caller's next attempt may succeed)."""
     try:
-        response = requests.get(url, timeout=timeout)
+        response = requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout)
         response.raise_for_status()
         body = response.json()
     except (requests.RequestException, ValueError) as exc:
@@ -169,7 +181,7 @@ def enrich(domain: str, config: dict) -> dict:
     min_interval = float(config.get("api_min_interval_seconds", {}).get("rdap", 0.2))
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(url, timeout=timeout),
+            lambda: requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout),
             host=rdap_host,
             min_interval=min_interval,
         )
@@ -316,7 +328,7 @@ def check_availability(domain: str, config: dict) -> dict:
 
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(url, timeout=timeout),
+            lambda: requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout),
             host=rdap_host,
             min_interval=min_interval,
         )

@@ -394,6 +394,31 @@ def test_check_availability_uses_per_host_throttle_override(monkeypatch):
     assert captured == [0.2]
 
 
+@responses.activate
+def test_rdap_requests_send_named_user_agent():
+    """Every outbound HTTP call in rdap.py — bootstrap fetch + the
+    per-domain RDAP query — must carry our named, contactable User-Agent
+    instead of the default `python-requests/X.Y.Z` (heavily-flagged WAF
+    signal; see USER_AGENT docstring in rdap.py for the why)."""
+    responses.add(
+        responses.GET, "https://data.iana.org/rdap/dns.json", json=BOOTSTRAP, status=200
+    )
+    responses.add(
+        responses.GET,
+        "https://rdap.verisign.example/com/v1/domain/example.com",
+        status=404,
+    )
+
+    rdap.check_availability("example.com", _config())
+
+    # Two outbound calls expected: IANA bootstrap + the RDAP /domain query.
+    assert len(responses.calls) == 2
+    for call in responses.calls:
+        ua = call.request.headers.get("User-Agent", "")
+        assert ua == rdap.USER_AGENT, f"unexpected UA on {call.request.url}: {ua!r}"
+        assert "python-requests" not in ua
+
+
 def test_check_availability_breaker_open_returns_unknown_immediately(monkeypatch):
     """When the module breaker is open, no network call is made and the
     response is unknown. The autouse conftest fixture resets the breaker
