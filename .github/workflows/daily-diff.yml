@@ -1,10 +1,22 @@
+# CRON MIGRATED TO OVH SYSTEMD ON 2026-05-11.
+# The daily 06:30 UTC run is now driven by systemd/domainsifter.timer on
+# the OVH self-hosted server (Debian 12, 128 GB RAM). This workflow is
+# retained ONLY as a manual fallback — invoke via the GitHub UI's "Run
+# workflow" button if the OVH run fails and an emergency rebuild on
+# GitHub-hosted infrastructure is needed. CAVEAT: GHA's 16 GB RAM ceiling
+# cannot parse .com (~15.5 GB peak; see 2026-05-10 STATE.md entry). If
+# falling back to GHA, .com must be reverted to tlds.pending in config.json
+# first or the run will OOM at ~6m54s.
+
 name: Daily Domain Diff
 
 on:
-  # Triggered by the Cloudflare Cron Trigger Worker (domainsifter-cron-trigger).
-  # GitHub Actions free-tier `schedule:` is best-effort with significant queue
-  # delays at common minutes; Cloudflare's cron infrastructure fires reliably
-  # and dispatches this workflow via the GitHub API.
+  # Historically triggered by the Cloudflare Worker domainsifter-cron-trigger
+  # (which dispatched this workflow via the GitHub API). AS OF 2026-05-11
+  # THAT WORKER IS DISABLED — workflow_dispatch is now the only active
+  # trigger. Do not re-enable the Worker without first disabling the OVH
+  # systemd timer, or both schedulers will race and one push will be
+  # rejected.
   workflow_dispatch: {}
 
 permissions:

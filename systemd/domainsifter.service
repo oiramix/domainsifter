@@ -1,0 +1,30 @@
+# DomainSifter daily pipeline service — self-hosted on OVH (Debian 12).
+# Replaces the previous GitHub Actions cron path. The GHA workflow at
+# .github/workflows/daily-diff.yml is kept as a manual fallback via
+# workflow_dispatch; this service is the production daily runner as of
+# 2026-05-11.
+#
+# INSTALL (server-side, run as root once):
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter.service /etc/systemd/system/
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter.timer   /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now domainsifter.timer
+#   systemctl list-timers       # confirm the next 06:30 UTC firing
+#
+# Logs: journalctl -u domainsifter.service -f
+# Manual trigger (testing): systemctl start domainsifter.service
+
+[Unit]
+Description=DomainSifter daily pipeline
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=domainsifter
+Group=domainsifter
+WorkingDirectory=/home/domainsifter/domainsifter
+EnvironmentFile=/home/domainsifter/domainsifter/.env
+ExecStart=/home/domainsifter/domainsifter/scripts/run-daily.sh
+StandardOutput=journal
+StandardError=journal
