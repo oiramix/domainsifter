@@ -28,3 +28,7 @@ EnvironmentFile=/home/domainsifter/domainsifter/.env
 ExecStart=/home/domainsifter/domainsifter/scripts/run-daily.sh
 StandardOutput=journal
 StandardError=journal
+# Explicit memory accounting so `systemctl show -p MemoryPeak` reports a
+# real number for the email report. Default-on for systemd 252+ (Debian 12)
+# but pinned for forward-portability.
+MemoryAccounting=yes

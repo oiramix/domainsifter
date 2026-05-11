@@ -23,11 +23,43 @@
 # will refuse to merge — manual server-side cleanup is required at that
 # point. Run `git status` on the server; the unpushed commit will be the
 # tip of main.
+#
+# Email report: an EXIT trap fires scripts/send_report.py on success OR
+# failure, sending the journalctl log of this systemd invocation to
+# hello@domainsifter.com via Brevo SMTP. Reporter failures never propagate;
+# the wrapper's exit code is the pipeline's, not the reporter's.
+#
+# Additional .env vars required for email reporting (paste on the server
+# before the first run that includes this script — values are NOT in the
+# repo):
+#   BREVO_SMTP_USER    — Brevo SMTP login (from STATE.md "Active accounts")
+#   BREVO_SMTP_KEY     — Brevo SMTP key (same source)
+#   REPORT_TO_EMAIL    — destination, typically hello@domainsifter.com
+#   REPORT_FROM_EMAIL  — Brevo-verified sender, typically hello@domainsifter.com
 
 set -euo pipefail
 
 REPO_DIR="/home/domainsifter/domainsifter"
 cd "${REPO_DIR}"
+
+# Capture run-start time for the reporter's wall-clock readout. Exported so
+# scripts.send_report (a child process) can read it via os.environ.
+export DOMAINSIFTER_RUN_START_TS="$(date -u +%s)"
+
+# Reporter must fire on ANY exit (success, failure, signal). We use a trap
+# so this is reliable even if `set -e` aborts mid-script. The trap reads
+# $? as the very first statement (before any other command can clobber it),
+# then disables itself so a hiccup inside the reporter can't recurse, then
+# re-exits with the captured code.
+send_report() {
+  local exit_code=$?
+  trap - EXIT
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] sending daily report (pipeline exit=${exit_code})"
+  .venv/bin/python -m scripts.send_report --pipeline-exit "${exit_code}" \
+    || echo "WARNING: email report failed to send (run exit=${exit_code})" >&2
+  exit "${exit_code}"
+}
+trap send_report EXIT
 
 # Fail early with a clear message if GITHUB_TOKEN didn't get loaded — the
 # alternative is a confusing failure 5+ minutes later at the push step.
