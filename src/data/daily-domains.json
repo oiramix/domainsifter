@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-05-11T15:47:50Z",
-  "domain_count": 20,
-  "today_count": 1,
-  "carryover_count": 19,
+  "generated_at": "2026-05-12T08:02:38Z",
+  "domain_count": 18,
+  "today_count": 0,
+  "carryover_count": 18,
   "domains": [
     {
       "name": "collegelabor.org",
@@ -32,8 +32,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:53:36Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "thereedgroup.org",
@@ -63,8 +63,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:44:59Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "directpage.org",
@@ -94,39 +94,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:54:52Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
-    },
-    {
-      "name": "nontongp.xyz",
-      "tld": "xyz",
-      "dropped_date": "2026-05-01",
-      "wayback_snapshots": 626,
-      "wayback_last_snapshot": "2025-03-31",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 56,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dnontongp.xyz"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=nontongp.xyz&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=nontongp.xyz&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-01T04:23:57Z",
-      "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 10
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "fraizerdesigns.org",
@@ -156,8 +125,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T07:14:39Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "earthlingsunited.org",
@@ -187,8 +156,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:44:29Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "linkvillage.org",
@@ -218,38 +187,7 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:51:51Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
-    },
-    {
-      "name": "livetrackerpro.xyz",
-      "tld": "xyz",
-      "dropped_date": "2026-05-07",
-      "wayback_snapshots": 122,
-      "wayback_last_snapshot": "2026-05-04",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 47,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlivetrackerpro.xyz"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=livetrackerpro.xyz&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=livetrackerpro.xyz&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-07T06:57:19Z",
-      "first_seen_date": "2026-05-07",
-      "last_validated_date": "2026-05-11",
+      "last_validated_date": "2026-05-12",
       "days_listed": 4
     },
     {
@@ -280,8 +218,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-07T06:39:24Z",
       "first_seen_date": "2026-05-07",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 4
+      "last_validated_date": "2026-05-12",
+      "days_listed": 5
     },
     {
       "name": "closedstreetmap.org",
@@ -311,8 +249,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-11T07:19:18Z",
       "first_seen_date": "2026-05-11",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 0
+      "last_validated_date": "2026-05-12",
+      "days_listed": 1
     },
     {
       "name": "chillody.org",
@@ -342,8 +280,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T07:01:12Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "mkproperties.org",
@@ -373,8 +311,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:52:01Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "multimediadesigns.org",
@@ -404,8 +342,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:30:08Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 6
+      "last_validated_date": "2026-05-12",
+      "days_listed": 7
     },
     {
       "name": "helloco.info",
@@ -435,8 +373,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 10
+      "last_validated_date": "2026-05-12",
+      "days_listed": 11
     },
     {
       "name": "ettan.shop",
@@ -466,8 +404,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 10
+      "last_validated_date": "2026-05-12",
+      "days_listed": 11
     },
     {
       "name": "repelis.app",
@@ -497,8 +435,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:34:33Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 6
+      "last_validated_date": "2026-05-12",
+      "days_listed": 7
     },
     {
       "name": "awkert.shop",
@@ -528,8 +466,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 8
+      "last_validated_date": "2026-05-12",
+      "days_listed": 9
     },
     {
       "name": "rainydaysfoundation.org",
@@ -559,8 +497,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:50:26Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     },
     {
       "name": "promo-pro.online",
@@ -590,8 +528,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-09T07:05:37Z",
       "first_seen_date": "2026-05-09",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 2
+      "last_validated_date": "2026-05-12",
+      "days_listed": 3
     },
     {
       "name": "melissawest.shop",
@@ -621,9 +559,9 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:56:02Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-11",
-      "days_listed": 3
+      "last_validated_date": "2026-05-12",
+      "days_listed": 4
     }
   ],
-  "total_candidates_evaluated": 0
+  "total_candidates_evaluated": 7460
 }
