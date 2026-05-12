@@ -54,6 +54,34 @@ export DOMAINSIFTER_RUN_START_TS="$(date -u +%s)"
 send_report() {
   local exit_code=$?
   trap - EXIT
+
+  # Capture peak memory FROM THE CGROUP, before invoking the reporter.
+  # Why here and not from send_report.py:
+  #   `systemctl show -p MemoryPeak` races with systemd's unit teardown —
+  #   by the time the trap-spawned python process reaches systemctl, the
+  #   unit property has already been cleared and the reporter logs
+  #   "Memory peak: (unavailable)". The cgroup file, in contrast, lives
+  #   until the script's main process actually exits, which is later than
+  #   when we read it here. cgroup v2 only; older v1-only hosts will not
+  #   have memory.peak and the read silently falls through.
+  if [[ -r /proc/self/cgroup ]]; then
+    local cg_path
+    cg_path="$(awk -F: '/^0::/{print $3; exit}' /proc/self/cgroup 2>/dev/null || true)"
+    if [[ -n "${cg_path}" ]]; then
+      local peak_file="/sys/fs/cgroup${cg_path}/memory.peak"
+      if [[ -r "${peak_file}" ]]; then
+        local peak_value
+        peak_value="$(cat "${peak_file}" 2>/dev/null || true)"
+        # memory.peak is a single integer in bytes. Reject empty / non-numeric
+        # defensively so send_report.py's env-var-isdigit check never sees
+        # garbage on the cgroup-readable-but-empty edge case.
+        if [[ "${peak_value}" =~ ^[0-9]+$ ]]; then
+          export DOMAINSIFTER_MEMORY_PEAK_BYTES="${peak_value}"
+        fi
+      fi
+    fi
+  fi
+
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] sending daily report (pipeline exit=${exit_code})"
   .venv/bin/python -m scripts.send_report --pipeline-exit "${exit_code}" \
     || echo "WARNING: email report failed to send (run exit=${exit_code})" >&2

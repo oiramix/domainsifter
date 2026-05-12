@@ -95,12 +95,29 @@ def _capture_journal(invocation_id: str, since: str | None = None) -> str:
 
 
 def _memory_peak_bytes() -> int | None:
-    """systemd's MemoryPeak accounting for the unit cgroup. Returns peak
-    bytes since unit start, or None if accounting is unavailable.
+    """Peak resident memory the run consumed, in bytes. Returns None when
+    no usable source is available.
 
-    Requires MemoryAccounting=yes (set explicitly in the unit; default on
-    systemd 252+).
+    Source order (changed 2026-05-12):
+      1. `DOMAINSIFTER_MEMORY_PEAK_BYTES` env var, exported by
+         scripts/run-daily.sh from `/sys/fs/cgroup/<unit>/memory.peak`
+         BEFORE this reporter is invoked. The wrapper reads the cgroup
+         file directly while the cgroup is still live — avoids a race
+         where `systemctl show -p MemoryPeak` returns empty because
+         systemd has already cleared the unit-level property by the time
+         the EXIT-trap-spawned subprocess gets to it.
+      2. `systemctl show -p MemoryPeak --value domainsifter.service`.
+         Retained for non-wrapper invocations (operator-mode validation
+         outside systemd, older deploys without the wrapper change). On
+         the trap path this is expected to return empty.
+
+    Either source returning None / empty / non-numeric is treated as
+    "no signal"; the caller renders "(unavailable)" in the email body.
     """
+    env_val = os.environ.get("DOMAINSIFTER_MEMORY_PEAK_BYTES", "").strip()
+    if env_val.isdigit():
+        return int(env_val)
+
     try:
         result = subprocess.run(
             ["systemctl", "show", "-p", "MemoryPeak", "--value", "domainsifter.service"],
@@ -127,6 +144,30 @@ def _format_bytes(n: int | None) -> str:
             return f"{size:.1f} {unit}"
         size /= 1024
     return f"{size:.1f} PB"
+
+
+def _format_memory_peak(n: int | None) -> str:
+    """Render a byte count as MB or GB depending on magnitude.
+
+    Picks GB at >= 1 GiB, MB otherwise (the realistic range for the
+    pipeline's memory peak — sub-MB doesn't happen for a Python process
+    that loads zone files; sub-GB is small-TLD days, GB-scale is large-
+    TLD days, multi-GB is the future .com case).
+
+    Precision: 1 decimal at >= 100, 2 decimals below — so "743.2 MB" and
+    "1.83 GB" both read naturally and "50.00 MB" / "127.7 GB" both keep
+    three significant figures.
+    """
+    if n is None:
+        return "(unavailable)"
+    if n < 1024 ** 3:
+        size = n / (1024 ** 2)
+        unit = "MB"
+    else:
+        size = n / (1024 ** 3)
+        unit = "GB"
+    decimals = 1 if size >= 100 else 2
+    return f"{size:.{decimals}f} {unit}"
 
 
 def _format_duration(seconds: float | None) -> str:
@@ -217,7 +258,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"Verdict          : {verdict_emoji} {verdict_word} (exit code {pipeline_exit})",
         f"Date (UTC)       : {now.strftime('%Y-%m-%d %H:%M:%S')}",
         f"Wall-clock       : {_format_duration(duration_sec)}",
-        f"Memory peak      : {_format_bytes(mem_peak)}",
+        f"Memory peak      : {_format_memory_peak(mem_peak)}",
         f"Domains published: {domain_count if domain_count is not None else '(unknown — log parse miss)'}",
         f"Breakers tripped : {breaker_trips}",
         f"TLD failures     : {tld_failures}",

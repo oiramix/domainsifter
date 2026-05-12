@@ -28,6 +28,10 @@ def required_env(monkeypatch):
     monkeypatch.setenv("BREVO_SMTP_KEY", "test-key-not-real")
     monkeypatch.setenv("REPORT_TO_EMAIL", "to@example.invalid")
     monkeypatch.setenv("REPORT_FROM_EMAIL", "from@example.invalid")
+    # A stale wrapper-exported memory peak in the dev shell would silently
+    # short-circuit the systemctl-mocked fallback path. Clear it by default;
+    # tests that exercise the env-var path set it explicitly.
+    monkeypatch.delenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", raising=False)
 
 
 # --- log parsing -----------------------------------------------------------
@@ -100,6 +104,114 @@ def test_format_bytes_handles_units():
     assert send_report._format_bytes(512) == "512.0 B"
     assert send_report._format_bytes(2048) == "2.0 KB"
     assert send_report._format_bytes(2 * 1024 * 1024) == "2.0 MB"
+
+
+# --- memory peak source: env var (preferred) vs systemctl (fallback) ------
+
+
+def test_memory_peak_prefers_env_var_over_systemctl(monkeypatch):
+    """The wrapper exports DOMAINSIFTER_MEMORY_PEAK_BYTES from
+    /sys/fs/cgroup/.../memory.peak inside the EXIT trap. The reporter
+    must read it directly and NOT consult systemctl — that's the whole
+    point: systemctl races with systemd's unit teardown."""
+    monkeypatch.setenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", "1965432109")
+
+    monkeypatch.setattr(
+        send_report.subprocess, "run",
+        MagicMock(side_effect=AssertionError("systemctl invoked despite env var being set")),
+    )
+    assert send_report._memory_peak_bytes() == 1965432109
+
+
+def test_memory_peak_env_var_path_accepts_small_values(monkeypatch):
+    """An early-failure run that died before any real allocation should
+    still flow through the env-var path rather than the systemctl
+    fallback."""
+    monkeypatch.setenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", "42")
+    monkeypatch.setattr(
+        send_report.subprocess, "run",
+        MagicMock(side_effect=AssertionError("systemctl invoked")),
+    )
+    assert send_report._memory_peak_bytes() == 42
+
+
+def test_memory_peak_falls_back_to_systemctl_when_env_unset(monkeypatch):
+    """Non-wrapper invocations (operator-mode validation, pre-fix deploys)
+    must keep working via the original systemctl path."""
+    monkeypatch.delenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", raising=False)
+    mock_result = MagicMock(returncode=0, stdout="2097152\n", stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=mock_result))
+    assert send_report._memory_peak_bytes() == 2097152
+
+
+def test_memory_peak_falls_back_when_env_is_empty(monkeypatch):
+    """Empty env var (cgroup file readable but contained no digits — edge
+    case the wrapper's regex normally screens out) must fall through to
+    systemctl, not crash or be interpreted as 0."""
+    monkeypatch.setenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", "")
+    mock_result = MagicMock(returncode=0, stdout="42\n", stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=mock_result))
+    assert send_report._memory_peak_bytes() == 42
+
+
+def test_memory_peak_falls_back_when_env_is_non_numeric(monkeypatch):
+    """Defence-in-depth: if the env var somehow contains garbage (e.g.
+    independent invocation outside the wrapper), the reporter must NOT
+    crash with int() raising — it must fall through to systemctl."""
+    monkeypatch.setenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", "  not-a-number  ")
+    mock_result = MagicMock(returncode=0, stdout="99\n", stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=mock_result))
+    assert send_report._memory_peak_bytes() == 99
+
+
+def test_memory_peak_returns_none_when_both_paths_fail(monkeypatch):
+    """No env var, no systemctl (e.g. cgroup v1 host with no memory.peak
+    file AND running outside systemd) → None → "(unavailable)" in email."""
+    monkeypatch.delenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", raising=False)
+
+    def boom(*_a, **_kw):
+        raise FileNotFoundError("systemctl not on PATH")
+
+    monkeypatch.setattr(send_report.subprocess, "run", boom)
+    assert send_report._memory_peak_bytes() is None
+
+
+def test_memory_peak_returns_none_when_systemctl_returns_empty(monkeypatch):
+    """systemctl returns 0 + empty stdout when MemoryAccounting was off OR
+    when the trap-timing race triggers (the original bug). Either way:
+    no signal → None → "(unavailable)"."""
+    monkeypatch.delenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", raising=False)
+    mock_result = MagicMock(returncode=0, stdout="\n", stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=mock_result))
+    assert send_report._memory_peak_bytes() is None
+
+
+# --- _format_memory_peak --------------------------------------------------
+
+
+def test_format_memory_peak_returns_unavailable_for_none():
+    assert send_report._format_memory_peak(None) == "(unavailable)"
+
+
+def test_format_memory_peak_uses_mb_below_one_gib():
+    """Under 1 GiB → MB. `>= 100` shows 1 decimal; `< 100` shows 2."""
+    # 743.2 MiB round-trips to "743.2 MB" (≥ 100 → 1 decimal)
+    assert send_report._format_memory_peak(int(743.2 * 1024 ** 2)) == "743.2 MB"
+    # 50 MiB exactly — small magnitude → 2 decimals
+    assert send_report._format_memory_peak(50 * 1024 ** 2) == "50.00 MB"
+
+
+def test_format_memory_peak_uses_gb_at_or_above_one_gib():
+    """At 1 GiB and above → GB. The 127.7 case covers the future .com
+    scenario where peak could approach KS-6's 128 GB ceiling."""
+    assert send_report._format_memory_peak(int(1.83 * 1024 ** 3)) == "1.83 GB"
+    assert send_report._format_memory_peak(int(127.7 * 1024 ** 3)) == "127.7 GB"
+
+
+def test_format_memory_peak_boundary_at_one_gib():
+    """Exactly 1 GiB switches to GB unit; one byte short stays in MB."""
+    assert send_report._format_memory_peak(1024 ** 3) == "1.00 GB"
+    assert send_report._format_memory_peak(1024 ** 3 - 1) == "1024.0 MB"
 
 
 def test_format_duration_human_readable():
@@ -209,6 +321,21 @@ def test_build_email_handles_missing_from_env_via_keyerror(monkeypatch):
     monkeypatch.setenv("REPORT_TO_EMAIL", "to@example.invalid")
     with pytest.raises(KeyError):
         send_report._build_email(pipeline_exit=0, log="", duration_sec=None)
+
+
+def test_build_email_renders_memory_peak_from_env_var(required_env, monkeypatch):
+    """End-to-end: wrapper exports DOMAINSIFTER_MEMORY_PEAK_BYTES → reporter
+    renders it as MB/GB in the email body without ever consulting
+    systemctl. The systemctl-not-called assertion is the core regression
+    guard for the trap-timing bug."""
+    monkeypatch.setenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", str(int(1.83 * 1024 ** 3)))
+    raising_mock = MagicMock(side_effect=AssertionError("systemctl invoked despite env var"))
+    monkeypatch.setattr(send_report.subprocess, "run", raising_mock)
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=42.0)
+    body = msg.get_content()
+    assert "Memory peak      : 1.83 GB" in body
+    raising_mock.assert_not_called()
 
 
 # --- main() integration ----------------------------------------------------
