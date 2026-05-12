@@ -59,6 +59,13 @@
     "max_runtime_per_host_seconds": 2700,
     "global_cap": 15000
   },
+  "dns_check": {
+    "_doc": "DNS pre-filter, run AFTER lexical filter and BEFORE RDAP bucket assignment. Queries NS records for each candidate apex via the system resolver (Quad9 since 2026-05-12 — see 'DNS resolver fix and DNSBL three-state contract' section in STATE.md). NXDOMAIN → dns_available=True → proceed to RDAP. Any NS records returned → dns_available=False → reject (the registry still delegates the domain, so it isn't actually available). Lookup error (timeout, transport failure, NoAnswer with name-exists-but-no-NS, NoNameservers) → dns_available=None → proceed to RDAP (fail-open, same epistemic-honesty pattern as the DNSBL three-state contract). Architectural intent: the RDAP throttle budget is the bottleneck on TLD scale-up — adding .com (~10× the next-largest TLD's apex count) would require either large RDAP throttle budgets (risks ban) or accept losing volume to skipped_budget. A genuinely-dropped domain has had its NS records removed at the registry, so a DNS NS query is a free, parallelizable pre-RDAP gate that should reject the 80-95% of post-lexical candidates that still have DNS infrastructure (in-transfer, in-grace-period, parked etc.) — letting RDAP focus its strict throttle budget on candidates that look genuinely available. Accuracy-preservation: candidates RDAP would have approved as available (404) have no NS, so DNS pre-filter rejects only candidates RDAP would have rejected too. Net effect: same final list, much less RDAP load. Defaults chosen 2026-05-12 (first deployment, conservative): 20 workers (~600 qps peak burst against Quad9 anycast — Quad9 publishes no formal limit but the DNSBL fix made them load-bearing for spam classification too, so don't poke them unnecessarily; raise later if production proves benign), 3s per-query timeout (covers slow TLD authoritative responses; the per-call wall-clock budget is workers × candidates × timeout / workers ≈ candidates × timeout but in practice dominated by sub-100ms responses), no throttle (set throttle_seconds > 0 if Quad9 fair-use starts biting). Set enabled=false to bypass the pre-filter entirely (escape hatch if dnspython misbehaves or Quad9 has an outage). Module: scripts/dns_prefilter.py — pipeline-stage helper, not an enricher (different lifecycle: runs once across all candidates with its own pool sizing; not registered in ENRICHMENT_MODULES).",
+    "enabled": true,
+    "workers": 20,
+    "timeout_seconds": 3,
+    "throttle_seconds": 0.0
+  },
   "max_candidates_for_publication": 300,
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,

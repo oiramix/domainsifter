@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: 2026-05-12 (First fully-autonomous OVH run at 06:30 UTC fired cleanly but produced zero new domains. Investigation surfaced a coupled environmental + code issue: OVH's shared DNS resolver `213.186.33.99` is rate-limited by Spamhaus and SURBL fair-use policies, so Spamhaus returned `127.255.255.254` ("query via public resolver, refused") for every lookup and SURBL returned NXDOMAIN for every lookup. The 127.255.255.254 response was then *mis-coded as a real listing* by `scripts/enrichment/_dnsbl.py`, causing 100% post-enrichment rejection. Two-part fix this commit: (1) OS-level — `/etc/systemd/resolved.conf` set to Quad9 primary (9.9.9.9, 149.112.112.112) with Cloudflare/Google fallback, `systemd-resolved` restarted, manually verified DNSBL queries now return correct codes; (2) code — `_dnsbl.py` now distinguishes three states (listed=True for 127.0.0.x/127.0.1.x, listed=False for NXDOMAIN, listed=None for the error band 127.255.255.x and any unexpected response or transport failure), `spamhaus.py`/`surbl.py` pass the None through as `{"spamhaus_listed": None}` / `{"surbl_listed": None}` instead of collapsing to empty dict, `filter.py` already rejected only on `is True` (so None and missing now correctly pass through), and `filter_candidates_post_enrichment` logs a per-run `DNSBL signal distribution` line so degraded-resolver days surface in the email report. **OVH DNS resolver: Quad9 (set 2026-05-12).** Tests: new `tests/enrichment/test__dnsbl.py` with 13 cases covering all three states + edge cases; `test_spamhaus.py` / `test_surbl.py` / `test_filter.py` updated for the new contract. See "DNS resolver fix and DNSBL three-state contract — 2026-05-12" section at end of file for full diagnosis and the two known risks. Second fix today (afternoon): email reporter's "Memory peak: (unavailable)" output traced to a race between the EXIT trap's `systemctl show -p MemoryPeak` and systemd's unit teardown — fixed by reading `/sys/fs/cgroup/<unit>/memory.peak` directly from `scripts/run-daily.sh` and exporting `DOMAINSIFTER_MEMORY_PEAK_BYTES` for `scripts/send_report.py` to consume; systemctl path retained as fallback for non-wrapper invocations. Enables empirical memory-peak measurement needed before re-enabling `.com` in `tlds.approved`. See "Memory peak instrumentation fix — 2026-05-12" section at end of file.)
+Last updated: 2026-05-12 (First fully-autonomous OVH run at 06:30 UTC fired cleanly but produced zero new domains. Investigation surfaced a coupled environmental + code issue: OVH's shared DNS resolver `213.186.33.99` is rate-limited by Spamhaus and SURBL fair-use policies, so Spamhaus returned `127.255.255.254` ("query via public resolver, refused") for every lookup and SURBL returned NXDOMAIN for every lookup. The 127.255.255.254 response was then *mis-coded as a real listing* by `scripts/enrichment/_dnsbl.py`, causing 100% post-enrichment rejection. Two-part fix this commit: (1) OS-level — `/etc/systemd/resolved.conf` set to Quad9 primary (9.9.9.9, 149.112.112.112) with Cloudflare/Google fallback, `systemd-resolved` restarted, manually verified DNSBL queries now return correct codes; (2) code — `_dnsbl.py` now distinguishes three states (listed=True for 127.0.0.x/127.0.1.x, listed=False for NXDOMAIN, listed=None for the error band 127.255.255.x and any unexpected response or transport failure), `spamhaus.py`/`surbl.py` pass the None through as `{"spamhaus_listed": None}` / `{"surbl_listed": None}` instead of collapsing to empty dict, `filter.py` already rejected only on `is True` (so None and missing now correctly pass through), and `filter_candidates_post_enrichment` logs a per-run `DNSBL signal distribution` line so degraded-resolver days surface in the email report. **OVH DNS resolver: Quad9 (set 2026-05-12).** Tests: new `tests/enrichment/test__dnsbl.py` with 13 cases covering all three states + edge cases; `test_spamhaus.py` / `test_surbl.py` / `test_filter.py` updated for the new contract. See "DNS resolver fix and DNSBL three-state contract — 2026-05-12" section at end of file for full diagnosis and the two known risks. Second fix today (afternoon): email reporter's "Memory peak: (unavailable)" output traced to a race between the EXIT trap's `systemctl show -p MemoryPeak` and systemd's unit teardown — fixed by reading `/sys/fs/cgroup/<unit>/memory.peak` directly from `scripts/run-daily.sh` and exporting `DOMAINSIFTER_MEMORY_PEAK_BYTES` for `scripts/send_report.py` to consume; systemctl path retained as fallback for non-wrapper invocations. Enables empirical memory-peak measurement needed before re-enabling `.com` in `tlds.approved`. See "Memory peak instrumentation fix — 2026-05-12" section at end of file. Third fix today (evening): RDAP throttle budget was the sole remaining blocker for re-enabling `.com` in `tlds.approved` — today's saturated run logged 214 candidates skipped (budget) across 8 host buckets even on the 14-TLD set, and adding .com (~10× the next-largest TLD's apex count) under today's per-host throttles would have made the saturation orders of magnitude worse. Architectural fix: new DNS pre-filter stage in `scripts/dns_prefilter.py` runs AFTER lexical filter and BEFORE RDAP bucket assignment; for each candidate apex, queries NS records via the system resolver (Quad9 since this morning) — NXDOMAIN means the registry has removed delegation (proceed to RDAP), NS records present means the domain is still delegated (reject pre-RDAP), error states (timeout/NoAnswer/transport) fail open to RDAP. Expected to reject 80-95% of post-lexical candidates with a free, fast, parallelisable lookup; accuracy-preserving (every candidate RDAP would have approved as available also has no NS records, so DNS pre-filter rejects only candidates RDAP would have rejected too). Configuration in `dns_check` section of config.json — conservative defaults of 20 workers, 3s timeout, 0s throttle on first deployment. Unblocks `.com` re-enablement (still wants one observed clean run + an RDAP throttle review, but the DNS pre-filter is the precondition that makes both possible). 17 new tests across `tests/test_dns_prefilter.py` (new file, 16 cases) and `tests/test_pipeline.py` (1 integration test asserting registered-domain rejection happens before RDAP). New dependency: `dnspython==2.6.1` (small pure-Python BSD lib; second focused-library exception to the stdlib-only stance after the `wayback` package on 2026-05-08). See "DNS pre-filter pipeline stage — 2026-05-12" section at end of file for the full architecture and the .com unblocking story.)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -1169,3 +1169,101 @@ The email body now shows the peak in MB or GB depending on magnitude (e.g. "743.
 **What this enables — accurate `.com` sizing.** `.com` is currently in `tlds.pending` because the GHA 16 GB ceiling OOM'd during zone parse, and OVH KS-6's 128 GB capacity hasn't been measured under production load yet. With the reporter now logging the real peak every day, we collect empirical headroom data on the current 14-TLD load. Once the peak has stabilised across a few days, we can compute the safety margin and decide whether `.com` (~10× the apex-name count of the next-largest TLD) fits under 128 GB with adequate headroom — the prerequisite for moving it to `tlds.approved`.
 
 Tests: 12 new cases in `tests/test_send_report.py` covering env-var-preferred path, systemctl fallback when env unset/empty/non-numeric, both-paths-fail returns None, MB-vs-GB unit picking, decimal-precision-by-magnitude, the 1 GiB boundary, and an end-to-end assertion that systemctl is NOT consulted when the env var is set (the regression guard for the trap-timing bug). 395/395 tests passing.
+
+---
+
+## DNS pre-filter pipeline stage — 2026-05-12
+
+**Status: NEW ARCHITECTURAL STAGE. Module: `scripts/dns_prefilter.py`. Config: `dns_check` section in `scripts/config.json`. Unblocks `.com` re-enablement.**
+
+### The bottleneck
+
+Today's autonomous OVH run at 06:30 UTC saturated the RDAP throttle budget: 214 candidates skipped (budget) across 8 RDAP host buckets, each capped at 540–2,700 candidates with 1–5-second per-host throttling. Even after the lexical filter cut 15,238 candidates down to 7,460, RDAP couldn't get through them all under the configured budget. The per-host throttles are deliberately conservative — multiple registries banned us under the prior settings (Identity Digital 24h, PIR 1h, GMO soft warnings; see the throttle-recalibration commit history on 2026-05-05 and 2026-05-09).
+
+Adding `.com` to `tlds.approved` would multiply the candidate volume by ~10× because `.com` has ~160 M apex names in the zone vs. ~10–15 M for the next-largest TLDs we're already running. Under today's throttle settings that would mean either days-long pipeline runs or accepting massive `skipped_budget` losses on the .com bucket alone. Re-enabling `.com` was blocked until either RDAP throttles loosened (registry-ban risk) or upstream volume shrank.
+
+### Architectural insight
+
+A genuinely dropped/available domain has no NS records at the registry level — the TLD operator removed the delegation when the previous registrant let it expire. A domain in transfer, grace period, redemption, or parked still has NS records configured by its (departing) owner that the TLD continues to publish. So a single DNS NS-record query per candidate cleanly separates "still owned, RDAP would reject" from "genuinely dropped, send to RDAP for the authoritative check".
+
+This is free (Quad9 has no documented rate limit at our query volume), fast (10–50 ms per query), and parallelisable (20-worker pool finishes 7,500 candidates in ~10–15 seconds wall-clock). It runs AFTER the lexical filter (whose work isn't redundant — many lexical rejects are genuinely-dropped junk like keyword-stuffed names that DNS pre-filter would also pass through) and BEFORE the RDAP bucket assignment.
+
+### The pre-filter stage
+
+`scripts/dns_prefilter.py` exports two functions:
+
+- `check_dns_availability(apex_domain, *, timeout_seconds=3.0) -> dict` — queries NS records for one apex; returns the three-state contract.
+- `filter_candidates(candidates, config) -> list[dict]` — pipeline stage; runs `check_dns_availability` concurrently across all candidates, annotates each one in place, returns the subset that should proceed to RDAP.
+
+Three-state contract (mirrors the DNSBL three-state contract codified earlier today — same epistemic-honesty pattern):
+
+- `dns_available = True` — NXDOMAIN → registry removed delegation → proceed to RDAP
+- `dns_available = False` — NS records present → still delegated → REJECT pre-RDAP
+- `dns_available = None` — error states (`dns.exception.Timeout`, `dns.resolver.NoAnswer`, `dns.resolver.NoNameservers`, generic `dns.exception.DNSException`, empty answer with no triggering exception) → fail open to RDAP
+
+`NoAnswer` deserves explicit mention: it's the "name exists but no NS records at the queried level" case (e.g. resolver chasing a CNAME, parent-zone weirdness). We route it to `None` rather than guess — Mario specifically called this out for epistemic honesty.
+
+Module lives at `scripts/dns_prefilter.py`, NOT `scripts/enrichment/`, because it's a pipeline-stage helper with a different lifecycle from the plugin-contract enrichers (different signature, runs ONCE across all candidates with its own pool sizing, doesn't merge fields onto the candidate for scoring, runs BEFORE the RDAP availability check rather than AFTER it).
+
+### Pipeline integration
+
+New stage inserted in `scripts/pipeline.py` between the lexical filter and the per-host bucket-and-cap step:
+
+```
+... → lexical filter → DNS pre-filter (NEW) → bucket-and-cap → validate_availability → enrich → ...
+```
+
+The stage runs in a ThreadPoolExecutor sized from `dns_check.workers`. Each worker calls `check_dns_availability`, optionally pacing through `GLOBAL_HOST_THROTTLE` under a `"dns_prefilter"` bucket key. Candidate dicts are mutated in place; the function returns only those with `dns_available is not False`.
+
+Debug export (`--debug-export` flag): two new fields in `_meta.json` counts: `dns_kept` and `dns_rejected`. The `trim_discards` list now reflects discards from the DNS-kept set (i.e. bucket-and-cap rejections only), so the two stages don't get conflated.
+
+### Accuracy-preservation property
+
+Every domain RDAP would have approved as `is_available=True` (HTTP 404) has had its NS records removed at the registry — RDAP and DNS pre-filter agree on the True case by construction. The pre-filter only rejects candidates whose `dns_available=False`, which corresponds to "domain still delegated" — and RDAP would have rejected those too (`status` would not be "available"). So the daily-domains.json output is unchanged in content; only the RDAP load drops.
+
+### Expected impact
+
+- Today's post-lexical volume: ~7,460 candidates
+- Expected DNS-rejected fraction: 80–95% (estimated; will measure in tomorrow's run)
+- Expected post-DNS-prefilter RDAP input: ~500–1,500 candidates
+- Today's RDAP wall-clock: ~45 min on the slowest bucket
+- Expected post-DNS-prefilter RDAP wall-clock: ~10–20 min (well within current per-host budgets)
+- Today's full pipeline wall-clock: 1h32m
+- Expected post-deployment wall-clock: ~40–60 min
+
+These are **predictions**, not measurements. Tomorrow's 06:30 UTC run will be the first observation; the actual rejection percentage drives the .com sizing decision.
+
+### What this unblocks — `.com` re-enablement
+
+`.com` was blocked on two prerequisites:
+
+1. **Memory headroom** (resolved this afternoon by the cgroup-direct memory-peak fix; commit `df72b86`). Empirical peak measurement on the current 14-TLD load is now collecting daily; once stable we can size the .com headroom safely.
+2. **RDAP throttle budget** (this commit). With DNS pre-filter cutting candidates by 80–95% before RDAP, the per-host budgets that fit today's 7,460 lexical survivors will comfortably fit `.com`'s additional load.
+
+Sequence to .com re-enablement:
+- **Tomorrow's run (2026-05-13 06:30 UTC)**: first measurement of DNS-pre-filter rejection rate at production scale. Need to confirm 80%+ rejection and no measurable accuracy regression (final domain count steady vs prior days).
+- **2026-05-14 to 2026-05-16**: 2–3 days of clean runs with stable DNS-pre-filter behaviour. Memory-peak measurements stabilise concurrently.
+- **2026-05-17 or so**: move `.com` from `tlds.pending` to `tlds.approved` in config.json, observe one day with the new bucket, recalibrate RDAP throttles if needed (likely no change required — the DNS pre-filter should absorb the volume increase).
+
+This timeline is conditional on tomorrow's first DNS-pre-filter run looking sane. If rejection rate is significantly lower than predicted (say, <60%), the .com plan stalls and we re-evaluate.
+
+### Edge cases handled silently (fail open)
+
+- `dnspython` not installed → pipeline import fails fast at startup (deliberate; the new dep is hard-required when `dns_check.enabled=true`)
+- `dns_check.enabled=false` in config → pre-filter bypassed entirely, every lexical survivor flows to RDAP (escape hatch)
+- All-Quad9-outage → every candidate gets `dns_available=None` → all proceed to RDAP, pipeline runs but DNS pre-filter contributes no value that day (epistemic honesty — we don't pretend domains are unavailable just because Quad9 is down)
+- Apex with literal NXDOMAIN at the recursive resolver but actually delegated → false-positive available (rare; RDAP catches it as the authoritative second pass anyway)
+- Quad9 fair-use bite at our query volume → `throttle_seconds` configurable; raise to e.g. 0.05 if Quad9 starts returning SERVFAIL en masse
+
+### New dependency
+
+`dnspython==2.6.1` added to `requirements.txt`. Small pure-Python BSD-licensed lib, the canonical Python DNS library; stdlib has no NS-record-querying primitive (`socket.gethostbyname_ex` queries A records, which would false-positive available parked-with-no-A domains). This is the second focused-library exception to the "stdlib + requests only" stance, after the `wayback` package added 2026-05-08; both crossed the line because the use case genuinely needed library-grade functionality that's awkward to reimplement.
+
+### Tests
+
+17 new test cases:
+
+- **`tests/test_dns_prefilter.py` (new file, 16 cases)** — covers all three contract states (NS records present, NXDOMAIN, NoAnswer/NoNameservers/Timeout/generic-DNSException), trailing-dot stripping on NS targets, empty answer handling, timeout wiring, the `enabled=false` escape hatch, empty-candidate-list short-circuit, end-to-end stage routing, signal-distribution log line, exception swallowing inside the worker, throttle bucket key + interval propagation, and the throttle-skipped-at-zero-interval invariant.
+- **`tests/test_pipeline.py` (1 new case)** — end-to-end integration: `test_main_dns_prefilter_routes_candidates_before_rdap` asserts that a candidate with `dns_available=False` never reaches RDAP, while `dns_available=True` and `dns_available=None` both do. The cfg fixture has `dns_check.enabled=false` by default so the rest of the pipeline test suite remains deterministic.
+
+412/412 tests passing (was 395; +17 new).

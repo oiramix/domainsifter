@@ -99,6 +99,12 @@ def cfg(tmp_path):
             "domain_length": 0.1,
         },
         "rejected_keywords": [],
+        # DNS pre-filter disabled by default in tests: it has its own
+        # dedicated suite (test_dns_prefilter.py) that exercises real
+        # routing behaviour, and the existing pipeline tests don't want
+        # to mock dns.resolver. Tests that DO want the pre-filter active
+        # override this section per-test.
+        "dns_check": {"enabled": False},
     }
     return config
 
@@ -915,6 +921,100 @@ def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cf
     assert enriched_names == ["great.com"]
     written = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
     assert [d["name"] for d in written["domains"]] == ["great.com"]
+
+
+def test_main_dns_prefilter_routes_candidates_before_rdap(monkeypatch, cfg, tmp_path):
+    """End-to-end: with dns_check.enabled=True, candidates whose apex still
+    has NS records are rejected BEFORE the RDAP availability check runs;
+    dns_available=None candidates fail open and still reach RDAP. This is
+    the central architectural property of the 2026-05-12 pre-filter — it
+    cuts RDAP load without compromising the final list (everything RDAP
+    would have approved still arrives there).
+    """
+    cfg = {
+        **cfg,
+        "dns_check": {
+            "enabled": True,
+            "workers": 2,
+            "timeout_seconds": 1,
+            "throttle_seconds": 0.0,
+        },
+    }
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+
+    # Bypass structural + lexical filters — this test cares only about
+    # DNS-prefilter → RDAP routing, and short invented names like
+    # "broken.com" land on the lexical trigram threshold by accident.
+    monkeypatch.setattr(
+        pipeline.filter_mod, "filter_candidates_structural",
+        lambda cands, _cfg: list(cands),
+    )
+    monkeypatch.setattr(
+        pipeline.lexical_filter, "filter_candidates",
+        lambda cands, _cfg, **_kw: list(cands),
+    )
+
+    today = date.today()
+    monkeypatch.setattr(
+        pipeline,
+        "collect_drops",
+        lambda _cfg, _tok, today, **_kw: ([
+            {"name": "available.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "registered.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "broken.com", "tld": "com", "dropped_date": today.isoformat()},
+        ], []),
+    )
+
+    # Patch check_dns_availability directly — keeps the test independent
+    # of dnspython internals and the system resolver. Each candidate gets
+    # one of the three contract states.
+    def fake_dns_check(apex, **_kw):
+        if apex == "available.com":
+            return {"dns_available": True, "ns_records": []}
+        if apex == "registered.com":
+            return {"dns_available": False, "ns_records": ["ns1.parking.example"]}
+        return {"dns_available": None, "ns_records": []}
+
+    monkeypatch.setattr(
+        pipeline.dns_prefilter, "check_dns_availability", fake_dns_check,
+    )
+
+    # Track every domain RDAP receives — the routing assertion is "RDAP
+    # never sees registered.com because the pre-filter rejected it".
+    rdap_seen: list[str] = []
+
+    from scripts.enrichment import rdap as rdap_mod
+
+    def fake_rdap_check(domain, _c):
+        rdap_seen.append(domain)
+        return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                "rdap_expiration": None, "previous_registrar": None}
+
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_rdap_check)
+    monkeypatch.setattr(
+        pipeline, "enrich_all",
+        lambda cands, _cfg: [
+            {**c, "wayback_snapshots": 50, "wayback_last_snapshot": "2024-01-01",
+             "open_page_rank": 3.0, "cert_history": True,
+             "spam_flagged": False, "surbl_listed": False,
+             "spamhaus_listed": False, "previous_registrar": "Acme"}
+            for c in cands
+        ],
+    )
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+
+    # The hard property: registered.com was rejected pre-RDAP.
+    # available.com (True) and broken.com (None, fail-open) both reached RDAP.
+    assert sorted(rdap_seen) == ["available.com", "broken.com"]
 
 
 def test_main_aborts_when_required_env_missing(monkeypatch, cfg, tmp_path):

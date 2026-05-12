@@ -14,11 +14,23 @@ Order of operations:
                                 — punycode, length, all-numeric, keyword
     6. lexical filter           (lexical_filter.filter_candidates)
                                 — digit/vowel/entropy/repeats/pronounceability
-    7. evaluation safety cap    (max_candidates_for_enrichment)
+    7. DNS pre-filter           (dns_prefilter.filter_candidates)
+                                — NS-record query per candidate; reject the
+                                  ones that still have registry delegation.
+                                  Added 2026-05-12 to relieve RDAP throttle
+                                  pressure (~80-95% of post-lexical
+                                  candidates have NS records still in
+                                  place and rejecting them here saves the
+                                  RDAP throttle budget for candidates that
+                                  actually look available). Fail-open on
+                                  any lookup error — see
+                                  scripts/dns_prefilter.py for the three-
+                                  state contract.
+    8. evaluation safety cap    (max_candidates_for_enrichment)
                                 — sort by length asc, take top N. Caps the
                                   RDAP availability check (next stage), not
                                   the enrichment phase any more.
-    8. validate_availability    (RDAP per-candidate; the AUTHORITATIVE check)
+    9. validate_availability    (RDAP per-candidate; the AUTHORITATIVE check)
                                 — only HTTP 404 is "available"; everything
                                   else (owned, redemption, hold, transport
                                   failure) is rejected. MOVED HERE 2026-04-30
@@ -32,15 +44,15 @@ Order of operations:
                                        drop concurrency to 1 and pace much
                                        more politely without blowing the
                                        time budget.
-    9. enrich each survivor sequentially within a wall-clock budget
+   10. enrich each survivor sequentially within a wall-clock budget
        (max_workers=1 by default, budget from enrichment_time_budget_seconds).
        Typical post-availability set is 5-50 candidates; pacing room is now
        generous.
-   10. post-enrichment filter   (strict_spam_check=True)
-   11. score + sort             — null components excluded from normalization
-   12. publication cap          (max_candidates_for_publication, in build_payload)
+   11. post-enrichment filter   (strict_spam_check=True)
+   12. score + sort             — null components excluded from normalization
+   13. publication cap          (max_candidates_for_publication, in build_payload)
                                 — CEILING, not quota; never pad with weak
-   13. write_output → src/data/daily-domains.json
+   14. write_output → src/data/daily-domains.json
 
 Logging: each module gets its own logger; root config writes INFO+ to stdout
 so GitHub Actions surfaces everything in the run log.
@@ -71,6 +83,7 @@ from scripts import (
     czds_client,
     debug_export,
     diff,
+    dns_prefilter,
     env_check,
     filter as filter_mod,
     lexical_filter,
@@ -774,13 +787,23 @@ def main(argv: list[str] | None = None) -> int:
         structural_kept, config, rejections_out=lexical_rejections,
     )
 
+    # Stage 2b: DNS pre-filter (added 2026-05-12) — rejects candidates whose
+    # apex still has NS records in the registry zone. A genuinely-dropped
+    # domain has had its delegation removed, so NS-records-present means the
+    # candidate is still owned (in transfer, redemption, grace period, parked
+    # — RDAP would reject it anyway). Failing the lookup (timeout, transport
+    # error, NoAnswer) keeps the candidate (fail-open to RDAP). Net effect on
+    # a typical day: ~80-95% of lexical survivors are removed here, RDAP's
+    # throttle budget is freed for the remainder. See scripts/dns_prefilter.py.
+    dns_kept = dns_prefilter.filter_candidates(lexical_kept, config)
+
     # Bucket lexical survivors by RDAP host and apply per-host caps derived
     # from the configured runtime budget (availability_check.max_runtime_per_host_seconds).
     # Replaces the prior 1000-cap length-asc trim; today's ~14k survivors all
     # flow through availability check, modulo per-host caps that bound
     # any single bucket's wall-clock at ~15 min.
     candidates_to_evaluate, per_host_stats = _bucket_and_cap_for_availability(
-        lexical_kept, config, today=today,
+        dns_kept, config, today=today,
     )
     total_evaluated = len(candidates_to_evaluate)
     logger.info(
@@ -857,8 +880,10 @@ def main(argv: list[str] | None = None) -> int:
                 "structural_kept": len(structural_kept),
                 "lexical_rejects": len(lexical_rejections or []),
                 "lexical_survivors": len(lexical_kept),
+                "dns_kept": len(dns_kept),
+                "dns_rejected": max(0, len(lexical_kept) - len(dns_kept)),
                 "trim_kept": len(candidates_to_evaluate),
-                "trim_discards": max(0, len(lexical_kept) - len(candidates_to_evaluate)),
+                "trim_discards": max(0, len(dns_kept) - len(candidates_to_evaluate)),
                 "available": len(available),
                 "enriched": len(enriched),
                 "post_enrichment_survivors": len(survivors),
@@ -871,7 +896,11 @@ def main(argv: list[str] | None = None) -> int:
             lexical_survivors=[c.get("name", "") for c in lexical_kept],
             trim_kept=list(trim_kept_set),
             trim_discards=[
-                c.get("name", "") for c in lexical_kept if c.get("name", "") not in trim_kept_set
+                # Candidates that ENTERED bucket-and-cap (i.e. passed the DNS
+                # pre-filter) but didn't survive its per-host caps. DNS-rejected
+                # candidates aren't in this list — they're implicit in
+                # (lexical_survivors - dns_kept).
+                c.get("name", "") for c in dns_kept if c.get("name", "") not in trim_kept_set
             ],
             published=published_names,
             meta=meta,
