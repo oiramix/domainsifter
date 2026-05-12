@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: 2026-05-11 (OVH KS-6 server provisioned and daily pipeline cutover from GitHub Actions executed end-to-end. Hardware: AMD EPYC 7351p, 128 GB RAM, Debian 12 (Warsaw). Pipeline runs as the `domainsifter` service user under a systemd timer firing daily at 06:30 UTC; replaces the previous Cloudflare-Worker-dispatched GHA workflow (workflow retained for manual fallback only, Worker dormant). New email reporter (Brevo SMTP) fires on every run via a bash EXIT trap, sending verdict + journal log to hello@domainsifter.com — visibility into degraded-API days without manual SSH. Validated end-to-end via the operator-mode `--journal-since` flag at 17:20 UTC; tomorrow's 06:30 UTC fire is the first fully autonomous OVH-only run. `.com` still in `tlds.pending` — no longer RAM-blocked (128 GB headroom for both today_set + yesterday_set on day-2 diff) but now RDAP-throttle-budget-blocked from the existing 14-TLD load on today's GHA run. Four commits today: `aa5189b` OVH migration files, `d83f974` morning GHA refresh (`.net`'s first production day), `3df0a72` afternoon unscheduled catch-up fire from `enable --now`+`Persistent=true` interaction (clean no-op), `b8d488a` email reporter. 359/359 tests passing.)
+Last updated: 2026-05-12 (First fully-autonomous OVH run at 06:30 UTC fired cleanly but produced zero new domains. Investigation surfaced a coupled environmental + code issue: OVH's shared DNS resolver `213.186.33.99` is rate-limited by Spamhaus and SURBL fair-use policies, so Spamhaus returned `127.255.255.254` ("query via public resolver, refused") for every lookup and SURBL returned NXDOMAIN for every lookup. The 127.255.255.254 response was then *mis-coded as a real listing* by `scripts/enrichment/_dnsbl.py`, causing 100% post-enrichment rejection. Two-part fix this commit: (1) OS-level — `/etc/systemd/resolved.conf` set to Quad9 primary (9.9.9.9, 149.112.112.112) with Cloudflare/Google fallback, `systemd-resolved` restarted, manually verified DNSBL queries now return correct codes; (2) code — `_dnsbl.py` now distinguishes three states (listed=True for 127.0.0.x/127.0.1.x, listed=False for NXDOMAIN, listed=None for the error band 127.255.255.x and any unexpected response or transport failure), `spamhaus.py`/`surbl.py` pass the None through as `{"spamhaus_listed": None}` / `{"surbl_listed": None}` instead of collapsing to empty dict, `filter.py` already rejected only on `is True` (so None and missing now correctly pass through), and `filter_candidates_post_enrichment` logs a per-run `DNSBL signal distribution` line so degraded-resolver days surface in the email report. **OVH DNS resolver: Quad9 (set 2026-05-12).** Tests: new `tests/enrichment/test__dnsbl.py` with 13 cases covering all three states + edge cases; `test_spamhaus.py` / `test_surbl.py` / `test_filter.py` updated for the new contract. See "DNS resolver fix and DNSBL three-state contract — 2026-05-12" section at end of file for full diagnosis and the two known risks.)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -1079,3 +1079,73 @@ Priority order for the enrichment phase:
 Total scope estimate now ~5–6 hours (was 4–5 in the original spec above): three-state output adds ~30 min vs single-integer output, priority-queue wiring adds another ~30 min on top of the original `enrichment/__init__.py` ordering work.
 
 **NOT acted on yet.** This is a "next week if this week's stability holds" item. Adding it here so future sessions can resume it without re-discovering the scope.
+
+---
+
+## DNS resolver fix and DNSBL three-state contract — 2026-05-12
+
+**Status: PROMINENT — OVH DNS resolver: Quad9 (set 2026-05-12).**
+
+### Issue
+
+Today's first fully-autonomous OVH run at 06:30 UTC fired cleanly but published zero new domains. Two coupled root causes:
+
+1. **Environmental.** OVH KS-6 uses the shared cloud resolver `213.186.33.99` by default. Spamhaus and SURBL both fingerprint queries by the resolver's source IP and rate-limit shared/cloud resolvers under their fair-use policies. Spamhaus returned `127.255.255.254` (its documented "query via public/open resolver, refused" error code) for every DNSBL lookup. SURBL returned NXDOMAIN for every lookup (its fair-use behaviour silently masquerades as "not listed").
+2. **Code bug.** `scripts/enrichment/_dnsbl.py` treated *any* address in `127.0.0.0/8` as `listed=True`. `127.255.255.254` starts with `127.`, so every Spamhaus error response was mis-coded as a real listing, which the post-enrichment filter rejected on rule R8. Net effect: 100% post-enrichment rejection. The SURBL side stayed silent (NXDOMAIN = not listed = pass) but the spam filter was now structurally degraded with no warning.
+
+The two issues together explain the empty output. Fixing only the resolver would still leave us with a fragile classifier; fixing only the code would still leave us hitting the rate-limited resolver every day. Both are addressed in this commit.
+
+### Diagnosis — resolver testing matrix (manual)
+
+Tested each candidate resolver against a known-spam Spamhaus probe and a known-spam SURBL probe directly from the OVH server:
+
+| Resolver | IP | Spamhaus response | SURBL response | Verdict |
+|---|---|---|---|---|
+| OVH default | `213.186.33.99` | `127.255.255.254` (rate-limited) | NXDOMAIN (fair-use mask) | broken |
+| Cloudflare | `1.1.1.1` | `127.255.255.254` (rate-limited) | NXDOMAIN (fair-use mask) | broken |
+| Google | `8.8.8.8` | `127.255.255.254` (rate-limited) | NXDOMAIN (fair-use mask) | broken |
+| Quad9 | `9.9.9.9` | correct listing code | correct listing code | works |
+
+Quad9 was the only public resolver that returned authoritative DNSBL responses. The three "broken" resolvers are all blocked because they're widely-used aggregators — exactly the case Spamhaus's and SURBL's fair-use policies are written to deter.
+
+### Fix — OS-level (already applied at the OS, not in the repo)
+
+`/etc/systemd/resolved.conf` updated to use Quad9 as primary with Cloudflare/Google as fallback (the fallbacks won't help DNSBL lookups but keep general DNS resolution working if Quad9 itself becomes unavailable):
+
+```
+[Resolve]
+DNS=9.9.9.9 149.112.112.112
+FallbackDNS=1.1.1.1 8.8.8.8
+```
+
+`systemctl restart systemd-resolved` was issued and DNSBL queries verified via `nslookup` from the server. Repo unchanged — this is OS-level state outside the codebase.
+
+### Fix — code-level (this commit)
+
+Reworked the DNSBL classifier to refuse to over-claim a listing when the resolver returns an error-band response.
+
+- `scripts/enrichment/_dnsbl.py` — `is_listed()` now returns three states: `True` only when the resolver returns a 127.0.0.x or 127.0.1.x address (the legitimate listing bands for SURBL and Spamhaus DBL respectively), `False` on NXDOMAIN, and `None` for the 127.255.255.x error band, any other unexpected response, or any DNS transport failure.
+- `scripts/enrichment/spamhaus.py` and `scripts/enrichment/surbl.py` — pass the `None` through as `{"spamhaus_listed": None}` / `{"surbl_listed": None}` instead of collapsing to empty dict. Empty dict is now reserved for "circuit breaker open" (the call wasn't made).
+- `scripts/filter.py` — the per-call reject was already `is True` (so `None` and missing already passed through correctly), but the contract is now codified in the module docstring and rule headers. The post-enrichment filter newly emits a `DNSBL signal distribution` log line summarising `spamhaus_listed=N, spamhaus_unknown=M, surbl_listed=N, surbl_unknown=M` whenever any unknown is present, so the daily email report makes degraded-resolver days visible without manual journal inspection.
+- Tests — new `tests/enrichment/test__dnsbl.py` (13 cases) explicitly covers the 127.255.255.254 case that broke today's run, plus the wider three-state contract and edge cases (empty address list, mixed listing+error response, non-127 unexpected addresses). `test_spamhaus.py`, `test_surbl.py`, and `test_filter.py` updated for the new contract, including a test that exercises the circuit-breaker-open path and one that asserts the `DNSBL signal distribution` log line shape.
+
+### Known risks (carry forward — these can bite again)
+
+**Known risk 1 — Quad9 itself could be blocked by Spamhaus/SURBL in the future.** Quad9 is a high-volume public resolver and could be added to either operator's fair-use blocklist at any time. Mitigation: the code change in this commit makes the pipeline epistemically honest about unknown responses — if Quad9 starts returning `127.255.255.254`, the candidates flow through as `spamhaus_listed=None` instead of being mis-rejected, and the daily email reporter surfaces the degraded coverage immediately via the `DNSBL signal distribution` log line. The pipeline keeps publishing; the operator gets a visible signal to act on. Longer-term mitigation if Quad9 is blocked: subscribe to Spamhaus Data Query Service (DQS) which authenticates by API key not by resolver IP, or run a local Unbound/dnsmasq resolver and accept the operational overhead.
+
+**Known risk 2 — OVH DHCP may re-override interface-level DNS after server reboot.** `/etc/systemd/resolved.conf` sets the global resolver, but OVH's DHCP can push interface-level resolvers via `netplan` / `systemd-networkd` that take priority over the global config on some Debian configurations. Manually verified today that the global config wins post-`systemctl restart systemd-resolved`, but a full server reboot has not yet been exercised. If post-reboot DNSBL issues recur, the operational fix is either (a) re-apply `/etc/systemd/resolved.conf` and restart, or (b) add a `systemd-networkd` drop-in under `/etc/systemd/network/` that pins the resolver per-interface. Document the fix here when it's exercised.
+
+### Operational signal for future runs
+
+Every run after 2026-05-12 should include the `DNSBL signal distribution` line in the journal output (and therefore in the Brevo email reporter's payload) whenever any unknown is present. The line shape is:
+
+```
+DNSBL signal distribution across N post-enrichment candidates:
+spamhaus_listed=A, spamhaus_unknown=B, surbl_listed=C, surbl_unknown=D
+(unknown = rate-limited / unavailable; passed through, not rejected)
+```
+
+Operator interpretation:
+- All-zero unknowns: healthy run, DNSBL coverage intact.
+- Unknowns dominate listings on a single source (e.g. `spamhaus_unknown` >> `spamhaus_listed`): that DNSBL is rate-limiting us. Quad9 likely fine for the other source.
+- Unknowns dominate both sources: today's resolver is broken across the board. Verify `/etc/systemd/resolved.conf` and `systemd-resolved` status.

@@ -24,8 +24,8 @@ Reject rules (any one triggers rejection):
     R4  all-numeric apex         — labels[0] is digits only
     R5  rejected keyword         — any rejected_keywords substring in apex
     R6  spam_flagged             — Safe Browsing match
-    R7  surbl_listed             — SURBL match
-    R8  spamhaus_listed          — Spamhaus DBL match
+    R7  surbl_listed             — SURBL match (only on `is True`)
+    R8  spamhaus_listed          — Spamhaus DBL match (only on `is True`)
     R9  no Wayback history       — wayback_snapshots < min_wayback_snapshots
                                    (only enforced when the field is present —
                                    a Wayback API failure leaves the field
@@ -35,6 +35,20 @@ Reject rules (any one triggers rejection):
                                    per-domain query failed; conservative
                                    reject. (Caller decides whether to
                                    enforce by passing strict_spam_check.)
+
+DNSBL three-state semantics (R7, R8): `surbl_listed` and `spamhaus_listed`
+can be True / False / None / missing. Only `is True` rejects; `None`
+(unknown — DNSBL rate-limited or otherwise refusing to answer) and
+"missing" (circuit breaker open) BOTH pass through. The per-call rejection
+on `is True` was already correct; the explicit three-state contract was
+codified on 2026-05-12 after OVH's shared resolver got rate-limited by
+Spamhaus and the previous code mis-coded 127.255.255.254 (Spamhaus's
+"public resolver, refused" error code) as a real listing. See
+scripts/enrichment/_dnsbl.py for the resolver-side reasoning.
+
+`filter_candidates_post_enrichment` logs an unknown-count line so daily
+run reports distinguish "domain listed" (signal: bad) from "DNSBL
+unavailable" (signal: missing).
 """
 
 from __future__ import annotations
@@ -83,7 +97,12 @@ def keep_post_enrichment(
     strict_spam_check: bool = True,
 ) -> tuple[bool, str | None]:
     """Post-enrichment rejects (R6-R10). Reads enrichment fields off the
-    candidate dict; treats absent fields as 'unknown' (mostly tolerant)."""
+    candidate dict; treats absent fields as 'unknown' (mostly tolerant).
+
+    DNSBL fields (`surbl_listed`, `spamhaus_listed`) follow the three-state
+    contract: only `is True` rejects. `None` and missing both pass — see
+    module docstring.
+    """
     thresholds = config.get("filter_thresholds", {})
     min_wayback = thresholds.get("min_wayback_snapshots", 1)
 
@@ -102,6 +121,34 @@ def keep_post_enrichment(
         return False, "spam_check_missing"
 
     return True, None
+
+
+def _count_dnsbl_unknowns(candidates: list[dict]) -> dict[str, int]:
+    """Tally how many candidates have a `None` or missing DNSBL field.
+
+    "Unknown" = either explicitly `None` (DNSBL returned an error-band
+    response such as 127.255.255.254, or DNS transport failed) or absent
+    from the dict (circuit breaker was open). Both cases mean the same
+    thing operationally: no DNSBL signal for this candidate.
+    """
+    spamhaus_unknown = sum(
+        1 for c in candidates if c.get("spamhaus_listed") is None
+    )
+    surbl_unknown = sum(
+        1 for c in candidates if c.get("surbl_listed") is None
+    )
+    spamhaus_listed = sum(
+        1 for c in candidates if c.get("spamhaus_listed") is True
+    )
+    surbl_listed = sum(
+        1 for c in candidates if c.get("surbl_listed") is True
+    )
+    return {
+        "spamhaus_listed": spamhaus_listed,
+        "spamhaus_unknown": spamhaus_unknown,
+        "surbl_listed": surbl_listed,
+        "surbl_unknown": surbl_unknown,
+    }
 
 
 def keep(
@@ -149,7 +196,26 @@ def filter_candidates_post_enrichment(
     *,
     strict_spam_check: bool = True,
 ) -> list[dict]:
-    """Post-enrichment filter — keeps only candidates that pass R6-R10."""
+    """Post-enrichment filter — keeps only candidates that pass R6-R10.
+
+    Logs a DNSBL signal-distribution line BEFORE applying rejections so
+    daily reports can distinguish "domain listed" (a real bad-signal
+    rejection) from "DNSBL unavailable" (no signal, passed through). On a
+    rate-limited resolver day this line is the canary: when
+    `*_unknown` counts dominate, the run published with degraded blocklist
+    coverage and the operator should investigate.
+    """
+    tallies = _count_dnsbl_unknowns(candidates)
+    if any(tallies.values()):
+        logger.info(
+            "DNSBL signal distribution across %d post-enrichment candidates: "
+            "spamhaus_listed=%d, spamhaus_unknown=%d, "
+            "surbl_listed=%d, surbl_unknown=%d "
+            "(unknown = rate-limited / unavailable; passed through, not rejected)",
+            len(candidates),
+            tallies["spamhaus_listed"], tallies["spamhaus_unknown"],
+            tallies["surbl_listed"], tallies["surbl_unknown"],
+        )
     return _apply(
         candidates,
         lambda c: keep_post_enrichment(c, config, strict_spam_check=strict_spam_check),
