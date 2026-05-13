@@ -77,7 +77,7 @@ Scope:
    - Domain length and readability
 6. Output: src/data/daily-domains.json with top 500 candidates per day, replacing sample-domains.json.
 7. Affiliate links: Namecheap placeholder for now (https://www.namecheap.com/domains/registration/results/?domain={name}); replace with real affiliate IDs as approvals land.
-8. Newsletter capture: Buttondown integration on existing email signup form (deferred — separate task post-pipeline).
+8. Newsletter capture: Buttondown integration on existing email signup form — SHIPPED 2026-04-30 (commit `97fbdca`). Public embed endpoint `https://buttondown.com/api/emails/embed-subscribe/domainsifter`, no API key in client. Account created and validated end-to-end 2026-05-13 with first organic subscriber.
 
 v1 deliverables:
 

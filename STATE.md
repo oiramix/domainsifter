@@ -120,11 +120,6 @@ This document captures the current snapshot of the project. Update it whenever a
 - Sav direct (5 min signup): NOT DONE
 - Skipped: Namecheap via impact.com (heavy tax/VAT forms — defer)
 
-### Newsletter capture
-
-- Buttondown account: NOT CREATED
-- Wire existing email signup form to Buttondown API endpoint https://api.buttondown.email/v1/subscribers: NOT DONE
-
 ### Social presence
 
 - Claim @domainsifter on X/Twitter: NOT DONE
@@ -1267,3 +1262,13 @@ This timeline is conditional on tomorrow's first DNS-pre-filter run looking sane
 - **`tests/test_pipeline.py` (1 new case)** — end-to-end integration: `test_main_dns_prefilter_routes_candidates_before_rdap` asserts that a candidate with `dns_available=False` never reaches RDAP, while `dns_available=True` and `dns_available=None` both do. The cfg fixture has `dns_check.enabled=false` by default so the rest of the pipeline test suite remains deterministic.
 
 412/412 tests passing (was 395; +17 new).
+
+---
+
+## Newsletter integration validated — 2026-05-13
+
+First organic newsletter subscriber. Integration validated end-to-end (Buttondown embed endpoint, double opt-in, dashboard tracking). Pre-signup count: 1 owner test address. Post: 2 subscribers including first real user.
+
+The signup form ([`src/components/EmailSignup.astro`](src/components/EmailSignup.astro)) was wired on 2026-04-30 in commit `97fbdca` against the public embed endpoint `https://buttondown.com/api/emails/embed-subscribe/domainsifter` — no API key in client, honeypot field, inline JS fetch intercept with `target="_blank"` as the no-JS fallback. Account creation was outside the agent loop (Mario did it manually via the Buttondown dashboard between then and now); today's organic signup is the first proof the dashboard side is functional too. Privacy disclosures in [`src/pages/privacy.astro`](src/pages/privacy.astro) name Buttondown and Postmark as data processors.
+
+Doc-sync removed three stale TODO/deferred references this commit: `STATE.md` had a "Newsletter capture" subsection under "What is NOT yet built" listing the account creation and embed wiring as undone; `STATUS.md` had the form-wiring and privacy-page bullets in the launch-blocking list; `PLAN.md` item 8 framed the integration as deferred-to-post-pipeline. All updated to reflect the shipped state. PLAN.md's v2 references (`scripts/newsletter.py` for digest generation, account-tier upgrade past free-tier 1k subscribers) intentionally untouched — those remain future work.

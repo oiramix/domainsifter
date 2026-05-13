@@ -69,8 +69,8 @@ The whole site is currently driven by 20 hardcoded entries. None of this exists 
 - [ ] Swap the "Last updated: Preview data" string for a real ISO timestamp
 
 ### Email backend
-- [ ] Wire the signup form to Buttondown (or whatever provider). Today the form is purely client-side — submissions go nowhere.
-- [ ] Decide: pure form POST to provider's hosted endpoint, or a small Worker that proxies + does spam protection?
+- [x] Signup form wired to Buttondown's public embed endpoint (`https://buttondown.com/api/emails/embed-subscribe/domainsifter`) — committed 2026-04-30, account created and validated end-to-end 2026-05-13 (first organic subscriber confirmed via double opt-in). No API key in client code; honeypot field + inline JS fetch intercept; `target="_blank"` is the no-JS fallback.
+- [x] Decided: pure form POST to provider's hosted embed endpoint. No Worker proxy needed — Buttondown handles spam protection server-side and the embed endpoint is API-key-less by design.
 
 ### Affiliate links
 - [ ] Apply for and add real affiliate IDs for Namecheap, Dynadot, Porkbun.
@@ -83,7 +83,7 @@ The whole site is currently driven by 20 hardcoded entries. None of this exists 
   - Switch the link target to the affiliate URL directly until the detail page exists.
 
 ### Privacy / legal
-- [ ] Footer links to `#privacy` (placeholder anchor). Need a real `/privacy` page before launch — at minimum: what we collect (email + standard logs), who it's shared with (Buttondown), how to delete.
+- [x] Real `/privacy` page exists at [`src/pages/privacy.astro`](src/pages/privacy.astro) — covers what we collect (email + standard logs), data processors (Buttondown for newsletter delivery, Postmark as Buttondown's email infrastructure), and how to delete. Footer link points there.
 - [ ] Decide whether the Cloudflare CZDS terms require a specific attribution beyond the footer line.
 
 ### Polish / open issues
