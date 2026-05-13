@@ -1272,3 +1272,79 @@ First organic newsletter subscriber. Integration validated end-to-end (Buttondow
 The signup form ([`src/components/EmailSignup.astro`](src/components/EmailSignup.astro)) was wired on 2026-04-30 in commit `97fbdca` against the public embed endpoint `https://buttondown.com/api/emails/embed-subscribe/domainsifter` — no API key in client, honeypot field, inline JS fetch intercept with `target="_blank"` as the no-JS fallback. Account creation was outside the agent loop (Mario did it manually via the Buttondown dashboard between then and now); today's organic signup is the first proof the dashboard side is functional too. Privacy disclosures in [`src/pages/privacy.astro`](src/pages/privacy.astro) name Buttondown and Postmark as data processors.
 
 Doc-sync removed three stale TODO/deferred references this commit: `STATE.md` had a "Newsletter capture" subsection under "What is NOT yet built" listing the account creation and embed wiring as undone; `STATUS.md` had the form-wiring and privacy-page bullets in the launch-blocking list; `PLAN.md` item 8 framed the integration as deferred-to-post-pipeline. All updated to reflect the shipped state. PLAN.md's v2 references (`scripts/newsletter.py` for digest generation, account-tier upgrade past free-tier 1k subscribers) intentionally untouched — those remain future work.
+
+---
+
+## Common Crawl integration (standalone, not yet wired) — 2026-05-13
+
+**Status: STANDALONE CAPABILITY SHIPPED. NOT WIRED INTO THE DAILY PIPELINE.**
+
+Two new modules + one new dep + accumulated R2 storage strategy. The pipeline doesn't know any of this exists yet — by design. Mario will validate end-to-end against real CC data on OVH before a follow-up commit wires `cc_backlinks` into `ENRICHMENT_MODULES`, scoring weights, and the homepage display.
+
+### What was built
+
+- **`scripts/cc_refresh.py`** (CLI: `python -m scripts.cc_refresh --release <name>`) — downloads a Common Crawl monthly domain-webgraph release from `data.commoncrawl.org`, uploads raw artifacts to R2 IA tier, builds a derived SQLite via DuckDB aggregation, uploads the SQLite to R2 Standard tier. Resume-on-failure via HTTP Range. Idempotent via HEAD-based R2 existence check. 32 MB multipart chunks. DuckDB capped at 8 GB memory limit for consistent behaviour on dev laptops vs KS-6.
+- **`scripts/enrichment/cc_backlinks.py`** (CLI: `python -m scripts.enrichment.cc_backlinks --apex <domain>`) — plugin-contract enricher that downloads the derived SQLite from R2 on first use (cached under `~/.cache/domainsifter/cc/` XDG-style), opens a read-only sqlite3 connection, and answers `enrich(domain, config) -> {"cc_source_domain_count": N}`. Connection is cached for the process lifetime so the pipeline's many-calls-per-run pattern doesn't repeatedly re-open the file.
+- **`scripts/config.json`** — new `cc_backlinks` section with `latest_release`, key templates, source URL template. Documented as STANDALONE-ONLY in the `_doc` field.
+- **`requirements.txt`** — `duckdb>=1.0,<2` added. Pure-Python wheel, ~30 MB. Third focused-library exception to the stdlib + requests stance, after `wayback` and `dnspython`. Used solely by `cc_refresh.py` for the 5.4B-edge aggregation; the enricher uses stdlib `sqlite3`.
+- **Tests**: 22 new in `tests/test_cc_refresh.py` covering URL/key construction, HEAD-based idempotency, resume-with-retry download, size-validation warnings, end-to-end DuckDB build against fixture TSV (including the multi-label TLD `uk.co.example4 → example4.co.uk` un-reverse and the dangler-included-with-count=0 case), Phase-1 and Phase-2 integration (idempotency, IA vs Standard storage class routing, R2-fallback for `--build-only`), and the disk-space guard. 18 new in `tests/enrichment/test_cc_backlinks.py` covering cache-dir precedence (explicit → env → XDG → ~/.cache), release precedence (env → config), R2 download path, zero-byte-cache invalidation, the three-state contract (known apex → count; dangler → 0; not in graph → {}), case-insensitive domain lookup, R2-failure-returns-empty contract, connection reuse, and a **load-bearing assertion that `cc_backlinks` is NOT in `pipeline.ENRICHMENT_MODULES`** until the wire-in commit (test will fail loudly if a future edit accidentally registers it).
+- 452/452 tests passing (was 412; +40 new).
+
+### How to use (operator workflow)
+
+After this commit lands, Mario runs ONCE on OVH to populate R2:
+
+```bash
+# Default: download + upload raw + build + upload derived. ~25-35 min total.
+python -m scripts.cc_refresh --release cc-main-2026-feb-mar-apr
+
+# Then exercise the enricher CLI against the live SQLite:
+python -m scripts.enrichment.cc_backlinks --apex google.com
+# → google.com: <large N> source domains
+
+python -m scripts.enrichment.cc_backlinks --apex marketglow.com
+# → marketglow.com: not in CC graph (release cc-main-2026-feb-mar-apr)
+```
+
+The agent did NOT run `cc_refresh` from this session — pushing 21 GiB of upstream bandwidth and R2 PUT-ops cost from a sandboxed harness wasn't appropriate. First real run is Mario's manually after the commit pushes.
+
+### Accumulation strategy
+
+**Never delete old releases.** CC publishes monthly. Each release ships ~21 GiB raw (IA) + ~1.5 GiB derived (Standard) to R2 under release-keyed paths (`cc/raw/<release>/` and `cc/derived/<release>.sqlite`). Over years this accumulates into a historical backlink-decay dataset that nobody else provides for free.
+
+Why: the daily pipeline only reads the latest release's derived SQLite (~1.5 GiB download per run, fast). Historical-comparison queries (years later) work via SQLite `ATTACH` across multiple per-release files — release context is encoded by the file path, NOT by a per-row column. Schema stays minimal (apex_domain PK + source_domain_count), file stays under ~1.5 GiB so daily pipeline reads stay cheap.
+
+### R2 storage cost projection
+
+R2 supports two classes: `STANDARD` ($0.015/GB-mo) and `INFREQUENT_ACCESS` ($0.010/GB-mo + $0.01/GB retrieval, 30-day min retention). Egress to public internet is $0/GB for both. Raw → IA (rarely re-read after build); derived → Standard (re-read daily once wired in; IA's retrieval fees would dominate at 30 reads/mo).
+
+| Year | Releases stored | Raw on IA cost | Derived on Standard cost | Total/mo |
+|---|---|---|---|---|
+| End of yr 1 | 12 | 12 × 21 GiB × $0.010 = $2.52 | 12 × 1.5 GiB × $0.015 = $0.27 | **~$2.79/mo** |
+| End of yr 2 | 24 | $5.04 | $0.54 | **~$5.58/mo** |
+| End of yr 3 | 36 | $7.56 | $0.81 | **~$8.37/mo** |
+| End of yr 5 | 60 | $12.60 | $1.35 | **~$13.95/mo** |
+
+Cumulative cost over the first 5 years is ~$420. PUT/GET ops are within R2's free tier (1M Class A / 10M Class B per month). Ingest from `data.commoncrawl.org` is via CloudFront and free; R2 ingress is free. Net cost to refresh one release is dominated by R2 storage (linear over time), not by ops or transfer.
+
+### What is intentionally NOT done in this commit
+
+Documented at the top of `scripts/enrichment/cc_backlinks.py` and in the `_doc` field of `config.json`'s `cc_backlinks` section, but worth surfacing here too:
+
+- ❌ `cc_backlinks` is NOT added to `ENRICHMENT_MODULES` in `scripts/enrichment/__init__.py`. The pipeline does not call it.
+- ❌ `scripts/pipeline.py` is NOT modified. Pipeline still runs the existing 6 enrichers in the same order.
+- ❌ `scripts/score.py` is NOT modified. No new `cc_*` term in scoring weights.
+- ❌ Frontend (`src/components/DomainTable.astro`, etc.) is NOT modified. No backlinks column.
+- ❌ No monthly cron job for automatic `cc_refresh`. Add when we wire in.
+- ❌ Common Crawl URL columnar index (the Wayback-substitute signal) is a separate future task.
+
+These remain available as the natural next commit, AFTER Mario validates that:
+1. `cc_refresh.py` actually completes against real CC data on OVH (the agent's smoke test used fixture data; the real 21 GiB pull and 5.4B-edge aggregation are exercised only by the production-environment run).
+2. The CLI returns sensible counts for known popular domains and zero/empty for invented test names.
+3. The derived SQLite size and shape are within projected ranges.
+
+The wire-in commit will be small (~50 lines): register `cc_backlinks` in `ENRICHMENT_MODULES`, add a `cc_source_domain_count` term to the scoring weights, document the new field in the JSON contract. That's a separate task because we want the standalone validation as a checkpoint between "code merged" and "scoring relies on this data".
+
+### Operational signal for tomorrow's session
+
+The Wave 2 design notes near the top of STATE.md (around line ~1035) describe a three-state CC output: `cc_seen_in_graph`, `cc_inbound_hosts`, `cc_outbound_hosts`. **This commit's schema is simpler** — just `cc_source_domain_count` with the row-absent vs row-present-with-zero distinction. Reason: outbound hosts isn't computed yet (we'd need to aggregate edges by `from_id` too — extra build cost, untested value). Add when scoring genuinely needs it. The current schema is forward-compatible: adding a `cc_outbound_count` column to `cc_apex` in a future cc_refresh.py version doesn't break the existing enricher contract.
