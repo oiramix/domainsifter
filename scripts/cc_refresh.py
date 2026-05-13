@@ -430,7 +430,11 @@ def _phase_download_and_upload_raw(
         )
         _validate_size(kind, written)
 
-        _upload_to_r2(s3, bucket, r2_key, local_path, storage_class="INFREQUENT_ACCESS")
+        # R2's S3-compatible API uses the AWS S3 storage-class name
+        # `STANDARD_IA`, NOT Cloudflare's `InfrequentAccess` (that's the
+        # Workers API spelling). Misusing the Workers spelling here failed
+        # with `InvalidStorageClass` on the first OVH run 2026-05-13.
+        _upload_to_r2(s3, bucket, r2_key, local_path, storage_class="STANDARD_IA")
         local_paths[kind] = local_path
     return local_paths
 

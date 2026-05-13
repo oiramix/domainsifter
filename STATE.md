@@ -1316,7 +1316,7 @@ Why: the daily pipeline only reads the latest release's derived SQLite (~1.5 GiB
 
 ### R2 storage cost projection
 
-R2 supports two classes: `STANDARD` ($0.015/GB-mo) and `INFREQUENT_ACCESS` ($0.010/GB-mo + $0.01/GB retrieval, 30-day min retention). Egress to public internet is $0/GB for both. Raw → IA (rarely re-read after build); derived → Standard (re-read daily once wired in; IA's retrieval fees would dominate at 30 reads/mo).
+R2 supports two classes: `STANDARD` ($0.015/GB-mo) and `STANDARD_IA` ($0.010/GB-mo + $0.01/GB retrieval, 30-day min retention). Egress to public internet is $0/GB for both. Raw → IA (rarely re-read after build); derived → Standard (re-read daily once wired in; IA's retrieval fees would dominate at 30 reads/mo). NOTE on the storage-class string: R2's S3-compatible API takes the AWS-style name `STANDARD_IA`, NOT Cloudflare's Workers-API spelling `InfrequentAccess`. The Workers-API spelling 400'd with `InvalidStorageClass` on the first OVH run 2026-05-13 — fixed same-day, see commit log.
 
 | Year | Releases stored | Raw on IA cost | Derived on Standard cost | Total/mo |
 |---|---|---|---|---|

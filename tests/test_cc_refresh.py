@@ -363,13 +363,16 @@ def test_phase_download_runs_when_force_true_even_if_r2_has_data(tmp_path, monke
         c.kwargs.get("ExtraArgs", {}).get("StorageClass")
         for c in s3.upload_file.call_args_list
     ]
-    assert all(sc == "INFREQUENT_ACCESS" for sc in upload_classes)
+    assert all(sc == "STANDARD_IA" for sc in upload_classes)
 
 
 def test_phase_download_uploads_to_infrequent_access_tier(tmp_path, monkeypatch):
     """Raw uploads go to the IA tier per the storage strategy. Cost design:
     raw is rarely re-read after the derived build, so IA's lower storage
-    cost wins over Standard's free-retrieval."""
+    cost wins over Standard's free-retrieval. R2's S3-compatible API uses
+    the AWS-style class name `STANDARD_IA` (NOT Cloudflare's Workers-API
+    `InfrequentAccess` spelling — that 400'd on the first OVH run
+    2026-05-13)."""
     s3 = MagicMock()
     s3.head_object.side_effect = ClientError(
         {"Error": {"Code": "NoSuchKey"}}, "HeadObject",
@@ -383,7 +386,7 @@ def test_phase_download_uploads_to_infrequent_access_tier(tmp_path, monkeypatch)
         s3=s3, bucket="b", release="rel", workdir=tmp_path, force=False,
     )
     for call in s3.upload_file.call_args_list:
-        assert call.kwargs["ExtraArgs"]["StorageClass"] == "INFREQUENT_ACCESS"
+        assert call.kwargs["ExtraArgs"]["StorageClass"] == "STANDARD_IA"
 
 
 # ---------------------------------------------------------------------------
