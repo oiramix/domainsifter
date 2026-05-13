@@ -5,6 +5,10 @@ Long-horizon decisions that don't fit neatly into PLAN.md (which scopes the curr
 Index of decisions:
 
 - [Common Crawl integration — accumulation strategy (2026-05-13)](#common-crawl-integration--accumulation-strategy-2026-05-13)
+- [Multi-release CC query strategy (2026-05-13, pending)](#multi-release-cc-query-strategy-2026-05-13-pending)
+- [Free vs paid tier model (2026-05-13, pending)](#free-vs-paid-tier-model-2026-05-13-pending)
+- [Daily publication count cap (2026-05-13, pending)](#daily-publication-count-cap-2026-05-13-pending)
+- [Common Crawl refresh cadence — manual vs automated (2026-05-13, pending)](#common-crawl-refresh-cadence--manual-vs-automated-2026-05-13-pending)
 
 ---
 
@@ -65,3 +69,191 @@ If any of those steps reveals a wrong assumption, we have a working standalone c
 - **Release-name source of truth**: `config.json[cc_backlinks].latest_release`. Bumping this string is part of the post-refresh commit each month (so the enricher queries the latest data).
 - **R2 cleanup discipline**: there is no cleanup. Manually checking `cc/raw/` and `cc/derived/` prefixes in the R2 dashboard should show monotonic growth. Any deletion is a bug; raise alarm.
 - **Wayback substitute via CC URL-columnar-index**: separate future task. Not part of this strategic accumulation. Will be its own scoped decision when we pick it up.
+
+---
+
+## Multi-release CC query strategy (2026-05-13, pending)
+
+### The question
+
+The enricher `scripts/enrichment/cc_backlinks.py` opens ONE derived SQLite per process. Today that's the latest release. As more monthly releases accumulate in R2 (year 1: 12, year 5: 60), what shape should the per-candidate query take?
+
+### Three strategies considered
+
+**Strategy A — latest release only.** Query the most recent release's `cc_apex`; return whatever it says (count N, dangler 0, or row-absent → `{}`). Simple, fast (~ms per lookup), no joins. Today's behaviour.
+
+**Strategy B — union/max across the last N releases.** For a candidate apex, query the last N SQLites and return `MAX(source_domain_count)` across them. Catches "domain had 800 inbound 3 months ago but the latest crawl only saw 12" — protects against transient crawl noise. ATTACH multiple SQLite files in `sqlite3` and run a single UNION query; cost is N × point-lookup ≈ still sub-ms for N ≤ 6.
+
+**Strategy C — full historical aggregate.** Query EVERY accumulated release; return both the max and a decay-curve signal (e.g. `[count_m12, count_m6, count_m3, count_m1]`). Strongest moat — nobody else has this data — but slowest lookup as N grows. At 60 releases, opening 60 SQLite files in a single process and ATTACHing them might hit OS file-handle limits; needs a different shape (e.g. a precomputed cross-release index).
+
+### Provisional answer
+
+**Strategy A for the wire-in commit.** Two reasons:
+
+1. We have exactly one release today. Strategies B and C don't have data to act on yet.
+2. The pipeline's enrichment time budget is tight (~5-50 candidates per run today; 3000s budget). Strategy A's sub-ms point-lookup is irrelevant to that budget; Strategy B/C with 6+ ATTACHed files start mattering at scale.
+
+### When to re-evaluate
+
+When we have ~6 accumulated releases (i.e., late 2026): re-evaluate B vs C. Decision criteria:
+
+- **Does the latest-release count vary materially from the 6-month max?** Run an offline analysis of, say, 1,000 sampled apex names from yesterday's `daily-domains.json`. Compare `latest_count` vs `MAX(last_6)`. If the median delta is >2×, Strategy B is worth the engineering cost. If it's <1.2×, Strategy A is fine and B is over-engineering.
+- **Has product positioning shifted toward decay-curve as a feature?** If the homepage UI ever surfaces "this domain's backlink trajectory" or paid-tier offers "12-month historical view", Strategy C lands automatically because that's the strategy paid-tier feature actually needs.
+
+Strategy C is the long-horizon target IFF historical backlink decay becomes a paid-tier feature; otherwise it's premature optimisation.
+
+### Implementation note (for whoever does the wire-in)
+
+The enricher's current `_get_connection(release, config)` already opens ONE connection cached by release name. Strategy B is additive: extend the cache key to a tuple of release names, ATTACH each, and rewrite the SQL to a UNION. Strategy A → B is a ~30-line change. B → C is the harder leap because the SQLite-per-release pattern starts groaning past ~10 attached files.
+
+---
+
+## Free vs paid tier model (2026-05-13, pending)
+
+### The proposition
+
+Articulated during tonight's discussion. The product naturally splits along two dimensions: **data freshness/depth** and **access mode**.
+
+**Free tier** (today's default):
+- Top 30–50 daily candidates surfaced on the homepage
+- 14-day rolling window (carryover already implements this)
+- **Static** CC backlink count from the latest release (latency: refreshed monthly)
+- No API, browse-only
+
+**Paid tier** (Phase 2, not yet built):
+- **Live** backlink verification — at request time, fetch a sample of source URLs from the CC graph and HTTP-check they still link to the candidate. Catches "CC saw 50k inbound 3 months ago but most are now dead pages". Strongest single signal for a serious drop-catcher.
+- **Historical decay** — the 12-month backlink trajectory (Strategy C from the multi-release query decision above)
+- **API access** — programmatic queries against today's list, historical lists, single-apex backlink lookups
+- **More domains/day** — 200-500 candidates vs free's 30-50
+- **Longer archive** — 60- or 90-day window vs free's 14
+- **CSV / NDJSON export** — for users who want to feed our list into their own tools
+
+### Why this shape
+
+The free tier needs to be genuinely useful — a publication-quality list of vetted drops with enough signal that someone could act on it. The paid tier should add capabilities that **require ongoing compute** (live verification) or **require accumulated infrastructure** (historical archive) — not just unlock data the free tier hides. That asymmetry justifies the price gap without making the free tier feel crippled.
+
+### Pricing/UX is deferred
+
+We don't know:
+- What the live-verification compute cost actually is per query
+- What the conversion funnel looks like (newsletter sub → free user → paid user)
+- What competitors charge (Ahrefs/Majestic price per domain query, not per-month-with-API; ExpiredDomains.net is free with ad noise)
+
+These all become legible only after Phase 2 ships and we have weeks of free-tier traffic data. Pricing tomorrow would be guesswork.
+
+### What we DON'T defer
+
+The data architecture choices made now affect what's possible later. Specifically:
+- **Accumulation strategy** (decided): never delete old releases — this is the *precondition* for the paid historical-decay tier
+- **Schema forward-compatibility** (decided): cc_apex schema is column-additive, multi-release-joinable — keeps Strategy C viable
+- **JSON contract stability** (already PLAN.md Principle 5): the public JSON shape is locked — paid-tier fields land via NEW keys, not by mutating existing ones
+
+So we're already paying the small cost of "build for paid-tier optionality" without paying any of the cost of "actually run a paid tier." Right balance for the current phase.
+
+### When to re-engage
+
+Trigger 1 — Newsletter subscriber count crosses ~100. Implies non-trivial audience interest; pricing experiments become possible.
+
+Trigger 2 — Live verification capability is built (Phase 2 milestone). Without it, the paid-tier proposition has no unique value.
+
+Trigger 3 — Direct user request for any of the paid-tier features (we won't proactively ask). If a user emails asking "can I get this as CSV for $X/mo", that's a pricing signal worth honoring.
+
+---
+
+## Daily publication count cap (2026-05-13, pending)
+
+### Current state
+
+`config.json` has `max_candidates_for_publication: 300`. This is a CEILING applied at publication time (in `output.build_payload`), NOT a quota — `output.py` never pads up to 300, just clips down from whatever survived scoring.
+
+**Today's run published 52 domains.** The cap is irrelevant at current quality density. Tomorrow's CC-enabled run might lift density meaningfully but won't reach 100; the cap stays inactive.
+
+### When the cap becomes real
+
+The cap matters once:
+- CC backlinks scoring lifts the typical day's publication count past ~150
+- `.com` re-enablement (planned 2026-05-17) multiplies candidate volume by ~10×
+
+Either alone might push us past 300/day. Both together almost certainly will. At that point the current "hard cap at 300" behaviour starts dropping legitimate candidates with no graceful UX.
+
+### Three options to consider then
+
+**Option H — Hard cap.** Keep `max_candidates_for_publication: N` as-is, raise N to whatever feels right (500? 1000?). Simple. Frontend gets a single static list. Domains beyond rank N silently lost on a given day.
+
+**Option F — Score-floor only.** Drop the cap entirely; publish every candidate that scores above `publish_min_score` (currently 30). List grows or shrinks naturally with quality density. Frontend needs lazy load or pagination for long lists. Domains beyond the rank that the user scrolls to: still in the JSON, just not visible without UI action.
+
+**Option Y — Hybrid: hard floor + pagination beyond.** Surface top N (say, 100) on the homepage card; remaining survivors accessible via a "more candidates" link or paginated archive page. Best UX, most engineering. Requires frontend work + URL routing for the archive page (currently no such page exists per STATUS.md).
+
+### Provisional lean (not decided)
+
+Option F (score-floor only) is the cleanest "data product" stance: we publish what passes our quality bar, the UI is the UI's problem. Option Y is the better PRODUCT but requires a Phase 2 frontend change we haven't scoped. Option H is the cop-out.
+
+### What to do before deciding
+
+- Wait until we have at least 3 days of CC-enabled runs to see the actual publication-count distribution
+- Look at the day-3 score histogram: bimodal would suggest Option Y (top tier vs long tail), unimodal would suggest Option F (no natural cut point)
+- Talk to the first ~3 paid users (when Phase 2 ships) about what they want — do they want curated top-50, or do they want raw "every domain that passed filters"?
+
+### What NOT to do
+
+Don't pre-emptively change the cap before CC scoring is wired and observed. The current 300 ceiling is fine for the next 4-6 days; we'll have real data to decide on by then.
+
+---
+
+## Common Crawl refresh cadence — manual vs automated (2026-05-13, pending)
+
+### Current state
+
+`cc_refresh.py` is invoked manually:
+
+```bash
+python -m scripts.cc_refresh --release cc-main-2026-feb-mar-apr
+```
+
+CC publishes a new domain-webgraph release roughly monthly. Next expected: `cc-main-2026-mar-apr-may`, late May / early June 2026. After today's first successful run, manual cadence is fine for the next refresh; automation is now eligible to land but not urgent.
+
+### Three options
+
+**Option Manual (today).** Operator triggers each refresh by hand. After completion, operator commits a config bump:
+
+```diff
+- "latest_release": "cc-main-2026-feb-mar-apr"
++ "latest_release": "cc-main-2026-mar-apr-may"
+```
+
+Pros: zero infrastructure; impossible to silently break; the config bump is a deliberate human acknowledgment that the new data is good.
+
+Cons: requires a human in the loop monthly; if Mario is on vacation when CC publishes, we miss a release.
+
+**Option Cron.** A systemd timer on OVH fires `cc_refresh` on the 5th of each month (later than CC's typical publication date of "early in the month"). On success, the script optionally bumps the config and commits to main.
+
+Pros: hands-off; we never miss a release.
+
+Cons: more moving parts (CC's actual publish date varies; the cron has to either hard-code a release name pattern or scrape CC's index for the latest); a silent failure (cron didn't run, CC's URL pattern changed, OVH disk full) goes unnoticed unless the email reporter is wired to catch refresh failures too.
+
+**Option Hybrid.** Cron checks if a new release is available on CC; if yes, run `cc_refresh` and send an email asking Mario to confirm + bump config. Best of both — no missed releases, but operator stays in the loop.
+
+### Provisional lean
+
+**Stay manual for the next 2-3 releases.** Reasons:
+
+1. The first real run JUST completed today; we don't yet know what variance to expect in CC's publication timing, file sizes, or schema. Manual cadence gives us a chance to observe before automating.
+2. Automation surface to maintain is non-trivial (release-name resolution, failure detection + alerting, config-bump-and-commit logic) and we're in a phase where every commit matters.
+3. The marginal cost of "human types one command monthly" is genuinely small compared to the cost of automation-bug fire-drills.
+
+### When to revisit
+
+After 2-3 manual refreshes (so call it July-August 2026), revisit. By then we'll have:
+- Empirical CC publication-date distribution
+- Empirical size/schema stability (or surprises)
+- Empirical refresh wall-clock variance
+- Confidence that the script handles the year's variants
+
+Then either: build Option Cron with retry/backoff/alerting, or build Option Hybrid (more conservative, keeps human in the loop), depending on whether the manual runs have revealed any surprises.
+
+### Operational discipline meanwhile
+
+- Next refresh due: ~early June 2026 (release `cc-main-2026-mar-apr-may`, expected)
+- Trigger: Mario notices the new release via CC's `https://commoncrawl.org/web-graphs` index, or watches the index manually
+- Action: `python -m scripts.cc_refresh --release cc-main-2026-mar-apr-may`, then a small commit bumping `config.json[cc_backlinks].latest_release`
+- Failure mode if missed: pipeline keeps querying the previous month's release; signal degrades from "latest month's view" to "previous month's view" — graceful, no crash

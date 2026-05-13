@@ -1,6 +1,6 @@
 # DomainSifter — Current State
 
-Last updated: 2026-05-12 (First fully-autonomous OVH run at 06:30 UTC fired cleanly but produced zero new domains. Investigation surfaced a coupled environmental + code issue: OVH's shared DNS resolver `213.186.33.99` is rate-limited by Spamhaus and SURBL fair-use policies, so Spamhaus returned `127.255.255.254` ("query via public resolver, refused") for every lookup and SURBL returned NXDOMAIN for every lookup. The 127.255.255.254 response was then *mis-coded as a real listing* by `scripts/enrichment/_dnsbl.py`, causing 100% post-enrichment rejection. Two-part fix this commit: (1) OS-level — `/etc/systemd/resolved.conf` set to Quad9 primary (9.9.9.9, 149.112.112.112) with Cloudflare/Google fallback, `systemd-resolved` restarted, manually verified DNSBL queries now return correct codes; (2) code — `_dnsbl.py` now distinguishes three states (listed=True for 127.0.0.x/127.0.1.x, listed=False for NXDOMAIN, listed=None for the error band 127.255.255.x and any unexpected response or transport failure), `spamhaus.py`/`surbl.py` pass the None through as `{"spamhaus_listed": None}` / `{"surbl_listed": None}` instead of collapsing to empty dict, `filter.py` already rejected only on `is True` (so None and missing now correctly pass through), and `filter_candidates_post_enrichment` logs a per-run `DNSBL signal distribution` line so degraded-resolver days surface in the email report. **OVH DNS resolver: Quad9 (set 2026-05-12).** Tests: new `tests/enrichment/test__dnsbl.py` with 13 cases covering all three states + edge cases; `test_spamhaus.py` / `test_surbl.py` / `test_filter.py` updated for the new contract. See "DNS resolver fix and DNSBL three-state contract — 2026-05-12" section at end of file for full diagnosis and the two known risks. Second fix today (afternoon): email reporter's "Memory peak: (unavailable)" output traced to a race between the EXIT trap's `systemctl show -p MemoryPeak` and systemd's unit teardown — fixed by reading `/sys/fs/cgroup/<unit>/memory.peak` directly from `scripts/run-daily.sh` and exporting `DOMAINSIFTER_MEMORY_PEAK_BYTES` for `scripts/send_report.py` to consume; systemctl path retained as fallback for non-wrapper invocations. Enables empirical memory-peak measurement needed before re-enabling `.com` in `tlds.approved`. See "Memory peak instrumentation fix — 2026-05-12" section at end of file. Third fix today (evening): RDAP throttle budget was the sole remaining blocker for re-enabling `.com` in `tlds.approved` — today's saturated run logged 214 candidates skipped (budget) across 8 host buckets even on the 14-TLD set, and adding .com (~10× the next-largest TLD's apex count) under today's per-host throttles would have made the saturation orders of magnitude worse. Architectural fix: new DNS pre-filter stage in `scripts/dns_prefilter.py` runs AFTER lexical filter and BEFORE RDAP bucket assignment; for each candidate apex, queries NS records via the system resolver (Quad9 since this morning) — NXDOMAIN means the registry has removed delegation (proceed to RDAP), NS records present means the domain is still delegated (reject pre-RDAP), error states (timeout/NoAnswer/transport) fail open to RDAP. Expected to reject 80-95% of post-lexical candidates with a free, fast, parallelisable lookup; accuracy-preserving (every candidate RDAP would have approved as available also has no NS records, so DNS pre-filter rejects only candidates RDAP would have rejected too). Configuration in `dns_check` section of config.json — conservative defaults of 20 workers, 3s timeout, 0s throttle on first deployment. Unblocks `.com` re-enablement (still wants one observed clean run + an RDAP throttle review, but the DNS pre-filter is the precondition that makes both possible). 17 new tests across `tests/test_dns_prefilter.py` (new file, 16 cases) and `tests/test_pipeline.py` (1 integration test asserting registered-domain rejection happens before RDAP). New dependency: `dnspython==2.6.1` (small pure-Python BSD lib; second focused-library exception to the stdlib-only stance after the `wayback` package on 2026-05-08). See "DNS pre-filter pipeline stage — 2026-05-12" section at end of file for the full architecture and the .com unblocking story.)
+Last updated: 2026-05-13 (Evening update: Common Crawl standalone capability shipped, first operational `cc_refresh` run on OVH completed successfully, and a same-day hotfix unblocked it. Three new commits today after this morning's Buttondown doc-sync: `ca38e6f` shipped `scripts/cc_refresh.py` + `scripts/enrichment/cc_backlinks.py` + 40 new tests + duckdb dep + STRATEGIC_NOTES.md initialisation; `33845a0` pushed after rebase over today's autonomous daily refresh; `f9887de` hotfix replaced `storage_class="INFREQUENT_ACCESS"` with `"STANDARD_IA"` after Mario's first OVH run hit `InvalidStorageClass` — the agent had used Cloudflare's Workers-API spelling instead of R2's S3-API spelling. Post-fix run on OVH completed end-to-end: release `cc-main-2026-feb-mar-apr` now in R2 (raw vertices+edges at `cc/raw/cc-main-2026-feb-mar-apr/*.txt.gz` on `STANDARD_IA`, derived SQLite at `cc/derived/cc-main-2026-feb-mar-apr.sqlite` on Standard). Validation queries returned plausible real-world numbers: `google.com → 16,365,926` source domains, `github.com → 747,095`, invented test names (`marketglow.com`, `tideblock.com`) returned "not in CC graph" as expected. `cc_backlinks` is still NOT registered in `ENRICHMENT_MODULES` — wire-in is the next commit. Also today: first organic newsletter subscriber (`damnv724@gmail.com`) validated Buttondown integration end-to-end under real production traffic — count 1 owner test → 2 subscribers including first real user. Seven pending decisions captured in `STRATEGIC_NOTES.md` (multi-release CC query strategy, free/paid tier model, daily publication count cap, CC refresh cadence). See "Day-end summary 2026-05-13" section at end of file for forward plan (14-17 May: observe → wire CC → observe → re-enable .com). Yesterday's three fixes (DNSBL three-state, memory peak cgroup, DNS pre-filter) summary preserved below for context. Yesterday's lead: First fully-autonomous OVH run at 06:30 UTC fired cleanly but produced zero new domains. Investigation surfaced a coupled environmental + code issue: OVH's shared DNS resolver `213.186.33.99` is rate-limited by Spamhaus and SURBL fair-use policies, so Spamhaus returned `127.255.255.254` ("query via public resolver, refused") for every lookup and SURBL returned NXDOMAIN for every lookup. The 127.255.255.254 response was then *mis-coded as a real listing* by `scripts/enrichment/_dnsbl.py`, causing 100% post-enrichment rejection. Two-part fix this commit: (1) OS-level — `/etc/systemd/resolved.conf` set to Quad9 primary (9.9.9.9, 149.112.112.112) with Cloudflare/Google fallback, `systemd-resolved` restarted, manually verified DNSBL queries now return correct codes; (2) code — `_dnsbl.py` now distinguishes three states (listed=True for 127.0.0.x/127.0.1.x, listed=False for NXDOMAIN, listed=None for the error band 127.255.255.x and any unexpected response or transport failure), `spamhaus.py`/`surbl.py` pass the None through as `{"spamhaus_listed": None}` / `{"surbl_listed": None}` instead of collapsing to empty dict, `filter.py` already rejected only on `is True` (so None and missing now correctly pass through), and `filter_candidates_post_enrichment` logs a per-run `DNSBL signal distribution` line so degraded-resolver days surface in the email report. **OVH DNS resolver: Quad9 (set 2026-05-12).** Tests: new `tests/enrichment/test__dnsbl.py` with 13 cases covering all three states + edge cases; `test_spamhaus.py` / `test_surbl.py` / `test_filter.py` updated for the new contract. See "DNS resolver fix and DNSBL three-state contract — 2026-05-12" section at end of file for full diagnosis and the two known risks. Second fix today (afternoon): email reporter's "Memory peak: (unavailable)" output traced to a race between the EXIT trap's `systemctl show -p MemoryPeak` and systemd's unit teardown — fixed by reading `/sys/fs/cgroup/<unit>/memory.peak` directly from `scripts/run-daily.sh` and exporting `DOMAINSIFTER_MEMORY_PEAK_BYTES` for `scripts/send_report.py` to consume; systemctl path retained as fallback for non-wrapper invocations. Enables empirical memory-peak measurement needed before re-enabling `.com` in `tlds.approved`. See "Memory peak instrumentation fix — 2026-05-12" section at end of file. Third fix today (evening): RDAP throttle budget was the sole remaining blocker for re-enabling `.com` in `tlds.approved` — today's saturated run logged 214 candidates skipped (budget) across 8 host buckets even on the 14-TLD set, and adding .com (~10× the next-largest TLD's apex count) under today's per-host throttles would have made the saturation orders of magnitude worse. Architectural fix: new DNS pre-filter stage in `scripts/dns_prefilter.py` runs AFTER lexical filter and BEFORE RDAP bucket assignment; for each candidate apex, queries NS records via the system resolver (Quad9 since this morning) — NXDOMAIN means the registry has removed delegation (proceed to RDAP), NS records present means the domain is still delegated (reject pre-RDAP), error states (timeout/NoAnswer/transport) fail open to RDAP. Expected to reject 80-95% of post-lexical candidates with a free, fast, parallelisable lookup; accuracy-preserving (every candidate RDAP would have approved as available also has no NS records, so DNS pre-filter rejects only candidates RDAP would have rejected too). Configuration in `dns_check` section of config.json — conservative defaults of 20 workers, 3s timeout, 0s throttle on first deployment. Unblocks `.com` re-enablement (still wants one observed clean run + an RDAP throttle review, but the DNS pre-filter is the precondition that makes both possible). 17 new tests across `tests/test_dns_prefilter.py` (new file, 16 cases) and `tests/test_pipeline.py` (1 integration test asserting registered-domain rejection happens before RDAP). New dependency: `dnspython==2.6.1` (small pure-Python BSD lib; second focused-library exception to the stdlib-only stance after the `wayback` package on 2026-05-08). See "DNS pre-filter pipeline stage — 2026-05-12" section at end of file for the full architecture and the .com unblocking story.)
 
 This document captures the current snapshot of the project. Update it whenever a meaningful milestone is reached. Read this file FIRST in any new session to understand where we are.
 
@@ -1292,7 +1292,7 @@ Two new modules + one new dep + accumulated R2 storage strategy. The pipeline do
 
 ### How to use (operator workflow)
 
-After this commit lands, Mario runs ONCE on OVH to populate R2:
+Operational workflow after the (now-shipped) commits land:
 
 ```bash
 # Default: download + upload raw + build + upload derived. ~25-35 min total.
@@ -1300,13 +1300,26 @@ python -m scripts.cc_refresh --release cc-main-2026-feb-mar-apr
 
 # Then exercise the enricher CLI against the live SQLite:
 python -m scripts.enrichment.cc_backlinks --apex google.com
-# → google.com: <large N> source domains
-
 python -m scripts.enrichment.cc_backlinks --apex marketglow.com
-# → marketglow.com: not in CC graph (release cc-main-2026-feb-mar-apr)
 ```
 
-The agent did NOT run `cc_refresh` from this session — pushing 21 GiB of upstream bandwidth and R2 PUT-ops cost from a sandboxed harness wasn't appropriate. First real run is Mario's manually after the commit pushes.
+**Update — first real run validated 2026-05-13 evening.** After the storage-class hotfix (commit `f9887de`) replaced the agent's mis-spelled `INFREQUENT_ACCESS` with the correct S3-API name `STANDARD_IA`, Mario re-ran `cc_refresh` on OVH end-to-end. Real validation output:
+
+```
+$ python -m scripts.enrichment.cc_backlinks --apex google.com
+google.com: 16365926 source domains
+
+$ python -m scripts.enrichment.cc_backlinks --apex github.com
+github.com: 747095 source domains
+
+$ python -m scripts.enrichment.cc_backlinks --apex marketglow.com
+marketglow.com: not in CC graph (release cc-main-2026-feb-mar-apr)
+
+$ python -m scripts.enrichment.cc_backlinks --apex tideblock.com
+tideblock.com: not in CC graph (release cc-main-2026-feb-mar-apr)
+```
+
+The agent did NOT run `cc_refresh` from this session — pushing 21 GiB of upstream bandwidth and R2 PUT-ops from a sandboxed harness wasn't appropriate. The agent shipped the code + tests + storage-class hotfix; Mario exercised the real network/storage path on OVH and confirmed end-to-end correctness.
 
 ### Accumulation strategy
 
@@ -1348,3 +1361,63 @@ The wire-in commit will be small (~50 lines): register `cc_backlinks` in `ENRICH
 ### Operational signal for tomorrow's session
 
 The Wave 2 design notes near the top of STATE.md (around line ~1035) describe a three-state CC output: `cc_seen_in_graph`, `cc_inbound_hosts`, `cc_outbound_hosts`. **This commit's schema is simpler** — just `cc_source_domain_count` with the row-absent vs row-present-with-zero distinction. Reason: outbound hosts isn't computed yet (we'd need to aggregate edges by `from_id` too — extra build cost, untested value). Add when scoring genuinely needs it. The current schema is forward-compatible: adding a `cc_outbound_count` column to `cc_apex` in a future cc_refresh.py version doesn't break the existing enricher contract.
+
+---
+
+## Day-end summary 2026-05-13
+
+Today produced three production milestones plus a captured set of seven pending decisions for future sessions. Reads bottom-up: this section is the end-of-day rollup; STRATEGIC_NOTES.md holds the long-form pending-decision reasoning.
+
+### Today's milestones
+
+**1. Common Crawl standalone capability shipped.** Commit `ca38e6f` (morning) added `scripts/cc_refresh.py` (~590 lines: download + R2 upload + DuckDB-driven SQLite build + CLI), `scripts/enrichment/cc_backlinks.py` (~270 lines: R2-cached SQLite query + CLI + plugin-contract `enrich()`), 40 new tests across two new test files (22 + 18), and a one-line addition to `requirements.txt` for `duckdb>=1.0,<2`. Pipeline NOT modified; `cc_backlinks` NOT registered in `ENRICHMENT_MODULES`. STATE.md and STRATEGIC_NOTES.md initialised with the accumulation-strategy rationale (never delete old releases — cumulative R2 cost reaches ~$14/mo at year 5, trivial for the strategic option-value).
+
+**2. Storage-class hotfix.** Commit `f9887de` (evening) fixed the same-day production failure of cc_refresh's first OVH run. The agent had written `storage_class="INFREQUENT_ACCESS"` for the raw-artifact upload — that's Cloudflare's Workers-API spelling. R2's S3-compatible API (which boto3 uses) takes the AWS-style `STANDARD_IA` name and 400'd with `InvalidStorageClass` on the Workers-spelling. Hotfix: change the constant string in cc_refresh.py + update two test assertions + correct the doc references in config.json and STATE.md's cost-projection subsection. 452/452 tests still pass. Mario re-ran `cc_refresh` post-hotfix and the end-to-end pipeline completed successfully.
+
+**3. Newsletter integration validated under real production traffic.** First organic newsletter subscriber landed today: `damnv724@gmail.com` (committed double opt-in via Buttondown). Pre-signup count: 1 owner test address (`buymore24@gmail.com`). Post-signup count: 2 subscribers. The Buttondown integration was wired into the signup form on 2026-04-30 (commit `97fbdca`); today's organic signup is the first proof the end-to-end path works including the dashboard side. See "Newsletter integration validated — 2026-05-13" section above for the full story. Documented in this morning's commit `272fe35` (Buttondown doc-sync removing three stale TODO references).
+
+### CC validation queries — actual production output
+
+After the storage-class hotfix and re-run, `cc_backlinks` returned plausible real-world numbers from the SQLite for release `cc-main-2026-feb-mar-apr`:
+
+| Domain | `cc_source_domain_count` | Interpretation |
+|---|---|---|
+| `google.com` | 16,365,926 | top-tier hub, exactly the order-of-magnitude expected from CC's main crawl |
+| `github.com` | 747,095 | major developer/docs hub, plausible scale |
+| `marketglow.com` | not in graph | invented test name → expected miss |
+| `tideblock.com` | not in graph | invented test name → expected miss |
+
+This is the validation gate the morning commit set up — "standalone capability completes against real CC data; CLI returns sensible counts; invented names miss as expected." All three conditions met. The wire-in commit (small follow-up: register `cc_backlinks` in `ENRICHMENT_MODULES`, add scoring weight, surface in JSON contract) is unblocked.
+
+### Forward plan (14–17 May 2026)
+
+Conditional on each previous day's run being clean before advancing:
+
+- **Wed 14 May**: observe production run with the three completed commits in place (CC standalone available but not wired). The autonomous OVH cron at 06:30 UTC exercises yesterday's three production fixes (DNS pre-filter, memory peak, DNSBL three-state) under real load with `.com` still in `tlds.pending`. Email reporter should now show non-`(unavailable)` memory peak — that's the headroom signal we need before re-enabling .com. Watch for DNS pre-filter rejection rate (predicted 80-95%) reported in the journal.
+
+- **Thu 15 May**: wire CC backlinks into pipeline IF 14 May run is clean. Small commit (~50 lines): `cc_backlinks` registered in `ENRICHMENT_MODULES`, scoring weight added, `cc_source_domain_count` documented in the JSON contract, frontend NOT touched yet (display layer is its own decision — see STRATEGIC_NOTES.md "Free/paid tier model"). Uses Strategy A (latest release only) per the pending-decision capture in STRATEGIC_NOTES.md.
+
+- **Fri 16 May**: observe first production run with CC backlinks in scoring. Validate counts appear on the published candidates; sanity-check the score distribution shifts modestly (not violently — CC adds signal, doesn't reshape it). If a candidate scoring 75 yesterday now scores 95 because it had 50k inbound source domains, the integration is doing exactly what we want.
+
+- **Sat 17 May (Sunday)**: re-enable `.com` in `tlds.approved` IF the pipeline is stable across all three intermediate days. This is the long-running unblock; memory peak instrumentation + DNS pre-filter + CC scoring all flowing means we have empirical headroom data, RDAP throttle relief, and quality density to absorb .com's ~10× candidate volume increase without degrading the daily output.
+
+Each day's go/no-go gate is "the previous day's email report shows a clean run with no critical-level log lines and no surprising count distributions." Any unexpected behaviour pauses the forward plan and triggers investigation before advancing.
+
+### Pending decisions captured for future sessions
+
+Seven items came up tonight that aren't action-this-commit but matter for upcoming sessions. Four go to STRATEGIC_NOTES.md (long-horizon decision shape); three are operational and live here (or in earlier sections of STATE.md):
+
+In STRATEGIC_NOTES.md (new sections in this commit):
+- **Multi-release CC query strategy** — when accumulated releases pile up, what does the enricher query? Today's answer: Strategy A (latest only). Re-evaluate when volume justifies B (union/max across recent N) or C (full historical).
+- **Free/paid tier model** — free shows top 30–50 daily with static CC counts; paid adds live backlink verification, historical decay, API access, expanded daily count, longer archive. Pricing/UX deferred to Phase 2 (live verification not yet built).
+- **Daily publication count cap** — `max_candidates_for_publication: 300` is a ceiling; today published 52. Decision punted until CC scoring lifts quality density and days produce 100+ — three options to consider then (hard cap, score-floor only, hybrid with pagination).
+- **Common Crawl refresh cadence** — next release expected late May / early June 2026 as `cc-main-2026-mar-apr-may`. Manual `cc_refresh` invocation for now; monthly cron deferred until the first manual refresh validates (which it just did tonight, so the cron is now eligible to land any time we want).
+
+Operational (here or in earlier STATE.md sections):
+- **Forward plan 14–17 May** — directly above.
+- **Storage-class gotcha** — `STANDARD_IA` for S3-API / `InfrequentAccess` for Workers-API. Inline notes in `scripts/cc_refresh.py` and the "R2 storage cost projection" subsection above. Future Cloudflare API additions: verify which API surface the new method targets before picking a class string.
+- **Buttondown subscriber milestone** — captured in the "Newsletter integration validated — 2026-05-13" section above.
+
+### Test surface
+
+452/452 tests passing locally. Two-day burst (2026-05-12 morning → 2026-05-13 evening) added 93 tests cumulatively across the four commits: +24 DNSBL three-state, +12 memory-peak instrumentation, +17 DNS pre-filter, +40 Common Crawl. End-of-day 2026-05-11 was 359; end-of-day 2026-05-13 is 452.
