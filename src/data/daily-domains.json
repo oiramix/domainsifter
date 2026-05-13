@@ -1,9 +1,40 @@
 {
-  "generated_at": "2026-05-12T08:02:38Z",
-  "domain_count": 18,
-  "today_count": 0,
-  "carryover_count": 18,
+  "generated_at": "2026-05-13T08:49:41Z",
+  "domain_count": 52,
+  "today_count": 36,
+  "carryover_count": 16,
   "domains": [
+    {
+      "name": "usimin.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 80988,
+      "wayback_last_snapshot": "2026-03-29",
+      "open_page_rank": 2.75,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 70,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dusimin.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=usimin.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=usimin.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:55:46Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
     {
       "name": "collegelabor.org",
       "tld": "org",
@@ -32,8 +63,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:53:36Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
     },
     {
       "name": "thereedgroup.org",
@@ -63,8 +94,225 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:44:59Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
+    },
+    {
+      "name": "hentai2.org",
+      "tld": "org",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 22116,
+      "wayback_last_snapshot": "2025-11-24",
+      "open_page_rank": 1.03,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 62,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhentai2.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=hentai2.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=hentai2.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:49:03Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "nightingaledeclaration.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 9053,
+      "wayback_last_snapshot": "2026-03-28",
+      "open_page_rank": 2.28,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 62,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dnightingaledeclaration.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=nightingaledeclaration.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=nightingaledeclaration.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:46:39Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "canvila.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 1460,
+      "wayback_last_snapshot": "2025-07-12",
+      "open_page_rank": 2.55,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 61,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcanvila.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=canvila.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=canvila.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:40:11Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "sfbrgenetics.org",
+      "tld": "org",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 900,
+      "wayback_last_snapshot": "2025-03-10",
+      "open_page_rank": 1.17,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 61,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsfbrgenetics.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=sfbrgenetics.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=sfbrgenetics.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:29:07Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "sjsinfo.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 2495,
+      "wayback_last_snapshot": "2025-11-05",
+      "open_page_rank": 2.18,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 59,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsjsinfo.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=sjsinfo.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=sjsinfo.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:42:20Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "industribune.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 19520,
+      "wayback_last_snapshot": "2026-02-11",
+      "open_page_rank": 2.5,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 58,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dindustribune.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=industribune.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=industribune.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:25:26Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "quachanh.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 3202,
+      "wayback_last_snapshot": "2025-02-27",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 58,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dquachanh.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=quachanh.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=quachanh.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:53:45Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "directpage.org",
@@ -94,8 +342,194 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:54:52Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
+    },
+    {
+      "name": "eastgrandlake.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 2821,
+      "wayback_last_snapshot": "2026-03-25",
+      "open_page_rank": 2.17,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 56,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Deastgrandlake.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=eastgrandlake.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=eastgrandlake.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:48:13Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "tequilarista.org",
+      "tld": "org",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 3241,
+      "wayback_last_snapshot": "2026-03-28",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 56,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtequilarista.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=tequilarista.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=tequilarista.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:34:14Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "jendelahati.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 11834,
+      "wayback_last_snapshot": "2025-11-15",
+      "open_page_rank": 1.83,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 55,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Djendelahati.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=jendelahati.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=jendelahati.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:41:16Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "lmgestion.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 15646,
+      "wayback_last_snapshot": "2026-03-14",
+      "open_page_rank": 1.48,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 54,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlmgestion.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=lmgestion.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=lmgestion.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:26:41Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "lavisionradio.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 3413,
+      "wayback_last_snapshot": "2026-02-06",
+      "open_page_rank": 1.51,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 53,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlavisionradio.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=lavisionradio.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=lavisionradio.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:28:15Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "ruchitsurati.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 3049,
+      "wayback_last_snapshot": "2026-03-26",
+      "open_page_rank": 1.52,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 53,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Druchitsurati.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=ruchitsurati.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=ruchitsurati.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:27:51Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "fraizerdesigns.org",
@@ -125,8 +559,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T07:14:39Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
     },
     {
       "name": "earthlingsunited.org",
@@ -156,8 +590,101 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:44:29Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
+    },
+    {
+      "name": "developersforum.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 4076,
+      "wayback_last_snapshot": "2026-02-18",
+      "open_page_rank": 1.22,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddevelopersforum.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=developersforum.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=developersforum.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:52:54Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "englishexplorers.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 780,
+      "wayback_last_snapshot": "2025-01-16",
+      "open_page_rank": 1.48,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Denglishexplorers.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=englishexplorers.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=englishexplorers.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:49:35Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "realjournalism.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 2400,
+      "wayback_last_snapshot": "2026-03-23",
+      "open_page_rank": 1.06,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Drealjournalism.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=realjournalism.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=realjournalism.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:56:10Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "linkvillage.org",
@@ -187,8 +714,318 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:51:51Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
+    },
+    {
+      "name": "hrainc.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 2397,
+      "wayback_last_snapshot": "2026-01-08",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 48,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhrainc.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=hrainc.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=hrainc.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:24:59Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "onwingirisleri.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 189,
+      "wayback_last_snapshot": "2026-03-26",
+      "open_page_rank": 2.56,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 48,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Donwingirisleri.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=onwingirisleri.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=onwingirisleri.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:54:22Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "biprint.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 883,
+      "wayback_last_snapshot": "2021-11-27",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 47,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dbiprint.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=biprint.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=biprint.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:33:11Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "canmaking.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 3797,
+      "wayback_last_snapshot": "2026-01-09",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 47,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcanmaking.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=canmaking.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=canmaking.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:54:49Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "fernandoalonso-f1.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 5277,
+      "wayback_last_snapshot": "2026-02-27",
+      "open_page_rank": 0.82,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 47,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dfernandoalonso-f1.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=fernandoalonso-f1.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=fernandoalonso-f1.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:22:54Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "nacenewengland.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 1248,
+      "wayback_last_snapshot": "2026-03-07",
+      "open_page_rank": 0.47,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 47,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dnacenewengland.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=nacenewengland.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=nacenewengland.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:33:47Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "chicagoraja.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 12241,
+      "wayback_last_snapshot": "2025-12-12",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dchicagoraja.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=chicagoraja.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=chicagoraja.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:34:09Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "expo-photo.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 5405,
+      "wayback_last_snapshot": "2026-03-07",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dexpo-photo.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=expo-photo.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=expo-photo.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:58:28Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "peraklodge.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 2709,
+      "wayback_last_snapshot": "2026-02-18",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dperaklodge.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=peraklodge.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=peraklodge.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:38:43Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "webcontinuum.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 4086,
+      "wayback_last_snapshot": "2026-02-18",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwebcontinuum.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=webcontinuum.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=webcontinuum.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:20:49Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "ipstresser.xyz",
@@ -218,39 +1055,101 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-07T06:39:24Z",
       "first_seen_date": "2026-05-07",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 5
+      "last_validated_date": "2026-05-13",
+      "days_listed": 6
     },
     {
-      "name": "closedstreetmap.org",
-      "tld": "org",
-      "dropped_date": "2026-05-11",
-      "wayback_snapshots": 906,
-      "wayback_last_snapshot": "2026-02-02",
-      "open_page_rank": 0.33,
+      "name": "genesisconsult.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 4645,
+      "wayback_last_snapshot": "2025-12-17",
+      "open_page_rank": 0.0,
       "cert_history": null,
       "previous_registrar": null,
       "score": 45,
       "registrars": [
         {
           "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dclosedstreetmap.org"
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgenesisconsult.net"
         },
         {
           "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=closedstreetmap.org&rid=36a0644du"
+          "url": "https://www.namesilo.com/domain/search-domains?query=genesisconsult.net&rid=36a0644du"
         },
         {
           "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=closedstreetmap.org&rscreg=domainsifter"
+          "url": "https://www.dynadot.com/domain/search?domain=genesisconsult.net&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
-      "availability_verified_at": "2026-05-11T07:19:18Z",
-      "first_seen_date": "2026-05-11",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 1
+      "availability_verified_at": "2026-05-13T07:38:54Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "managerspiele.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 7268,
+      "wayback_last_snapshot": "2026-03-13",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmanagerspiele.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=managerspiele.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=managerspiele.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:18:21Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "thelaserclinic.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 1635,
+      "wayback_last_snapshot": "2025-12-16",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dthelaserclinic.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=thelaserclinic.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=thelaserclinic.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:30:02Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "chillody.org",
@@ -280,8 +1179,39 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T07:01:12Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
+    },
+    {
+      "name": "archilink.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 546,
+      "wayback_last_snapshot": "2024-09-09",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 44,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Darchilink.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=archilink.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=archilink.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:39:51Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "mkproperties.org",
@@ -311,8 +1241,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:52:01Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
     },
     {
       "name": "multimediadesigns.org",
@@ -342,8 +1272,39 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:30:08Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 7
+      "last_validated_date": "2026-05-13",
+      "days_listed": 8
+    },
+    {
+      "name": "instalserv.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 433,
+      "wayback_last_snapshot": "2026-03-23",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 42,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dinstalserv.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=instalserv.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=instalserv.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:28:30Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "helloco.info",
@@ -373,8 +1334,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:21:58Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 11
+      "last_validated_date": "2026-05-13",
+      "days_listed": 12
     },
     {
       "name": "ettan.shop",
@@ -404,8 +1365,39 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-01T04:14:35Z",
       "first_seen_date": "2026-05-01",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 11
+      "last_validated_date": "2026-05-13",
+      "days_listed": 12
+    },
+    {
+      "name": "orthochem.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 197,
+      "wayback_last_snapshot": "2026-03-24",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 38,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dorthochem.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=orthochem.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=orthochem.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:23:03Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "repelis.app",
@@ -435,8 +1427,39 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-05T05:34:33Z",
       "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 7
+      "last_validated_date": "2026-05-13",
+      "days_listed": 8
+    },
+    {
+      "name": "parksquareapartments.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 275,
+      "wayback_last_snapshot": "2025-07-18",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 35,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dparksquareapartments.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=parksquareapartments.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=parksquareapartments.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:41:41Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "awkert.shop",
@@ -466,39 +1489,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-03T05:29:03Z",
       "first_seen_date": "2026-05-03",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 9
-    },
-    {
-      "name": "rainydaysfoundation.org",
-      "tld": "org",
-      "dropped_date": "2026-05-08",
-      "wayback_snapshots": 10,
-      "wayback_last_snapshot": "2024-07-29",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 34,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Drainydaysfoundation.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=rainydaysfoundation.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=rainydaysfoundation.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-08T06:50:26Z",
-      "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 10
     },
     {
       "name": "promo-pro.online",
@@ -528,8 +1520,70 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-09T07:05:37Z",
       "first_seen_date": "2026-05-09",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 3
+      "last_validated_date": "2026-05-13",
+      "days_listed": 4
+    },
+    {
+      "name": "proplans.online",
+      "tld": "online",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 66,
+      "wayback_last_snapshot": "2025-07-18",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 33,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dproplans.online"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=proplans.online&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=proplans.online&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:57:10Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
+    },
+    {
+      "name": "moneyreset.net",
+      "tld": "net",
+      "dropped_date": "2026-05-13",
+      "wayback_snapshots": 1,
+      "wayback_last_snapshot": "2024-04-18",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 30,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmoneyreset.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=moneyreset.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=moneyreset.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-05-13T07:43:25Z",
+      "first_seen_date": "2026-05-13",
+      "last_validated_date": "2026-05-13",
+      "days_listed": 0
     },
     {
       "name": "melissawest.shop",
@@ -559,9 +1613,9 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-05-08T06:56:02Z",
       "first_seen_date": "2026-05-08",
-      "last_validated_date": "2026-05-12",
-      "days_listed": 4
+      "last_validated_date": "2026-05-13",
+      "days_listed": 5
     }
   ],
-  "total_candidates_evaluated": 7460
+  "total_candidates_evaluated": 7851
 }
