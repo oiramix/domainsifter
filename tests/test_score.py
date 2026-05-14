@@ -10,6 +10,7 @@ CONFIG = {
         "open_page_rank": 0.4,
         "cert_history": 0.2,
         "domain_length": 0.1,
+        "cc_source_domain_count": 0.3,
     },
     "filter_thresholds": {"min_domain_length": 2, "max_domain_length": 30},
 }
@@ -157,3 +158,107 @@ def test_score_candidates_breaks_ties_by_name():
     ]
     result = score.score_candidates(cands, CONFIG)
     assert [c["name"] for c in result] == ["aaaa.com", "mmmm.com", "zzzz.com"]
+
+
+# --- cc_source_domain_count (added 2026-05-14) -------------------------------
+
+
+def test_score_increases_with_more_cc_backlinks():
+    """Log-scaled: more inbound source domains → higher score, with
+    diminishing marginal returns at the high end."""
+    base = {"name": "ab.com", "wayback_snapshots": 0, "open_page_rank": 0.0, "cert_history": False}
+    low = score.score_candidate({**base, "cc_source_domain_count": 1}, CONFIG)
+    mid = score.score_candidate({**base, "cc_source_domain_count": 100}, CONFIG)
+    high = score.score_candidate({**base, "cc_source_domain_count": 10_000}, CONFIG)
+    assert low < mid < high
+
+
+def test_score_cc_saturates_at_10k():
+    """Divisor 4.0 means log10(10_001)/4 ≈ 1.0 → the component caps. Any
+    count beyond that yields the same normalized value (1.0)."""
+    base = {"name": "ab.com", "wayback_snapshots": 0, "open_page_rank": 0.0, "cert_history": False}
+    at_cap = score.score_candidate({**base, "cc_source_domain_count": 10_000}, CONFIG)
+    way_over = score.score_candidate({**base, "cc_source_domain_count": 16_365_926}, CONFIG)
+    assert at_cap == way_over
+
+
+def test_score_cc_zero_count_distinct_from_missing():
+    """A dangler (in CC graph but no inbound edges) reads as 0 — distinct
+    from 'not in graph' (which is None). 0 IS populated, contributing 0
+    to the numerator but adding cc's weight (0.3) to the denominator —
+    pulling the weighted average down. None is excluded from both.
+
+    This is the operational consequence of the three-state distinction at
+    the enricher boundary: dangler vs not-in-graph carry different scoring
+    semantics even when both look like 'no inbound edges' colloquially."""
+    base = {"name": "ab.com", "open_page_rank": 0.0, "cert_history": False, "wayback_snapshots": 0}
+    with_zero = score.score_candidate({**base, "cc_source_domain_count": 0}, CONFIG)
+    without_key = score.score_candidate(base, CONFIG)
+    # without_key: cc excluded from average, length=1.0 carries the entire
+    # numerator: 0.1 / 1.0 = 0.1 → score 10.
+    # with_zero: cc=0 IS populated but contributes 0; length=1.0 still
+    # carries: 0.1 / 1.3 ≈ 0.077 → score 8.
+    # The asymmetry is the whole point: zero is a real observation, null
+    # is an unknown.
+    assert with_zero < without_key, (
+        "dangler (cc=0) must score lower than not-in-graph (cc=null) when "
+        "every other signal is zero — zero pulls the average down, null is "
+        "excluded from it"
+    )
+
+
+def test_score_cc_null_excluded_from_average():
+    """cc_source_domain_count=None means 'not in graph'. The score formula
+    excludes None components from BOTH numerator and denominator — the
+    candidate scores on what IS known, not penalized for absence."""
+    base = {
+        "name": "ab.com",
+        "wayback_snapshots": 100,
+        "open_page_rank": 5.0,
+        "cert_history": True,
+    }
+    s_null = score.score_candidate({**base, "cc_source_domain_count": None}, CONFIG)
+    s_missing = score.score_candidate(base, CONFIG)
+    # null and key-missing both mean 'unknown' to the formula; same score.
+    assert s_null == s_missing
+    # And it is HIGHER than the same candidate scored as if cc were 0
+    # (zero IS populated and drags the weighted average down).
+    s_zero = score.score_candidate({**base, "cc_source_domain_count": 0}, CONFIG)
+    assert s_null > s_zero, "null cc should score better than zero cc"
+
+
+def test_score_cc_contributes_proportionally_to_weight():
+    """When cc is at its cap (1.0 normalized) and every other component is
+    0, the resulting score equals cc's weight share of the total. Hand-
+    computed: cc weight 0.3 / total 1.0 = 30%."""
+    cand = {
+        "name": "z" * 30 + ".com",   # length component = 0.0 at max_len
+        "wayback_snapshots": 0,       # 0.0
+        "open_page_rank": 0.0,        # 0.0
+        "cert_history": False,        # 0.0
+        "cc_source_domain_count": 1_000_000,  # saturates to 1.0
+    }
+    # Weighted: 0.0 + 0.0 + 0.0 + 0.0 + 1.0×0.3 = 0.3
+    # Total weight: 0.3 + 0.4 + 0.2 + 0.1 + 0.3 = 1.3
+    # raw = 0.3 / 1.3 ≈ 0.2308 → round(23.08) = 23
+    assert score.score_candidate(cand, CONFIG) == 23
+
+
+def test_score_full_data_with_cc():
+    """All five components populated. Hand-checked math: the formula
+    matches the documented log-scale derivation."""
+    cand = {
+        "name": "ab.com",
+        "wayback_snapshots": 100,
+        "open_page_rank": 5.0,
+        "cert_history": True,
+        "cc_source_domain_count": 100,
+    }
+    s = score.score_candidate(cand, CONFIG)
+    # wayback: log10(101)/3 ≈ 0.667 × 0.3 = 0.2002
+    # cc:      log10(101)/4 ≈ 0.500 × 0.3 = 0.150
+    # opr:     0.5 × 0.4 = 0.2
+    # cert:    1.0 × 0.2 = 0.2
+    # length:  1.0 × 0.1 = 0.1
+    # weighted ≈ 0.8502 / total_weight 1.3 ≈ 0.6540 → round(65.40) = 65
+    assert s == 65

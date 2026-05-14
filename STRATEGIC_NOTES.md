@@ -5,7 +5,7 @@ Long-horizon decisions that don't fit neatly into PLAN.md (which scopes the curr
 Index of decisions:
 
 - [Common Crawl integration — accumulation strategy (2026-05-13)](#common-crawl-integration--accumulation-strategy-2026-05-13)
-- [Multi-release CC query strategy (2026-05-13, pending)](#multi-release-cc-query-strategy-2026-05-13-pending)
+- [Multi-release CC query strategy (2026-05-13 — Strategy A active 2026-05-14)](#multi-release-cc-query-strategy-2026-05-13-pending)
 - [Free vs paid tier model (2026-05-13, pending)](#free-vs-paid-tier-model-2026-05-13-pending)
 - [Daily publication count cap (2026-05-13, pending)](#daily-publication-count-cap-2026-05-13-pending)
 - [Common Crawl refresh cadence — manual vs automated (2026-05-13, pending)](#common-crawl-refresh-cadence--manual-vs-automated-2026-05-13-pending)
@@ -72,7 +72,11 @@ If any of those steps reveals a wrong assumption, we have a working standalone c
 
 ---
 
-## Multi-release CC query strategy (2026-05-13, pending)
+## Multi-release CC query strategy (2026-05-13 — Strategy A active 2026-05-14)
+
+### Status update — 2026-05-14
+
+**Strategy A is now active in production.** The 2026-05-14 wire-in commit registered `cc_backlinks` in `ENRICHMENT_MODULES` with Strategy A — the enricher queries the single latest release configured in `config["cc_backlinks"]["latest_release"]`. Strategies B (union/max across last N) and C (full historical aggregate) remain deferred. The re-evaluation criteria below stand: revisit when ~6 releases have accumulated (late 2026), or when product positioning shifts toward decay-curve as a feature.
 
 ### The question
 

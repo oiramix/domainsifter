@@ -260,6 +260,7 @@ The Astro site reads src/data/daily-domains.json. The pipeline writes that file.
 "cert_history": true,
 "previous_registrar": "GoDaddy",
 "score": 78,
+"cc_source_domain_count": 247,
 "affiliate_link": "https://..."
 }
 ]
@@ -267,6 +268,12 @@ The Astro site reads src/data/daily-domains.json. The pipeline writes that file.
 ```
 
 Pipeline produces this. Site consumes this. Neither side surprises the other.
+
+Field additions are append-only — any new key that the pipeline starts emitting must be optional from the site's point of view (treat null / absent as "feature not available for this row"). Existing keys never change shape. Documented migrations:
+- 2026-04-27 evening: single `affiliate_link` → `registrars[]` array.
+- 2026-04-28 evening: added top-level `total_candidates_evaluated`.
+- 2026-04-30: added `first_seen_date` / `last_validated_date` / `days_listed` plus top-level `today_count` / `carryover_count` for the 14-day persistent rolling list.
+- 2026-05-14: added per-domain `cc_source_domain_count` (Common Crawl backlinks). Integer = count of distinct source domains observed linking to this apex in the latest CC release; null = the apex isn't in that release's graph. Older payloads and the preview/sample fallback may omit the key entirely.
 
 ### Principle 6: Spam check is named generically
 

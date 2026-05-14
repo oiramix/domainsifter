@@ -1017,6 +1017,114 @@ def test_main_dns_prefilter_routes_candidates_before_rdap(monkeypatch, cfg, tmp_
     assert sorted(rdap_seen) == ["available.com", "broken.com"]
 
 
+# --- cc_backlinks integration (wire-in 2026-05-14) --------------------------
+
+
+def test_cc_backlinks_runs_during_enrichment_phase():
+    """Architectural assertion: cc_backlinks is wired into ENRICHMENT_MODULES
+    so the daily pipeline calls it as part of the enrichment phase. The
+    other enrichers (wayback, opr, spam_check, surbl, spamhaus, crtsh) are
+    unchanged."""
+    assert "cc_backlinks" in pipeline.ENRICHMENT_MODULES
+    # Order matters less than presence, but locking in the position keeps the
+    # log lines + test stubs aligned with the production order.
+    assert pipeline.ENRICHMENT_MODULES == (
+        "wayback",
+        "open_page_rank",
+        "spam_check",
+        "surbl",
+        "spamhaus",
+        "crtsh",
+        "cc_backlinks",
+    )
+
+
+def test_cc_backlinks_can_be_loaded_via_load_enrichers():
+    """The dynamic import mechanism in _load_enrichers must be able to
+    locate and import scripts.enrichment.cc_backlinks without error.
+    Catches typos in ENRICHMENT_MODULES (e.g. 'cc_backlink' singular)
+    before they crash production at run time."""
+    enrichers = pipeline._load_enrichers()
+    by_name = dict(enrichers)
+    assert "cc_backlinks" in by_name
+    assert callable(by_name["cc_backlinks"])
+
+
+def test_main_merges_cc_source_domain_count_into_published_payload(
+    monkeypatch, cfg, tmp_path,
+):
+    """End-to-end: with cc_backlinks active in ENRICHMENT_MODULES, the
+    field surfaces in the published daily-domains.json. We stub the
+    cc_backlinks.enrich function (so no R2 download) but exercise the real
+    enrichment dispatch in pipeline._load_enrichers + _enrich_one."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    monkeypatch.setenv("CZDS_USERNAME", "u")
+    monkeypatch.setenv("CZDS_PASSWORD", "p")
+    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
+    _set_r2_env(monkeypatch)
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+
+    today = date.today()
+    monkeypatch.setattr(
+        pipeline,
+        "collect_drops",
+        lambda _cfg, _tok, today, **_kw: ([
+            {"name": "great.com", "tld": "com", "dropped_date": today.isoformat()},
+            {"name": "alsogood.com", "tld": "com", "dropped_date": today.isoformat()},
+        ], []),
+    )
+
+    # Stub the six pre-CC enrichers + cc_backlinks. Real _load_enrichers /
+    # _enrich_one drive the dispatch. cc_backlinks returns a count for
+    # great.com and the not-in-graph empty-dict for alsogood.com — so the
+    # final payload should preserve that distinction (integer vs null).
+    from scripts.enrichment import (
+        wayback as wayback_mod,
+        open_page_rank as opr_mod,
+        spam_check as spam_check_mod,
+        surbl as surbl_mod,
+        spamhaus as spamhaus_mod,
+        crtsh as crtsh_mod,
+        cc_backlinks as cc_mod,
+    )
+
+    monkeypatch.setattr(wayback_mod, "enrich", lambda *_a, **_k: {
+        "wayback_snapshots": 100, "wayback_last_snapshot": "2024-01-01",
+    })
+    monkeypatch.setattr(opr_mod, "enrich", lambda *_a, **_k: {"open_page_rank": 3.0})
+    monkeypatch.setattr(spam_check_mod, "enrich", lambda *_a, **_k: {"spam_flagged": False})
+    monkeypatch.setattr(surbl_mod, "enrich", lambda *_a, **_k: {"surbl_listed": False})
+    monkeypatch.setattr(spamhaus_mod, "enrich", lambda *_a, **_k: {"spamhaus_listed": False})
+    monkeypatch.setattr(crtsh_mod, "enrich", lambda *_a, **_k: {
+        "cert_history": True, "previous_registrar": "Acme",
+    })
+
+    def fake_cc_enrich(domain, _config):
+        if domain == "great.com":
+            return {"cc_source_domain_count": 247}
+        return {}  # not-in-graph → field stays absent → null in payload
+
+    monkeypatch.setattr(cc_mod, "enrich", fake_cc_enrich)
+
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(
+        rdap_mod, "check_availability",
+        lambda d, _c: {"is_available": True, "rdap_http": 404,
+                       "rdap_status": [], "rdap_expiration": None,
+                       "previous_registrar": None},
+    )
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+
+    written = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    by_name = {d["name"]: d for d in written["domains"]}
+    assert by_name["great.com"]["cc_source_domain_count"] == 247
+    assert by_name["alsogood.com"]["cc_source_domain_count"] is None
+
+
 def test_main_aborts_when_required_env_missing(monkeypatch, cfg, tmp_path):
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(cfg), encoding="utf-8")

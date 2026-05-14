@@ -5,17 +5,30 @@ Each component is normalized to [0, 1] and then weighted-summed using
 in [0, 100] for display.
 
 Components:
-    wayback_snapshots — log-scaled. 0 snapshots → 0.0, 1 → ~0.15,
-                        10 → ~0.5, 100 → ~0.75, 1000+ → ~1.0.
-                        Log scale because the marginal value of a 100th
-                        snapshot is much smaller than the 1st.
-    open_page_rank    — already 0-10 from OPR API. Linearly normalized.
-                        Most expired domains sit at 0; anything > 2 is
-                        already meaningful.
-    cert_history      — boolean. True → 1.0, False → 0.0.
-    domain_length     — inverted, so shorter = better. min_len → 1.0,
-                        max_len → 0.0, linear in between. Pulls scoring
-                        toward concise, more memorable names.
+    wayback_snapshots         — log-scaled (/3.0 divisor). 0 → 0.0,
+                                1 → ~0.10, 10 → ~0.35, 100 → ~0.67,
+                                1000+ → ~1.0. Log scale because the
+                                marginal value of a 100th snapshot is
+                                much smaller than the 1st.
+    open_page_rank            — already 0-10 from OPR API. Linearly
+                                normalized. Most expired domains sit at
+                                0; anything > 2 is already meaningful.
+    cert_history              — boolean. True → 1.0, False → 0.0.
+    domain_length             — inverted, so shorter = better.
+                                min_len → 1.0, max_len → 0.0, linear in
+                                between. Pulls scoring toward concise,
+                                more memorable names.
+    cc_source_domain_count    — log-scaled (/4.0 divisor; fatter divisor
+                                than wayback because CC's distribution
+                                has a heavier tail — google.com is at
+                                16M and the 99th percentile expired
+                                domain is in the hundreds). 0 → 0.0,
+                                1 → ~0.08, 10 → ~0.26, 100 → 0.50,
+                                1,000 → ~0.75, 10,000+ → 1.0. Wired in
+                                2026-05-14; PLAN.md frames this as a
+                                complementary historical-authority
+                                signal to wayback (temporal evidence vs
+                                link evidence). Symmetric weight (0.30).
 
 NULL-AWARE NORMALIZATION (changed 2026-04-30):
 A field that is None means "we don't know" — the enrichment call failed,
@@ -49,6 +62,12 @@ def _norm_wayback(snapshots: int) -> float:
     if snapshots <= 0:
         return 0.0
     return min(1.0, math.log10(snapshots + 1) / 3.0)
+
+
+def _norm_cc(count: int) -> float:
+    if count <= 0:
+        return 0.0
+    return min(1.0, math.log10(count + 1) / 4.0)
 
 
 def _norm_opr(opr_score: float) -> float:
@@ -92,6 +111,11 @@ def score_candidate(candidate: dict, config: dict) -> int | None:
     wb = candidate.get("wayback_snapshots")
     components.append(
         ("wayback_snapshots", _norm_wayback(int(wb)) if wb is not None else None)
+    )
+
+    cc = candidate.get("cc_source_domain_count")
+    components.append(
+        ("cc_source_domain_count", _norm_cc(int(cc)) if cc is not None else None)
     )
 
     opr = candidate.get("open_page_rank")

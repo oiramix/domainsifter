@@ -1,12 +1,8 @@
-"""Unit tests for scripts/enrichment/cc_backlinks.py — the standalone CC
-backlinks enricher.
+"""Unit tests for scripts/enrichment/cc_backlinks.py — the CC backlinks
+enricher, wired into the pipeline on 2026-05-14.
 
 Mocks the R2 download. Builds a tiny fixture SQLite with the same schema
 the real cc_refresh.py produces and runs `enrich()` against it.
-
-This module is NOT in ENRICHMENT_MODULES, so it doesn't break the existing
-pipeline contract regardless of what we do here — but the test file exists
-to give a fast feedback loop on cc_backlinks itself.
 """
 
 from __future__ import annotations
@@ -307,17 +303,18 @@ def test_enrich_reuses_connection_across_calls(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Architectural assertion: NOT registered in ENRICHMENT_MODULES
+# Architectural assertion: REGISTERED in ENRICHMENT_MODULES
 # ---------------------------------------------------------------------------
 
 
-def test_cc_backlinks_NOT_in_pipeline_enrichment_modules():
-    """Hard guarantee: until the wire-in commit, cc_backlinks must not be
-    in pipeline.ENRICHMENT_MODULES. This test fails loudly if a future
-    edit accidentally registers it before the validation step is done."""
+def test_cc_backlinks_in_pipeline_enrichment_modules():
+    """Hard guarantee (inverted on 2026-05-14, wire-in commit): cc_backlinks
+    is now part of the daily enrichment phase. If a future refactor drops
+    it from ENRICHMENT_MODULES, this test fails loudly. See STATE.md
+    'Common Crawl wire-in — 2026-05-14' for context."""
     from scripts import pipeline
-    assert "cc_backlinks" not in pipeline.ENRICHMENT_MODULES, (
-        "cc_backlinks is the STANDALONE-only enricher; it must not be "
-        "registered in ENRICHMENT_MODULES until the wire-in commit. "
-        "See STATE.md 'Common Crawl integration (standalone)' for context."
+    assert "cc_backlinks" in pipeline.ENRICHMENT_MODULES, (
+        "cc_backlinks must be registered in ENRICHMENT_MODULES so the daily "
+        "pipeline runs the CC backlink lookup. Wire-in was 2026-05-14; "
+        "dropping it back out should be a deliberate, documented choice."
     )

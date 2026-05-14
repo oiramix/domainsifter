@@ -101,6 +101,13 @@ ENRICHMENT_MODULES = (
     "surbl",
     "spamhaus",
     "crtsh",
+    # `cc_backlinks` joined 2026-05-14 (wire-in commit). Returns
+    # `cc_source_domain_count` (int) when the apex is in the latest CC
+    # release's graph; empty dict otherwise — which the score formula
+    # treats as null and excludes from the average. SQLite for
+    # `cc_backlinks.latest_release` is fetched from R2 once on first call
+    # and cached at `~/.cache/domainsifter/cc/` for the rest of the run.
+    "cc_backlinks",
     # `rdap` is intentionally NOT in this list any more. It's now run as a
     # dedicated post-score availability check (validate_availability), where
     # HTTP 404 is the only signal that proves "actually registerable." The

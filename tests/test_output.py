@@ -380,3 +380,52 @@ def test_write_output_uses_config_path_when_omitted(tmp_path):
     written = output.write_output([_cand("a.com")], cfg)
     assert written == tmp_path / "from_config.json"
     assert written.exists()
+
+
+# --- cc_source_domain_count (added 2026-05-14, wire-in commit) ---------------
+
+
+def test_cc_source_domain_count_passes_through_to_payload():
+    """The new contract field is projected from the candidate into the
+    emitted JSON. Integer counts flow through as-is."""
+    cand = _cand("amber.org", 80, cc_source_domain_count=247)
+    payload = output.build_payload([cand], CONFIG)
+    assert payload["domains"][0]["cc_source_domain_count"] == 247
+
+
+def test_cc_source_domain_count_null_passes_through_to_payload():
+    """null means 'not in CC graph for the latest release'. The contract
+    preserves null distinctly from missing — the frontend renders a dash
+    for null, not a zero."""
+    cand = _cand("nograph.com", 60, cc_source_domain_count=None)
+    payload = output.build_payload([cand], CONFIG)
+    assert payload["domains"][0]["cc_source_domain_count"] is None
+
+
+def test_cc_source_domain_count_defaults_to_null_when_missing_on_candidate():
+    """Older candidate dicts produced before the wire-in (or by tests
+    constructed via the legacy _cand() helper) get null in the projected
+    payload. Backward-compatible."""
+    cand = _cand("legacy.com", 60)
+    assert "cc_source_domain_count" not in cand  # confirm the helper omits it
+    payload = output.build_payload([cand], CONFIG)
+    assert payload["domains"][0]["cc_source_domain_count"] is None
+
+
+def test_cc_source_domain_count_not_in_completeness_calculation():
+    """Hard guarantee: a candidate with null cc must not be rejected by
+    the publish_min_enrichment_completeness gate due to missing CC alone.
+    Absence from the CC graph is informational, not a quality deficit."""
+    cfg = {**CONFIG, "publish_min_enrichment_completeness": 0.99}
+    # 5/5 of _ENRICHMENT_FIELDS_FOR_COMPLETENESS populated, cc null.
+    cand = _cand("rich.com", 80, cc_source_domain_count=None)
+    payload = output.build_payload([cand], cfg)
+    assert payload["domain_count"] == 1, (
+        "candidate with full traditional enrichment but null CC must still "
+        "pass the completeness gate"
+    )
+
+
+def test_cc_source_domain_count_in_contract_fields():
+    """Architectural assertion: the field is part of the locked schema."""
+    assert "cc_source_domain_count" in output.CONTRACT_FIELDS

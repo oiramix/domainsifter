@@ -1,17 +1,16 @@
-"""Common Crawl backlinks enricher — standalone, NOT wired into pipeline.
+"""Common Crawl backlinks enricher — wired into the pipeline.
 
 Queries the derived SQLite produced by `scripts/cc_refresh.py` for a
 candidate apex domain and returns its inbound source-domain count from the
 configured release's CC domain webgraph.
 
-**This module is INTENTIONALLY NOT REGISTERED** in
-`scripts/enrichment/__init__.py`'s `ENRICHMENT_MODULES`. The pipeline does
-not call it. Wiring into the scoring + display layers is a separate later
-commit, after Mario validates the standalone capability against real
-production data on OVH. See STATE.md section "Common Crawl integration
-(standalone, not yet wired) — 2026-05-13" for context.
+Registered in `scripts.pipeline.ENRICHMENT_MODULES` as of 2026-05-14 (the
+wire-in commit, after the 2026-05-13 standalone validation against real
+CC data on OVH). Uses Strategy A — query the single latest release only;
+multi-release strategies (B/C) deferred (see STRATEGIC_NOTES.md `Multi-
+release CC query strategy`).
 
-Plugin contract (when eventually wired):
+Plugin contract:
     enrich(domain, config) -> dict
 
 Returns:

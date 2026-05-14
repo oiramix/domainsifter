@@ -18,6 +18,7 @@ Output shape:
                 "wayback_snapshots": 142, "wayback_last_snapshot": "2024-08-15",
                 "open_page_rank": 3.7, "cert_history": true,
                 "previous_registrar": "GoDaddy", "score": 78,
+                "cc_source_domain_count": 247,
                 "registrars": [{"name": "Namecheap", "url": "https://..."}, ...]
             }
         ]
@@ -84,6 +85,12 @@ CONTRACT_FIELDS = (
     "first_seen_date",
     "last_validated_date",
     "days_listed",
+    # Common Crawl backlinks (added 2026-05-14). Integer count of distinct
+    # source domains observed linking to the apex in the latest CC release;
+    # null when the apex isn't in that release's graph at all. Deliberately
+    # NOT added to _ENRICHMENT_FIELDS_FOR_COMPLETENESS — absence from the CC
+    # graph is informational, not a quality deficit.
+    "cc_source_domain_count",
 )
 
 # Enrichment fields used to compute completeness ratio. A candidate's
@@ -140,6 +147,7 @@ def _project(candidate: dict, registrars_config: list[dict]) -> dict:
         "first_seen_date": candidate.get("first_seen_date"),
         "last_validated_date": candidate.get("last_validated_date"),
         "days_listed": candidate.get("days_listed", 0),
+        "cc_source_domain_count": candidate.get("cc_source_domain_count"),
     }
 
 

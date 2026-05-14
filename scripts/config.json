@@ -27,10 +27,12 @@
     "min_open_page_rank": 0
   },
   "scoring_weights": {
+    "_doc": "Relative weights; the formula in score.py averages over POPULATED components only so missing fields don't drag the denominator. cc_source_domain_count joined 2026-05-14 at 0.30 — symmetric with wayback because PLAN.md frames both as historical-authority signals (wayback = temporal evidence the site existed; cc = link evidence others thought it mattered). Domains absent from the CC graph (cc_source_domain_count=null) are excluded from the average rather than penalized.",
     "wayback_snapshots": 0.3,
     "open_page_rank": 0.4,
     "cert_history": 0.2,
-    "domain_length": 0.1
+    "domain_length": 0.1,
+    "cc_source_domain_count": 0.3
   },
   "rejected_keywords": [
     "porn",
@@ -67,7 +69,7 @@
     "throttle_seconds": 0.0
   },
   "cc_backlinks": {
-    "_doc": "Common Crawl domain-webgraph integration. STANDALONE-ONLY as of 2026-05-13 — `scripts/cc_refresh.py` builds and uploads per-release artifacts to R2; `scripts/enrichment/cc_backlinks.py` queries the derived SQLite. NOT registered in `scripts/enrichment/__init__.py` ENRICHMENT_MODULES — wiring into the daily pipeline is a separate later commit once the standalone capability is validated against real CC data on OVH (Mario runs the first refresh manually after this commit lands; the 21 GiB download cannot be exercised from an agent session). Accumulation strategy: monthly CC releases never deleted; raw vertices+edges (~21 GiB/release) live on R2 IA tier (S3-API class name `STANDARD_IA`, matches AWS conventions — NOT Cloudflare's Workers-API `InfrequentAccess` spelling, which 400'd on the first OVH run 2026-05-13) ($0.010/GB-mo, rarely re-read after derived build), derived SQLite (~1.5 GiB/release) lives on Standard tier ($0.015/GB-mo, read once per pipeline run when eventually wired). Year-end cost projection: ~$3/mo at year 1, ~$14/mo at year 5 (60 releases × $0.23/each). Schema: one SQLite per release with `meta` table (release, built_at, schema_version, source_url) and `cc_apex` table (apex_domain TEXT PK, source_domain_count INTEGER) — danglers included as count=0 for three-state symmetry (not-in-graph vs zero-inbound are different facts). Release column intentionally NOT per-row — file path encodes the release context, meta table self-documents.",
+    "_doc": "Common Crawl domain-webgraph integration. WIRED INTO PIPELINE as of 2026-05-14 — `scripts/cc_refresh.py` builds and uploads per-release artifacts to R2; `scripts/enrichment/cc_backlinks.py` is registered in ENRICHMENT_MODULES and runs as part of the daily enrichment phase. Strategy A (latest release only — see STRATEGIC_NOTES.md `Multi-release CC query strategy`). On first call per pipeline process, the derived SQLite for `latest_release` is downloaded from R2 to `~/.cache/domainsifter/cc/` and reused for every subsequent candidate (sub-ms point-lookups thereafter). `source_domain_count=null` from the enricher means 'domain not in this release's graph' — null-aware in score.py (excluded from average) and intentionally NOT counted toward `publish_min_enrichment_completeness` so absence from CC graph doesn't penalize a candidate at the publication gate. Accumulation strategy: monthly CC releases never deleted; raw vertices+edges (~21 GiB/release) live on R2 IA tier (S3-API class name `STANDARD_IA`, matches AWS conventions — NOT Cloudflare's Workers-API `InfrequentAccess` spelling, which 400'd on the first OVH run 2026-05-13) ($0.010/GB-mo, rarely re-read after derived build), derived SQLite (~1.5 GiB/release) lives on Standard tier ($0.015/GB-mo, read once per pipeline run). Year-end cost projection: ~$3/mo at year 1, ~$14/mo at year 5 (60 releases × $0.23/each). Schema: one SQLite per release with `meta` table (release, built_at, schema_version, source_url) and `cc_apex` table (apex_domain TEXT PK, source_domain_count INTEGER) — danglers included as count=0 for three-state symmetry (not-in-graph vs zero-inbound are different facts). Release column intentionally NOT per-row — file path encodes the release context, meta table self-documents. Refresh cadence: manual `python -m scripts.cc_refresh --release <name>` invocation, then bump `latest_release` here and commit; monthly cron deferred (see STRATEGIC_NOTES.md `Common Crawl refresh cadence`).",
     "latest_release": "cc-main-2026-feb-mar-apr",
     "r2_raw_key_template_vertices": "cc/raw/{release}/vertices.txt.gz",
     "r2_raw_key_template_edges": "cc/raw/{release}/edges.txt.gz",
