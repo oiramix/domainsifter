@@ -106,6 +106,17 @@ git pull --ff-only origin main
 # Any non-zero exit aborts the script via set -e.
 .venv/bin/python -m scripts.pipeline --config scripts/config.json
 
+# Step 3b: generate the Buttondown newsletter draft from the fresh JSON.
+# Failures here are LOGGED but do NOT abort the daily run — newsletter is
+# optional, pipeline JSON publish is the source of truth. The module
+# already returns 0 for the no-op states (newsletter.enabled=false,
+# duplicate-found, zero-domains), so this `|| true` mostly catches genuine
+# API / config errors. Toggle on by setting config.newsletter.enabled=true
+# AND BUTTONDOWN_API_KEY in .env. See STATE.md 'Daily newsletter — 2026-05-14'.
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] generating newsletter draft"
+.venv/bin/python -m scripts.generate_newsletter --config scripts/config.json \
+  || echo "WARNING: newsletter generation failed (non-fatal; continuing)" >&2
+
 # Step 4: replicate the GHA workflow's "Commit refreshed daily output" step.
 # `git config` writes to .git/config (local, not credentials — just author
 # identity). Idempotent on every run.

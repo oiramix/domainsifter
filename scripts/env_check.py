@@ -15,9 +15,12 @@ Required vs. optional:
         R2_ACCESS_KEY_ID      R2 (migrated off the repo because per-TLD
         R2_SECRET_ACCESS_KEY  state files exceeded GitHub's 100 MB limit).
         R2_BUCKET_NAME        Pipeline can't compute drops without R2 auth.
-    OPTIONAL — pipeline runs with the corresponding enrichment skipped:
+    OPTIONAL — pipeline runs with the corresponding feature skipped:
         OPENPAGERANK_KEY    — without it, no authority signal; we still
                               produce output, just with weaker scoring
+        BUTTONDOWN_API_KEY  — without it, the daily newsletter step skips
+                              (added 2026-05-14 alongside the newsletter
+                              feature). Pipeline JSON publish is unaffected.
 """
 
 from __future__ import annotations
@@ -37,7 +40,7 @@ REQUIRED_ENV_VARS: tuple[str, ...] = (
     "R2_BUCKET_NAME",
 )
 
-OPTIONAL_ENV_VARS: tuple[str, ...] = ("OPENPAGERANK_KEY",)
+OPTIONAL_ENV_VARS: tuple[str, ...] = ("OPENPAGERANK_KEY", "BUTTONDOWN_API_KEY")
 
 
 class MissingEnvVarsError(RuntimeError):

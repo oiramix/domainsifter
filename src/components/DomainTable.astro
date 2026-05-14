@@ -314,6 +314,7 @@ const carryoverSubheader = (n: number): string => {
                 const popoverId = `pop-today-row-${i}`;
                 return (
                   <div
+                    id={`drop-${d.name}`}
                     role="row"
                     data-row
                     data-scope="today"
@@ -559,6 +560,7 @@ const carryoverSubheader = (n: number): string => {
                 const popoverId = `pop-carry-row-${i}`;
                 return (
                   <div
+                    id={`drop-${d.name}`}
                     role="row"
                     data-row
                     data-scope="carryover"

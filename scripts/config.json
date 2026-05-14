@@ -76,6 +76,14 @@
     "r2_derived_key_template": "cc/derived/{release}.sqlite",
     "source_url_template": "https://data.commoncrawl.org/projects/hyperlinkgraph/{release}/domain/{release}-domain-{file}.txt.gz"
   },
+  "newsletter": {
+    "_doc": "Daily newsletter draft generation via Buttondown. Disabled by default — Mario flips enabled=true after adding BUTTONDOWN_API_KEY to .env on OVH. Drafts are NEVER auto-sent: Buttondown's status=draft state requires a manual dashboard action (Send draft for QA or change to about_to_send for real subscribers). Idempotent: re-running the same day finds the existing draft by subject and skips creation. Configured 2026-05-14; see STATE.md 'Daily newsletter — 2026-05-14' for setup + test-send workflow. Module: scripts/generate_newsletter.py — run-daily.sh invokes it AFTER pipeline.py succeeds, failure here is logged but never aborts the daily run.",
+    "enabled": false,
+    "top_n": 20,
+    "subject_template": "DomainSifter daily — {n} picks for {date}",
+    "intro_text": "Today's top expired domain picks, sorted by score. Backlinks counts come from Common Crawl's last 3 months of crawl data. All domains were available at last check — verify at registrar before buying.",
+    "site_url": "https://domainsifter.com"
+  },
   "max_candidates_for_publication": 300,
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,
