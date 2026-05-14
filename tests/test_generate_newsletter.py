@@ -69,7 +69,7 @@ def _config(**overrides: Any) -> dict:
         "newsletter": {
             "enabled": True,
             "top_n": 20,
-            "subject_template": "DomainSifter daily — {n} picks for {date}",
+            "subject_template": "DomainSifter daily picks — {date}",
             "intro_text": "Intro text for testing.",
             "site_url": "https://domainsifter.com",
         },
@@ -249,8 +249,9 @@ def test_build_html_body_has_proper_html_structure():
     assert "<html" in body
     assert "</html>" in body
     assert 'role="presentation"' in body
-    # Inline CSS only — never a <style> block (some clients strip those).
-    assert "<style" not in body
+    # A <style> block carries the responsive @media swap. Per-element styles
+    # are still inline so older clients fall back to the desktop layout.
+    assert "<style" in body
 
 
 def test_build_html_body_uses_per_row_anchor_link():
@@ -296,8 +297,10 @@ def test_build_html_body_skips_unknown_registrar_logos():
     d["registrars"].append({"name": "MysteryRegistrar", "url": "https://x/y"})
     body = gn.build_html_body([d], date(2026, 5, 15), "x")
     assert "MysteryRegistrar" not in body
-    # The 3 known logos still render.
-    assert body.count("registrar-logos/") == 3
+    # The 3 known logos render twice each (once in desktop table, once in
+    # mobile cards); 6 total. The unknown one would have rendered twice too
+    # if not filtered — its absence is what this test guards.
+    assert body.count("registrar-logos/") == 6
 
 
 def test_build_html_body_includes_unsubscribe_token():
@@ -354,6 +357,47 @@ def test_build_html_body_narrow_columns_have_nowrap_and_domain_does_not():
     # The Domain td is the only `<td style="padding: 10px 6px;">` with no
     # additional declarations (followed immediately by the <a>).
     assert '<td style="padding: 10px 6px;"><a href=' in body
+
+
+def test_build_html_body_h1_is_static_brand_string():
+    """The in-body <h1> is "DomainSifter daily picks" with no count and no
+    date — the inbox already shows the date, and a hardcoded count would
+    sometimes lie on low-volume days."""
+    body = gn.build_html_body([_domain("a.org", 80)], date(2026, 5, 15), "x")
+    assert ">DomainSifter daily picks</h1>" in body
+    # No subline date paragraph below the h1.
+    assert "Daily picks ·" not in body
+
+
+def test_build_html_body_has_responsive_media_query():
+    """The responsive swap requires a @media (max-width: 600px) block in
+    head <style>. Without it, mobile clients render the unreadable
+    7-column desktop table — that's the bug this layout fixes."""
+    body = gn.build_html_body([_domain("a.org", 80)], date(2026, 5, 15), "x")
+    assert "(max-width: 600px)" in body
+    # The display-swap rules use !important to override inline styles.
+    assert "display: none !important" in body
+    assert "display: block !important" in body
+
+
+def test_build_html_body_emits_mobile_cards_alongside_desktop_table():
+    """Two layout blocks coexist in the markup. @media toggles which one
+    is visible — desktop sees the table, mobile sees the cards. The mobile
+    block is hidden by default via inline `display: none`; @media flips it
+    on. The desktop block uses no inline display so it's table by default
+    and goes to none on mobile via the @media rule."""
+    body = gn.build_html_body([_domain("amber.org", 80)], date(2026, 5, 15), "x")
+    # Desktop table is tagged for hide-on-mobile.
+    assert 'class="ds-desktop-only"' in body
+    # Mobile cards block exists and is hidden inline by default.
+    assert 'class="ds-mobile-only"' in body
+    assert 'class="ds-mobile-only" style="display: none' in body
+    # Mobile card rendering: each domain has a card-tagged label/value row.
+    # The "TLD" / "Wayback" / etc. labels appear as <td> text inside the
+    # cards (they don't appear in the desktop table — those use <th>).
+    assert ">TLD</td>" in body
+    assert ">Wayback</td>" in body
+    assert ">Backlinks</td>" in body
 
 
 def test_build_html_body_uses_configured_site_url():
@@ -450,10 +494,10 @@ def test_create_draft_raises_on_4xx():
 def test_already_drafted_finds_match_by_subject():
     drafts = [
         {"id": "a", "subject": "Other"},
-        {"id": "b", "subject": "DomainSifter daily — 20 picks for May 15, 2026"},
+        {"id": "b", "subject": "DomainSifter daily picks — May 15, 2026"},
         {"id": "c", "subject": "Else"},
     ]
-    found = gn._already_drafted(drafts, "DomainSifter daily — 20 picks for May 15, 2026")
+    found = gn._already_drafted(drafts, "DomainSifter daily picks — May 15, 2026")
     assert found and found["id"] == "b"
 
 
@@ -508,7 +552,7 @@ def test_generate_newsletter_creates_draft_happy_path():
         {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
         {"method": "POST", "status": 201, "json": {
             "id": "new-id",
-            "subject": "DomainSifter daily — 2 picks for May 15, 2026",
+            "subject": "DomainSifter daily picks — May 15, 2026",
         }},
     ])
     out = gn.generate_newsletter(
@@ -518,13 +562,13 @@ def test_generate_newsletter_creates_draft_happy_path():
     )
     assert out["status"] == "created"
     assert out["id"] == "new-id"
-    assert out["subject"] == "DomainSifter daily — 2 picks for May 15, 2026"
+    assert out["subject"] == "DomainSifter daily picks — May 15, 2026"
     assert out["domain_count"] == 2
 
 
 def test_generate_newsletter_idempotent_when_draft_exists():
     """Same subject already in drafts → skip create. Don't POST a duplicate."""
-    existing_subject = "DomainSifter daily — 1 picks for May 15, 2026"
+    existing_subject = "DomainSifter daily picks — May 15, 2026"
     session = _fake_session([
         {"method": "GET", "status": 200, "json": {
             "results": [{"id": "existing-id", "subject": existing_subject}],
@@ -574,9 +618,8 @@ def test_generate_newsletter_respects_custom_top_n():
         cfg, {"domains": domains}, api_key="KEY",
         today=date(2026, 5, 15), session=session,
     )
-    # Subject reflects 3 picks (not 10).
-    assert "3 picks" in captured["subject"]
-    # Only top 3 by score (d0, d1, d2) appear in body; d9 does not.
+    # Only top 3 by score (d0, d1, d2) appear in body; d9 does not. The
+    # subject no longer carries a count — varies day-to-day, sometimes wrong.
     assert "d0.com" in captured["body"]
     assert "d2.com" in captured["body"]
     assert "d9.com" not in captured["body"]
@@ -594,7 +637,7 @@ def test_generate_newsletter_subject_uses_iso_date_for_idempotency():
         cfg, {"domains": [_domain("a.org", 80)]},
         api_key="K", today=date(2026, 5, 14), session=session1,
     )
-    out2_subject = "DomainSifter daily — 1 picks for May 15, 2026"
+    out2_subject = "DomainSifter daily picks — May 15, 2026"
     # Different date in today=... → different subject.
     assert out1["subject"] != out2_subject
 

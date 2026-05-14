@@ -80,7 +80,7 @@
     "_doc": "Daily newsletter draft generation via Buttondown. Enabled 2026-05-14 same-day as the wire-in commit — drafts are inherently safe (status=draft never reaches subscribers without a manual dashboard action), so flipping the flag on doesn't create deliverability risk. Idempotent: re-running the same day finds the existing draft by subject and skips creation. See STATE.md 'Daily newsletter — 2026-05-14' for the test-send workflow. Module: scripts/generate_newsletter.py — run-daily.sh invokes it AFTER pipeline.py succeeds, failure here is logged but never aborts the daily run. Disable by flipping enabled to false if Buttondown is misbehaving or for any reason draft creation should pause.",
     "enabled": true,
     "top_n": 20,
-    "subject_template": "DomainSifter daily — {n} picks for {date}",
+    "subject_template": "DomainSifter daily picks — {date}",
     "intro_text": "Today's top expired domain picks, sorted by score. Backlinks counts come from Common Crawl's last 3 months of crawl data. All domains were available at last check — verify at registrar before buying.",
     "site_url": "https://domainsifter.com"
   },

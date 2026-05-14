@@ -30,7 +30,8 @@ Exit codes:
 Configuration sources:
     config["newsletter"]["enabled"]           — feature flag (default False)
     config["newsletter"]["top_n"]             — default 20
-    config["newsletter"]["subject_template"]  — uses {n} and {date} placeholders
+    config["newsletter"]["subject_template"]  — uses {date} placeholder ({n}
+                                              still accepted for back-compat)
     config["newsletter"]["intro_text"]        — body intro paragraph
     config["newsletter"]["site_url"]          — for "see full list" link
     env BUTTONDOWN_API_KEY                    — required when enabled=true
@@ -68,7 +69,7 @@ REGISTRAR_LOGO_SLUGS = {
 }
 
 DEFAULT_TOP_N = 20
-DEFAULT_SUBJECT_TEMPLATE = "DomainSifter daily — {n} picks for {date}"
+DEFAULT_SUBJECT_TEMPLATE = "DomainSifter daily picks — {date}"
 DEFAULT_INTRO = (
     "Today's top expired domain picks, sorted by score. Backlinks counts "
     "come from Common Crawl's last 3 months of crawl data. All domains "
@@ -139,10 +140,38 @@ def _verdict_style(verdict: str) -> tuple[str, str]:
 # --- HTML body assembly ------------------------------------------------------
 
 
+def _render_logos(domain: dict, site_url: str) -> str:
+    """Build the affiliate-registrar logo strip for one domain. Each entry is
+    an <a> wrapping an <img>, with UTM appended to the outer registrar URL.
+    Unknown registrars (not in REGISTRAR_LOGO_SLUGS) are silently skipped so
+    a future config entry without a hosted PNG doesn't render a broken image.
+    Used by both desktop rows (_row_html) and mobile cards (_card_html)."""
+    parts: list[str] = []
+    for reg in domain.get("registrars", []) or []:
+        reg_name = reg.get("name", "") if isinstance(reg, dict) else ""
+        reg_url = reg.get("url", "") if isinstance(reg, dict) else ""
+        logo_slug = REGISTRAR_LOGO_SLUGS.get(reg_name)
+        if not logo_slug or not reg_url:
+            continue
+        tracked = _append_utm(reg_url)
+        logo_url = LOGO_URL_TEMPLATE.format(site_url=site_url, slug=logo_slug)
+        parts.append(
+            f'<a href="{html.escape(tracked, quote=True)}" '
+            f'style="display: inline-block; margin-right: 6px; text-decoration: none;">'
+            f'<img src="{html.escape(logo_url, quote=True)}" '
+            f'width="20" height="20" alt="{html.escape(reg_name)}" '
+            f'style="display: inline-block; border-radius: 2px; vertical-align: middle; border: 0;">'
+            f'</a>'
+        )
+    return "".join(parts) or "—"
+
+
 def _row_html(domain: dict, site_url: str) -> str:
-    """One <tr> for a domain. All CSS inline (email clients strip <style>).
-    Text content is HTML-escaped; href values come from trusted config-built
-    URLs (pipeline already produced them) plus UTM params we control."""
+    """One desktop <tr> for a domain. All CSS inline (the responsive @media
+    block lives in head <style>; this row stays narrow-table-styled because
+    inline styles win on desktop). Text content is HTML-escaped; href values
+    come from trusted config-built URLs (pipeline already produced them)
+    plus UTM params we control."""
     name = domain.get("name", "")
     tld = domain.get("tld", "")
     score = int(domain.get("score", 0) or 0)
@@ -154,25 +183,7 @@ def _row_html(domain: dict, site_url: str) -> str:
     opr = _fmt_decimal(domain.get("open_page_rank"))
     backlinks = _fmt_int(domain.get("cc_source_domain_count"))
 
-    logos_parts: list[str] = []
-    for reg in domain.get("registrars", []) or []:
-        reg_name = reg.get("name", "") if isinstance(reg, dict) else ""
-        reg_url = reg.get("url", "") if isinstance(reg, dict) else ""
-        logo_slug = REGISTRAR_LOGO_SLUGS.get(reg_name)
-        if not logo_slug or not reg_url:
-            continue
-        tracked = _append_utm(reg_url)
-        logo_url = LOGO_URL_TEMPLATE.format(site_url=site_url, slug=logo_slug)
-        logos_parts.append(
-            f'<a href="{html.escape(tracked, quote=True)}" '
-            f'style="display: inline-block; margin-right: 6px; text-decoration: none;">'
-            f'<img src="{html.escape(logo_url, quote=True)}" '
-            f'width="20" height="20" alt="{html.escape(reg_name)}" '
-            f'style="display: inline-block; border-radius: 2px; vertical-align: middle; border: 0;">'
-            f'</a>'
-        )
-    logos = "".join(logos_parts) or "—"
-
+    logos = _render_logos(domain, site_url)
     domain_anchor = f"{site_url}/#{slug}"
 
     return (
@@ -197,18 +208,81 @@ def _row_html(domain: dict, site_url: str) -> str:
     )
 
 
+def _card_html(domain: dict, site_url: str) -> str:
+    """One stacked mobile card for a domain. Lives inside `.ds-mobile-only`
+    which is `display: none` by default; the @media (max-width: 600px) block
+    flips it to `display: block !important`, hiding the desktop table and
+    showing these cards instead. Each card: prominent domain link on top,
+    label/value rows below, registrar logos at the bottom."""
+    name = domain.get("name", "")
+    tld = domain.get("tld", "")
+    score = int(domain.get("score", 0) or 0)
+    verdict = _verdict_from_score(score)
+    v_color, v_bg = _verdict_style(verdict)
+    slug = _domain_slug(name)
+
+    wayback = _fmt_int(domain.get("wayback_snapshots"))
+    opr = _fmt_decimal(domain.get("open_page_rank"))
+    backlinks = _fmt_int(domain.get("cc_source_domain_count"))
+
+    logos = _render_logos(domain, site_url)
+    domain_anchor = f"{site_url}/#{slug}"
+
+    label_style = "padding: 4px 0; color: #78716c; font-size: 13px;"
+    value_style = (
+        "padding: 4px 0; text-align: right; color: #1a1a1a; font-size: 13px;"
+    )
+
+    return (
+        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
+        'width="100%" style="border-bottom: 1px solid #e7e5e4;">'
+        '<tr><td style="padding: 14px 0;">'
+        f'<a href="{html.escape(domain_anchor, quote=True)}" '
+        f'style="display: block; font-size: 16px; font-weight: 600; '
+        f'color: #0d6e6e; text-decoration: none; margin-bottom: 10px; '
+        f'word-break: break-word;">{html.escape(name)}</a>'
+        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
+        'width="100%">'
+        f'<tr><td style="{label_style}">TLD</td>'
+        f'<td style="{value_style}">.{html.escape(tld)}</td></tr>'
+        f'<tr><td style="{label_style}">Wayback</td>'
+        f'<td style="{value_style}">{wayback}</td></tr>'
+        f'<tr><td style="{label_style}">OPR</td>'
+        f'<td style="{value_style}">{opr}</td></tr>'
+        f'<tr><td style="{label_style}">Backlinks</td>'
+        f'<td style="{value_style}">{backlinks}</td></tr>'
+        f'<tr><td style="{label_style}">Verdict</td>'
+        '<td style="padding: 4px 0; text-align: right;">'
+        f'<span style="display: inline-block; padding: 2px 10px; '
+        f'border-radius: 9999px; background: {v_bg}; color: {v_color}; '
+        f'font-size: 11px; font-weight: 500;">{verdict}</span></td></tr>'
+        '</table>'
+        f'<div style="margin-top: 12px;">{logos}</div>'
+        '</td></tr></table>'
+    )
+
+
 def build_html_body(
     domains: list[dict],
     today: date,
     intro_text: str,
     site_url: str = DEFAULT_SITE_URL,
 ) -> str:
-    """Full HTML email body, inline-styled, 720px max-width nested-table layout.
+    """Full HTML email body. Two layouts emitted side-by-side:
+      - Desktop (>600px viewport): the 7-column table inside `.ds-desktop-only`.
+      - Mobile (<=600px viewport): stacked cards inside `.ds-mobile-only`.
+
+    The `<style>` block in `<head>` carries the @media query that swaps which
+    block is visible. Inline styles still dominate per-element, so the @media
+    rules use `!important` to override `display: none` / `display: table`
+    inline declarations — the standard responsive-email pattern (Gmail web,
+    Gmail mobile, Apple Mail, Outlook mobile all support it).
 
     Includes `{{ unsubscribe_url }}` Buttondown template tag so subscribers
     can unsubscribe — Buttondown substitutes it server-side at send time.
     """
     rows = "\n".join(_row_html(d, site_url) for d in domains)
+    cards = "\n".join(_card_html(d, site_url) for d in domains)
     formatted_date = today.strftime("%B %d, %Y")
     site_link = _append_utm(site_url)
 
@@ -217,14 +291,28 @@ def build_html_body(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DomainSifter daily — {formatted_date}</title>
+  <title>DomainSifter daily picks — {formatted_date}</title>
+  <style type="text/css">
+    @media only screen and (max-width: 600px) {{
+      .ds-desktop-only {{
+        display: none !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
+      }}
+      .ds-mobile-only {{
+        display: block !important;
+        max-height: none !important;
+        overflow: visible !important;
+        width: 100% !important;
+      }}
+    }}
+  </style>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif; color: #1a1a1a; background: #fafaf9; margin: 0; padding: 24px;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #e7e5e4; border-radius: 8px; padding: 28px;">
     <tr>
       <td>
-        <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #0d6e6e; letter-spacing: -0.01em;">DomainSifter</h1>
-        <p style="margin: 4px 0 0 0; font-size: 13px; color: #78716c;">Daily picks · {formatted_date}</p>
+        <h1 style="margin: 0; font-size: 22px; font-weight: 600; color: #0d6e6e; letter-spacing: -0.01em;">DomainSifter daily picks</h1>
       </td>
     </tr>
     <tr>
@@ -234,7 +322,7 @@ def build_html_body(
     </tr>
     <tr>
       <td style="padding-top: 24px;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <table class="ds-desktop-only" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <thead>
             <tr style="border-bottom: 2px solid #e7e5e4; color: #78716c; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">
               <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Domain</th>
@@ -250,6 +338,9 @@ def build_html_body(
 {rows}
           </tbody>
         </table>
+        <div class="ds-mobile-only" style="display: none; max-height: 0; overflow: hidden;">
+{cards}
+        </div>
       </td>
     </tr>
     <tr>
@@ -258,7 +349,7 @@ def build_html_body(
           See the full daily list at <a href="{html.escape(site_link, quote=True)}" style="color: #0d6e6e; text-decoration: none;">domainsifter.com</a>.
         </p>
         <p style="margin: 16px 0 0 0; font-size: 12px; color: #a8a29e; line-height: 1.5;">
-          DomainSifter publishes a daily-curated list of recently-expired domains, filtered for spam, malware, and abuse signals. Estonia-based independent project.
+          DomainSifter publishes a daily-curated list of recently-expired domains, filtered for spam, malware, and abuse signals.
         </p>
         <p style="margin: 12px 0 0 0; font-size: 11px; color: #a8a29e;">
           <a href="{{{{ unsubscribe_url }}}}" style="color: #a8a29e; text-decoration: underline;">Unsubscribe</a>
