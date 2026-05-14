@@ -102,14 +102,6 @@ const droppedDaysAgo = (isoDate: string): string => {
   return `${days} days ago`;
 };
 
-// "Listed" column label — purely from days_listed (computed pipeline-side
-// at write time so the value is stable across browser timezones).
-const listedAgo = (days: number | undefined | null): string => {
-  if (days == null || days <= 0) return 'today';
-  if (days === 1) return '1 day ago';
-  return `${days} days ago`;
-};
-
 // --- Null-safe formatters ----------------------------------------------------
 const DASH = '—';
 const fmtInt = (v: number | null | undefined): string =>
@@ -169,7 +161,7 @@ const carryoverSubheader = (n: number): string => {
 };
 ---
 
-<section id="today" class="mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
+<section id="today" class="mx-auto max-w-7xl px-4 sm:px-6 pt-6 pb-12 sm:pt-8 sm:pb-16">
   <!-- Shared header bar: title, last-updated, search, TLD filter.
        Filter + search apply to BOTH cards simultaneously. -->
   <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
@@ -500,16 +492,16 @@ const carryoverSubheader = (n: number): string => {
         <!-- Desktop table for Card 2 — same columns as Card 1 plus "Listed". -->
         <div class="hidden md:block max-h-[60rem] overflow-y-auto rounded-b-lg">
           {/*
-            Same grid pattern as Card 1, with the Listed column inserted at
-            position 4 (between Dropped and Wayback). Listed groups
-            naturally with Dropped — both are temporal — so this ordering
-            reads better than putting Listed at the far right next to
-            Register. 8 columns total; Register column still 1fr to host
-            the inline popover.
+            Same grid pattern AND column widths as Card 1 — the Recent
+            drops card now mirrors Today's drops exactly, after the
+            duplicate "Listed" column was removed (it showed the same
+            days-ago value as "Dropped" because production data always
+            has first_seen_date == dropped_date). Register column still
+            1fr to host the inline popover.
           */}
           <div role="table" class="w-full text-sm" data-domain-table data-table-scope="carryover">
             <div role="rowgroup" class="sticky top-0 z-10 bg-stone-50 text-stone-600 border-b border-stone-100">
-              <div role="row" class="grid grid-cols-[200px_80px_110px_110px_110px_180px_110px_120px_1fr] font-medium">
+              <div role="row" class="grid grid-cols-[200px_80px_110px_110px_180px_110px_120px_1fr] font-medium">
                 <div role="columnheader">
                   <button type="button" class="w-full text-left px-4 py-3 hover:text-ink flex items-center gap-1" data-sort-key="name">
                     Domain <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
@@ -523,11 +515,6 @@ const carryoverSubheader = (n: number): string => {
                 <div role="columnheader">
                   <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="dropped">
                     Dropped <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
-                  </button>
-                </div>
-                <div role="columnheader">
-                  <button type="button" class="w-full text-right px-4 py-3 hover:text-ink flex items-center justify-end gap-1" data-sort-key="listed">
-                    Listed <span class="sort-indicator text-stone-300" aria-hidden="true">↕</span>
                   </button>
                 </div>
                 <div role="columnheader">
@@ -557,7 +544,6 @@ const carryoverSubheader = (n: number): string => {
               {carryoverDomains.map((d, i) => {
                 const verdict = verdictFromScore(d.score);
                 const popoverId = `pop-carry-row-${i}`;
-                const days = d.days_listed ?? 0;
                 return (
                   <div
                     role="row"
@@ -570,15 +556,13 @@ const carryoverSubheader = (n: number): string => {
                     data-opr={d.open_page_rank}
                     data-backlinks={d.cc_source_domain_count}
                     data-score={d.score}
-                    data-listed={days}
-                    class="grid grid-cols-[200px_80px_110px_110px_110px_180px_110px_120px_1fr] items-center"
+                    class="grid grid-cols-[200px_80px_110px_110px_180px_110px_120px_1fr] items-center"
                   >
                     <div role="cell" class="px-4 py-3"><span class="font-medium text-ink">{d.name}</span></div>
                     <div role="cell" class="px-4 py-3">
                       <span class={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${tldClass(d.tld)}`}>.{d.tld}</span>
                     </div>
                     <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{droppedDaysAgo(d.dropped_date)}</div>
-                    <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-500">{listedAgo(days)}</div>
                     <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.wayback_snapshots)}</div>
                     <div role="cell" class="px-4 py-3">
                       <div class="flex items-center gap-2">
@@ -634,12 +618,13 @@ const carryoverSubheader = (n: number): string => {
           </p>
         </div>
 
-        <!-- Mobile cards for Card 2 — extra "Listed" row in the dl -->
+        <!-- Mobile cards for Card 2 — same dl shape as Card 1 (Listed row
+             removed; it was a duplicate of Dropped because production
+             data always has first_seen_date == dropped_date). -->
         <ul class="md:hidden space-y-3 p-3 max-h-[80vh] overflow-y-auto" data-card-list data-scope="carryover">
           {carryoverDomains.map((d, i) => {
             const verdict = verdictFromScore(d.score);
             const popoverId = `pop-carry-card-${i}`;
-            const days = d.days_listed ?? 0;
             return (
               <li
                 data-card
@@ -651,7 +636,6 @@ const carryoverSubheader = (n: number): string => {
                 data-opr={d.open_page_rank}
                 data-backlinks={d.cc_source_domain_count}
                 data-score={d.score}
-                data-listed={days}
                 class="rounded-lg border border-stone-200 bg-white p-4 shadow-sm"
               >
                 <div class="flex items-start justify-between gap-3">
@@ -664,8 +648,6 @@ const carryoverSubheader = (n: number): string => {
                   </dd></div>
                   <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Dropped</dt>
                     <dd class="text-stone-800 tabular-nums">{droppedDaysAgo(d.dropped_date)}</dd></div>
-                  <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Listed</dt>
-                    <dd class="text-stone-800 tabular-nums">{listedAgo(days)}</dd></div>
                   <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Wayback snapshots</dt>
                     <dd class="text-stone-800 tabular-nums">{fmtInt(d.wayback_snapshots)}</dd></div>
                   <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">OpenPageRank</dt>
@@ -711,7 +693,7 @@ const carryoverSubheader = (n: number): string => {
 </section>
 
 <script>
-  type SortKey = 'name' | 'tld' | 'dropped' | 'wayback' | 'opr' | 'backlinks' | 'score' | 'listed';
+  type SortKey = 'name' | 'tld' | 'dropped' | 'wayback' | 'opr' | 'backlinks' | 'score';
   type SortDir = 'asc' | 'desc';
   type Scope = 'today' | 'carryover';
 
@@ -738,7 +720,6 @@ const carryoverSubheader = (n: number): string => {
       case 'opr':       return numOrNull('data-opr');
       case 'backlinks': return numOrNull('data-backlinks');
       case 'score':     return numOrNull('data-score');
-      case 'listed':    return numOrNull('data-listed');
     }
   };
 
