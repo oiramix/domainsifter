@@ -144,8 +144,7 @@ def _render_logos(domain: dict, site_url: str) -> str:
     """Build the affiliate-registrar logo strip for one domain. Each entry is
     an <a> wrapping an <img>, with UTM appended to the outer registrar URL.
     Unknown registrars (not in REGISTRAR_LOGO_SLUGS) are silently skipped so
-    a future config entry without a hosted PNG doesn't render a broken image.
-    Used by both desktop rows (_row_html) and mobile cards (_card_html)."""
+    a future config entry without a hosted PNG doesn't render a broken image."""
     parts: list[str] = []
     for reg in domain.get("registrars", []) or []:
         reg_name = reg.get("name", "") if isinstance(reg, dict) else ""
@@ -167,11 +166,12 @@ def _render_logos(domain: dict, site_url: str) -> str:
 
 
 def _row_html(domain: dict, site_url: str) -> str:
-    """One desktop <tr> for a domain. All CSS inline (the responsive @media
-    block lives in head <style>; this row stays narrow-table-styled because
-    inline styles win on desktop). Text content is HTML-escaped; href values
-    come from trusted config-built URLs (pipeline already produced them)
-    plus UTM params we control."""
+    """One <tr> for a domain. All per-cell CSS inline; the responsive @media
+    block in <style> targets `.ds-register-cell` to wrap the registrar logos
+    onto a new full-width line below the data cells on viewports ≤600px,
+    keeping the other six narrow columns side-by-side. Text content is
+    HTML-escaped; href values come from trusted config-built URLs (pipeline
+    already produced them) plus UTM params we control."""
     name = domain.get("name", "")
     tld = domain.get("tld", "")
     score = int(domain.get("score", 0) or 0)
@@ -203,62 +203,8 @@ def _row_html(domain: dict, site_url: str) -> str:
         f'background: {v_bg}; color: {v_color}; font-size: 11px; font-weight: 500;">'
         f'{verdict}</span>'
         '</td>'
-        f'<td style="padding: 10px 6px; white-space: nowrap;">{logos}</td>'
+        f'<td class="ds-register-cell" style="padding: 10px 6px; white-space: nowrap;">{logos}</td>'
         '</tr>'
-    )
-
-
-def _card_html(domain: dict, site_url: str) -> str:
-    """One stacked mobile card for a domain. Lives inside `.ds-mobile-only`
-    which is `display: none` by default; the @media (max-width: 600px) block
-    flips it to `display: block !important`, hiding the desktop table and
-    showing these cards instead. Each card: prominent domain link on top,
-    label/value rows below, registrar logos at the bottom."""
-    name = domain.get("name", "")
-    tld = domain.get("tld", "")
-    score = int(domain.get("score", 0) or 0)
-    verdict = _verdict_from_score(score)
-    v_color, v_bg = _verdict_style(verdict)
-    slug = _domain_slug(name)
-
-    wayback = _fmt_int(domain.get("wayback_snapshots"))
-    opr = _fmt_decimal(domain.get("open_page_rank"))
-    backlinks = _fmt_int(domain.get("cc_source_domain_count"))
-
-    logos = _render_logos(domain, site_url)
-    domain_anchor = f"{site_url}/#{slug}"
-
-    label_style = "padding: 4px 0; color: #78716c; font-size: 13px;"
-    value_style = (
-        "padding: 4px 0; text-align: right; color: #1a1a1a; font-size: 13px;"
-    )
-
-    return (
-        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
-        'width="100%" style="border-bottom: 1px solid #e7e5e4;">'
-        '<tr><td style="padding: 14px 0;">'
-        f'<a href="{html.escape(domain_anchor, quote=True)}" '
-        f'style="display: block; font-size: 16px; font-weight: 600; '
-        f'color: #0d6e6e; text-decoration: none; margin-bottom: 10px; '
-        f'word-break: break-word;">{html.escape(name)}</a>'
-        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
-        'width="100%">'
-        f'<tr><td style="{label_style}">TLD</td>'
-        f'<td style="{value_style}">.{html.escape(tld)}</td></tr>'
-        f'<tr><td style="{label_style}">Wayback</td>'
-        f'<td style="{value_style}">{wayback}</td></tr>'
-        f'<tr><td style="{label_style}">OPR</td>'
-        f'<td style="{value_style}">{opr}</td></tr>'
-        f'<tr><td style="{label_style}">Backlinks</td>'
-        f'<td style="{value_style}">{backlinks}</td></tr>'
-        f'<tr><td style="{label_style}">Verdict</td>'
-        '<td style="padding: 4px 0; text-align: right;">'
-        f'<span style="display: inline-block; padding: 2px 10px; '
-        f'border-radius: 9999px; background: {v_bg}; color: {v_color}; '
-        f'font-size: 11px; font-weight: 500;">{verdict}</span></td></tr>'
-        '</table>'
-        f'<div style="margin-top: 12px;">{logos}</div>'
-        '</td></tr></table>'
     )
 
 
@@ -268,21 +214,25 @@ def build_html_body(
     intro_text: str,
     site_url: str = DEFAULT_SITE_URL,
 ) -> str:
-    """Full HTML email body. Two layouts emitted side-by-side:
-      - Desktop (>600px viewport): the 7-column table inside `.ds-desktop-only`.
-      - Mobile (<=600px viewport): stacked cards inside `.ds-mobile-only`.
+    """Full HTML email body. Single 7-column table; the `<style>` block in
+    `<head>` carries an @media (max-width: 600px) rule that:
+      - Hides the Register `<th>` header on mobile.
+      - Promotes the Register `<td>` (class `ds-register-cell`) to a full-
+        width block element below the data cells, so the registrar logos
+        wrap to their own line instead of fighting the other six columns
+        for horizontal space.
+      - Reduces horizontal padding on the other cells to 4px on mobile so
+        they fit on a ~360px viewport without breaking words.
 
-    The `<style>` block in `<head>` carries the @media query that swaps which
-    block is visible. Inline styles still dominate per-element, so the @media
-    rules use `!important` to override `display: none` / `display: table`
-    inline declarations — the standard responsive-email pattern (Gmail web,
-    Gmail mobile, Apple Mail, Outlook mobile all support it).
+    Why a single table instead of a duplicated desktop-table + mobile-cards
+    layout: a 20-domain duplicated render crossed Gmail's 102KB clip
+    threshold (commit 8e479a7's email was clipped). One table renders
+    compactly (~25-30KB at 20 domains, well under the limit).
 
     Includes `{{ unsubscribe_url }}` Buttondown template tag so subscribers
     can unsubscribe — Buttondown substitutes it server-side at send time.
     """
     rows = "\n".join(_row_html(d, site_url) for d in domains)
-    cards = "\n".join(_card_html(d, site_url) for d in domains)
     formatted_date = today.strftime("%B %d, %Y")
     site_link = _append_utm(site_url)
 
@@ -294,16 +244,20 @@ def build_html_body(
   <title>DomainSifter daily picks — {formatted_date}</title>
   <style type="text/css">
     @media only screen and (max-width: 600px) {{
-      .ds-desktop-only {{
+      th.ds-register-cell {{
         display: none !important;
-        max-height: 0 !important;
-        overflow: hidden !important;
       }}
-      .ds-mobile-only {{
+      td.ds-register-cell {{
         display: block !important;
-        max-height: none !important;
-        overflow: visible !important;
         width: 100% !important;
+        padding: 6px 4px 14px 4px !important;
+        border-bottom: 1px solid #e7e5e4 !important;
+        white-space: normal !important;
+      }}
+      th:not(.ds-register-cell),
+      td:not(.ds-register-cell) {{
+        padding-left: 4px !important;
+        padding-right: 4px !important;
       }}
     }}
   </style>
@@ -322,7 +276,7 @@ def build_html_body(
     </tr>
     <tr>
       <td style="padding-top: 24px;">
-        <table class="ds-desktop-only" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <thead>
             <tr style="border-bottom: 2px solid #e7e5e4; color: #78716c; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">
               <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Domain</th>
@@ -331,16 +285,13 @@ def build_html_body(
               <th style="text-align: right; padding: 8px 6px; font-weight: 600; white-space: nowrap;">OPR</th>
               <th style="text-align: right; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Backlinks</th>
               <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Verdict</th>
-              <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Register</th>
+              <th class="ds-register-cell" style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Register</th>
             </tr>
           </thead>
           <tbody>
 {rows}
           </tbody>
         </table>
-        <div class="ds-mobile-only" style="display: none; max-height: 0; overflow: hidden;">
-{cards}
-        </div>
       </td>
     </tr>
     <tr>

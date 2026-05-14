@@ -297,10 +297,8 @@ def test_build_html_body_skips_unknown_registrar_logos():
     d["registrars"].append({"name": "MysteryRegistrar", "url": "https://x/y"})
     body = gn.build_html_body([d], date(2026, 5, 15), "x")
     assert "MysteryRegistrar" not in body
-    # The 3 known logos render twice each (once in desktop table, once in
-    # mobile cards); 6 total. The unknown one would have rendered twice too
-    # if not filtered — its absence is what this test guards.
-    assert body.count("registrar-logos/") == 6
+    # 3 known logos render once each (single-table layout, no duplication).
+    assert body.count("registrar-logos/") == 3
 
 
 def test_build_html_body_includes_unsubscribe_token():
@@ -380,24 +378,46 @@ def test_build_html_body_has_responsive_media_query():
     assert "display: block !important" in body
 
 
-def test_build_html_body_emits_mobile_cards_alongside_desktop_table():
-    """Two layout blocks coexist in the markup. @media toggles which one
-    is visible — desktop sees the table, mobile sees the cards. The mobile
-    block is hidden by default via inline `display: none`; @media flips it
-    on. The desktop block uses no inline display so it's table by default
-    and goes to none on mobile via the @media rule."""
-    body = gn.build_html_body([_domain("amber.org", 80)], date(2026, 5, 15), "x")
-    # Desktop table is tagged for hide-on-mobile.
-    assert 'class="ds-desktop-only"' in body
-    # Mobile cards block exists and is hidden inline by default.
-    assert 'class="ds-mobile-only"' in body
-    assert 'class="ds-mobile-only" style="display: none' in body
-    # Mobile card rendering: each domain has a card-tagged label/value row.
-    # The "TLD" / "Wayback" / etc. labels appear as <td> text inside the
-    # cards (they don't appear in the desktop table — those use <th>).
-    assert ">TLD</td>" in body
-    assert ">Wayback</td>" in body
-    assert ">Backlinks</td>" in body
+def test_build_html_body_register_cell_carries_ds_register_class():
+    """Both the Register <th> (header) and <td> (data cell) carry the
+    `ds-register-cell` class so the @media (max-width: 600px) rule can
+    hide the header and promote the data cell to a full-width block —
+    putting the registrar logos on their own line below the data cells."""
+    body = gn.build_html_body([_domain("a.org", 80)], date(2026, 5, 15), "x")
+    # One <th> with the class.
+    assert 'th class="ds-register-cell"' in body
+    # One <td> per data row.
+    assert 'td class="ds-register-cell"' in body
+    # 2 markup attributes (1 th + 1 td); the class name also appears in the
+    # @media CSS selectors but that's counted separately by inclusion above.
+    assert body.count('class="ds-register-cell"') == 2
+
+
+def test_build_html_body_does_not_mention_estonia():
+    """The 'Estonia-based independent project' sentence was removed earlier.
+    Regression guard against it being reintroduced — the phrasing did no
+    positioning work and just added byte count."""
+    body = gn.build_html_body([_domain("a.org", 80)], date(2026, 5, 15), "x")
+    assert "Estonia" not in body
+    assert "Estonian" not in body
+
+
+def test_build_html_body_under_gmail_clip_limit_at_20_domains():
+    """Gmail clips messages over ~102 KB ('[Message clipped] View entire
+    message'). Commit 8e479a7 emitted each domain twice (desktop table +
+    mobile cards) and crossed that line. Single-table layout must stay
+    well under it — assert under 90,000 bytes at 20 domains, which is
+    the realistic top-of-cluster daily count."""
+    domains = [_domain(f"sample{i}.org", 80 - i) for i in range(20)]
+    body = gn.build_html_body(
+        domains, date(2026, 5, 15),
+        "Intro paragraph used for the byte-budget regression test.",
+    )
+    size = len(body.encode("utf-8"))
+    assert size < 90_000, (
+        f"Body is {size} bytes; Gmail clips above ~102 KB and the 90 KB "
+        f"ceiling is the safety margin under that limit."
+    )
 
 
 def test_build_html_body_uses_configured_site_url():
