@@ -184,10 +184,10 @@ def _row_html(domain: dict, site_url: str) -> str:
         '</td>'
         '<td style="padding: 10px 6px; color: #57534e; font-size: 12px; white-space: nowrap;">'
         f'.{html.escape(tld)}</td>'
-        f'<td style="padding: 10px 6px; text-align: right; color: #1a1a1a;">{wayback}</td>'
-        f'<td style="padding: 10px 6px; text-align: right; color: #1a1a1a;">{opr}</td>'
-        f'<td style="padding: 10px 6px; text-align: right; color: #1a1a1a;">{backlinks}</td>'
-        '<td style="padding: 10px 6px;">'
+        f'<td style="padding: 10px 6px; text-align: right; color: #1a1a1a; white-space: nowrap;">{wayback}</td>'
+        f'<td style="padding: 10px 6px; text-align: right; color: #1a1a1a; white-space: nowrap;">{opr}</td>'
+        f'<td style="padding: 10px 6px; text-align: right; color: #1a1a1a; white-space: nowrap;">{backlinks}</td>'
+        '<td style="padding: 10px 6px; white-space: nowrap;">'
         f'<span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; '
         f'background: {v_bg}; color: {v_color}; font-size: 11px; font-weight: 500;">'
         f'{verdict}</span>'
@@ -237,13 +237,13 @@ def build_html_body(
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <thead>
             <tr style="border-bottom: 2px solid #e7e5e4; color: #78716c; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">
-              <th style="text-align: left; padding: 8px 6px; font-weight: 600;">Domain</th>
-              <th style="text-align: left; padding: 8px 6px; font-weight: 600;">TLD</th>
-              <th style="text-align: right; padding: 8px 6px; font-weight: 600;">Wayback</th>
-              <th style="text-align: right; padding: 8px 6px; font-weight: 600;">OPR</th>
-              <th style="text-align: right; padding: 8px 6px; font-weight: 600;">Backlinks</th>
-              <th style="text-align: left; padding: 8px 6px; font-weight: 600;">Verdict</th>
-              <th style="text-align: left; padding: 8px 6px; font-weight: 600;">Register</th>
+              <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Domain</th>
+              <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">TLD</th>
+              <th style="text-align: right; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Wayback</th>
+              <th style="text-align: right; padding: 8px 6px; font-weight: 600; white-space: nowrap;">OPR</th>
+              <th style="text-align: right; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Backlinks</th>
+              <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Verdict</th>
+              <th style="text-align: left; padding: 8px 6px; font-weight: 600; white-space: nowrap;">Register</th>
             </tr>
           </thead>
           <tbody>

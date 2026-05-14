@@ -330,6 +330,32 @@ def test_build_html_body_escapes_html_in_domain_names():
     assert "evil&lt;script&gt;.org" in body
 
 
+def test_build_html_body_narrow_columns_have_nowrap_and_domain_does_not():
+    """Narrow columns (TLD, Wayback, OPR, Backlinks, Verdict, Register) MUST
+    carry `white-space: nowrap` so short labels like "TLD" and "Promising"
+    don't break across lines in narrow email reading panes (observed in
+    Gmail web). The Domain column intentionally omits nowrap so long names
+    absorb the flex when other columns are pinned wide."""
+    body = gn.build_html_body(
+        [_domain("amber.org", 55)],  # 55 → "Promising" verdict
+        date(2026, 5, 15), "x",
+    )
+    # Every <th> header has nowrap.
+    th_count = body.count("<th ")
+    nowrap_th_count = body.count('font-weight: 600; white-space: nowrap;">')
+    # 7 columns: Domain, TLD, Wayback, OPR, Backlinks, Verdict, Register.
+    assert th_count == 7
+    assert nowrap_th_count == 7
+    # Narrow data cells carry nowrap.
+    assert 'text-align: right; color: #1a1a1a; white-space: nowrap;">' in body
+    # Verdict pill cell carries nowrap.
+    assert 'padding: 10px 6px; white-space: nowrap;">' in body
+    # Domain link cell does NOT carry nowrap — long names need to wrap.
+    # The Domain td is the only `<td style="padding: 10px 6px;">` with no
+    # additional declarations (followed immediately by the <a>).
+    assert '<td style="padding: 10px 6px;"><a href=' in body
+
+
 def test_build_html_body_uses_configured_site_url():
     body = gn.build_html_body(
         [_domain("a.org", 80)], date(2026, 5, 15), "x",
