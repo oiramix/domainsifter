@@ -466,11 +466,12 @@ const carryoverSubheader = (n: number): string => {
     )}
   </article>
 
-  <!-- Visual divider between cards. The eye catches the line on fast
-       scroll, especially on mobile where the cards stack and peripheral
-       context is lost. 4px teal (matches brand accent), 75% of card
-       width centered, comfortable vertical breathing on both sides. -->
-  <hr class="my-8 w-3/4 mx-auto border-t-4 border-accent" />
+  <!-- Visual divider between cards. Center-strong teal gradient on a
+       rounded pill shape — full accent in the middle, fades to
+       transparent at both edges so it reads as a soft section break
+       rather than a hard rectangle. Catches the eye on fast scroll
+       (especially mobile) without screaming. -->
+  <hr class="my-8 mx-auto h-1 w-3/4 rounded-full border-0 bg-gradient-to-r from-accent/0 via-accent to-accent/0" />
 
   <!-- =============== CARD 2: Recent drops =============== -->
   <article
