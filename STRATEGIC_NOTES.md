@@ -54,6 +54,8 @@ A few framings we explicitly rejected:
 
 ### Validation gate before scaling reliance
 
+**Status update — 2026-05-14**: All four validation steps below passed. Wire-in commit `bae0bde` registered `cc_backlinks` in `ENRICHMENT_MODULES`, added the scoring weight (0.30, log-scaled /4.0), and surfaced the Backlinks column on the homepage plus the Step 5 "Check backlinks" methodology card. Tomorrow's 06:30 UTC autonomous run is the first production exercise of the wired stage. The validation gate paragraph is preserved below for historical reference.
+
 Before adding `cc_backlinks` to the scoring weights or surfacing backlink counts on the homepage, we want at least one full validation cycle:
 
 1. `cc_refresh.py` completes end-to-end on OVH against real CC data (~25-35 min wall-clock, ~22 GiB transferred). The agent's smoke tests covered the build path against fixture data; the real run exercises file sizes, DuckDB spill behavior on real 5.4B-edge data, and R2 upload throughput.
