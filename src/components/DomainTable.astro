@@ -466,12 +466,18 @@ const carryoverSubheader = (n: number): string => {
     )}
   </article>
 
-  <!-- Visual divider between cards. Center-strong teal gradient on a
-       rounded pill shape — full accent in the middle, fades to
-       transparent at both edges so it reads as a soft section break
-       rather than a hard rectangle. Catches the eye on fast scroll
-       (especially mobile) without screaming. -->
-  <hr class="my-8 mx-auto h-1 w-3/4 rounded-full border-0 bg-gradient-to-r from-accent/0 via-accent to-accent/0" />
+  {/* Visual divider between cards. Three small teal dots in a classic
+      editorial chapter-break pattern. The eye locks onto discrete
+      shapes faster than a continuous line, and the minimalist
+      presentation doesn't compete with the table chrome. Decorative
+      only — section semantics are carried by the h3 headers on each
+      card, so aria-hidden keeps the dots out of the accessibility
+      tree. */}
+  <div class="my-8 flex items-center justify-center gap-3" aria-hidden="true">
+    <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-accent"></span>
+  </div>
 
   <!-- =============== CARD 2: Recent drops =============== -->
   <article
