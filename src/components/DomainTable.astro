@@ -226,11 +226,10 @@ const carryoverSubheader = (n: number): string => {
   <!-- =============== CARD 1: Today's drops =============== -->
   <article
     data-card-scope="today"
-    class="rounded-lg border border-stone-200 bg-white shadow-sm mb-12"
+    class="rounded-lg border border-stone-200 bg-white shadow-sm"
   >
     <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
-      <p class="text-xs font-semibold uppercase tracking-widest text-accent">Today</p>
-      <h3 class="mt-1 text-xl font-semibold tracking-tight text-ink">Today's drops</h3>
+      <h3 class="text-lg font-semibold text-ink">Today's drops</h3>
       <p class="mt-1 text-sm text-stone-600" data-today-subheader>
         {todaySubheader(todayDomains.length)}
       </p>
@@ -467,14 +466,19 @@ const carryoverSubheader = (n: number): string => {
     )}
   </article>
 
+  <!-- Visual divider between cards. The eye catches the line on fast
+       scroll, especially on mobile where the cards stack and peripheral
+       context is lost. 2px stone-300, full section width, comfortable
+       vertical breathing on both sides. -->
+  <hr class="my-8 border-t-2 border-stone-300" />
+
   <!-- =============== CARD 2: Recent drops =============== -->
   <article
     data-card-scope="carryover"
     class="rounded-lg border border-stone-200 bg-white shadow-sm"
   >
     <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
-      <p class="text-xs font-semibold uppercase tracking-widest text-accent">Recent</p>
-      <h3 class="mt-1 text-xl font-semibold tracking-tight text-ink">Recent drops</h3>
+      <h3 class="text-lg font-semibold text-ink">Recent drops</h3>
       <p class="mt-1 text-sm text-stone-600" data-carryover-subheader>
         {carryoverSubheader(carryoverDomains.length)}
       </p>
