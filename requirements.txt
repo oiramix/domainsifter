@@ -3,3 +3,4 @@ boto3==1.35.71
 wayback>=0.4.5
 dnspython==2.6.1
 duckdb>=1.0,<2
+anthropic>=0.40.0

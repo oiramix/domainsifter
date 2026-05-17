@@ -1,0 +1,202 @@
+---
+// Per-domain archive page. One static HTML file per archived domain,
+// built from the Markdown body that scripts/archive_generator.py wrote to
+// src/content/archive/{name}.md.
+//
+// URL shape: /d/{domain} (dot in path is fine — Astro emits
+// dist/d/{domain}/index.html). See scripts/archive_generator.py header
+// for the generator side.
+import { getCollection, getEntry } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+
+const SITE_URL = 'https://domainsifter.com';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('archive');
+  return entries.map((entry) => ({
+    params: { domain: entry.data.name },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+const d = entry.data;
+
+// Lightweight similar-domain query: other entries with the same TLD, by
+// score desc. Excludes the current entry. Capped at 5. Pure build-time
+// pass over the collection — fine at our scale (~18k entries projected).
+const allEntries = await getCollection('archive');
+const similar = allEntries
+  .filter((e) => e.data.tld === d.tld && e.data.name !== d.name)
+  .sort((a, b) => b.data.score - a.data.score)
+  .slice(0, 5);
+
+// Page metadata. Keep the title close to the spec template; longer
+// domain + Promising can drift past 65 but search engines render the
+// first ~60 chars anyway.
+const pageTitle = `${d.name} — domain history, backlinks, and DomainSifter ${d.verdict} verdict`;
+const pageDesc =
+  `${d.name} became available on ${d.dropped_date}. ` +
+  `DomainSifter verdict: ${d.verdict} (score ${d.score}). ` +
+  `Wayback snapshots: ${d.wayback_snapshots ?? 'unknown'}, ` +
+  `OpenPageRank: ${d.open_page_rank ?? 'unknown'}, ` +
+  `Common Crawl backlinks: ${d.cc_source_domain_count ?? 'unknown'}.`;
+
+const canonicalUrl = `${SITE_URL}/d/${d.name}`;
+
+// Article schema. Reflects the page as an evergreen reference; date
+// modified equals archived_date since the page is frozen at evaluation
+// time (no re-validation — see spec's out-of-scope).
+const articleSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: pageTitle,
+  datePublished: d.archived_date,
+  dateModified: d.archived_date,
+  author: {
+    '@type': 'Organization',
+    name: 'DomainSifter',
+    url: SITE_URL,
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'DomainSifter',
+    url: SITE_URL,
+    logo: { '@type': 'ImageObject', url: `${SITE_URL}/favicon.svg` },
+  },
+  mainEntityOfPage: canonicalUrl,
+};
+
+// Dataset schema. The metrics this page documents — exposes the
+// quantitative signals as machine-readable fields for crawlers / data
+// portals. Only include populated numeric fields.
+const variableMeasured: Record<string, unknown>[] = [];
+if (d.wayback_snapshots !== null) {
+  variableMeasured.push({
+    '@type': 'PropertyValue',
+    name: 'Wayback snapshots',
+    value: d.wayback_snapshots,
+  });
+}
+if (d.open_page_rank !== null) {
+  variableMeasured.push({
+    '@type': 'PropertyValue',
+    name: 'OpenPageRank',
+    value: d.open_page_rank,
+  });
+}
+if (d.cc_source_domain_count !== null) {
+  variableMeasured.push({
+    '@type': 'PropertyValue',
+    name: 'Common Crawl backlinks',
+    value: d.cc_source_domain_count,
+  });
+}
+variableMeasured.push({
+  '@type': 'PropertyValue',
+  name: 'DomainSifter verdict',
+  value: d.verdict,
+});
+
+const datasetSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Dataset',
+  name: `${d.name} expired domain evaluation`,
+  description: pageDesc,
+  creator: { '@type': 'Organization', name: 'DomainSifter', url: SITE_URL },
+  url: canonicalUrl,
+  datePublished: d.archived_date,
+  variableMeasured,
+};
+
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
+    { '@type': 'ListItem', position: 2, name: 'Archive', item: `${SITE_URL}/archive` },
+    {
+      '@type': 'ListItem',
+      position: 3,
+      name: `.${d.tld}`,
+      item: `${SITE_URL}/archive?tld=${d.tld}`,
+    },
+    {
+      '@type': 'ListItem',
+      position: 4,
+      name: d.name,
+      item: canonicalUrl,
+    },
+  ],
+};
+
+const extraJsonLd = [articleSchema, datasetSchema, breadcrumbSchema];
+
+const verdictPill =
+  d.verdict === 'Clean'
+    ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+    : 'bg-amber-50 text-amber-900 ring-amber-200';
+---
+
+<Layout
+  title={pageTitle}
+  description={pageDesc}
+  ogType="article"
+  extraJsonLd={extraJsonLd}
+>
+  <Header />
+  <main id="main" class="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-12">
+    {/* Breadcrumbs (schema.org/BreadcrumbList JSON-LD already in head) */}
+    <nav aria-label="Breadcrumb" class="text-sm text-stone-500 mb-6">
+      <ol class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <li><a href="/" class="hover:text-accent">Home</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href="/archive" class="hover:text-accent">Archive</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href={`/archive?tld=${d.tld}`} class="hover:text-accent">.{d.tld}</a></li>
+        <li aria-hidden="true">/</li>
+        <li class="text-stone-700">{d.name}</li>
+      </ol>
+    </nav>
+
+    {/* Verdict badge in the header area, mirroring DomainTable's pill style */}
+    <div class="mb-4">
+      <span class={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${verdictPill}`}>
+        DomainSifter verdict: {d.verdict}
+      </span>
+      <span class="ml-2 text-xs text-stone-500">
+        Score {d.score} · Evaluated {d.dropped_date}
+      </span>
+    </div>
+
+    <article class="prose prose-stone max-w-none prose-headings:tracking-tight prose-h2:text-3xl prose-h2:font-semibold prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-8 prose-p:text-stone-700 prose-a:text-accent">
+      <Content />
+    </article>
+
+    {similar.length > 0 && (
+      <section class="mt-12 border-t border-stone-200 pt-8">
+        <h3 class="text-base font-semibold text-ink mb-3">Other archived .{d.tld} domains</h3>
+        <ul class="space-y-2 text-sm">
+          {similar.map((e) => (
+            <li>
+              <a href={`/d/${e.data.name}`} class="text-accent hover:underline font-medium">
+                {e.data.name}
+              </a>
+              <span class="text-stone-500"> · score {e.data.score} · {e.data.verdict}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    <footer class="mt-12 border-t border-stone-200 pt-6 text-sm text-stone-500">
+      <a href="/archive" class="text-accent hover:underline">Back to archive</a>
+      <span class="mx-2">·</span>
+      <a href="/" class="text-accent hover:underline">Home</a>
+    </footer>
+  </main>
+  <Footer />
+</Layout>

@@ -12,6 +12,11 @@ interface Props {
   ogImage?: string;
   ogType?: string;
   noindex?: boolean;
+  // Per-page JSON-LD blocks (Article, Dataset, BreadcrumbList) emitted by
+  // archive /d/[domain] pages. Each entry becomes its own
+  // <script type="application/ld+json"> after the site-level @graph block.
+  // Default empty — homepage and existing pages are unaffected.
+  extraJsonLd?: Record<string, unknown>[];
 }
 
 const {
@@ -20,6 +25,7 @@ const {
   ogImage = DEFAULT_OG_IMAGE,
   ogType = 'website',
   noindex = false,
+  extraJsonLd = [],
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, SITE_URL).toString();
@@ -93,6 +99,9 @@ const jsonLd = {
     />
 
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    {extraJsonLd.map((block) => (
+      <script type="application/ld+json" set:html={JSON.stringify(block)} />
+    ))}
   </head>
   <body class="bg-paper text-ink font-sans antialiased">
     <a
