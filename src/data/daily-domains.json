@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-05-17T08:18:49Z",
-  "domain_count": 195,
-  "today_count": 89,
-  "carryover_count": 106,
+  "generated_at": "2026-05-17T13:11:17Z",
+  "domain_count": 188,
+  "today_count": 86,
+  "carryover_count": 102,
   "domains": [
     {
       "name": "deepsand.net",
@@ -34,7 +34,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1590
+      "cc_source_domain_count": 1590,
+      "verdict": "Clean"
     },
     {
       "name": "usimin.net",
@@ -66,7 +67,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Clean"
     },
     {
       "name": "waterangels.net",
@@ -98,7 +100,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1517
+      "cc_source_domain_count": 1517,
+      "verdict": "Promising"
     },
     {
       "name": "afritunes.net",
@@ -130,7 +133,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 473
+      "cc_source_domain_count": 473,
+      "verdict": "Promising"
     },
     {
       "name": "collegelabor.org",
@@ -162,7 +166,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "coolkidscreations.net",
@@ -194,7 +199,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1197
+      "cc_source_domain_count": 1197,
+      "verdict": "Promising"
     },
     {
       "name": "airshower.net",
@@ -226,7 +232,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2898
+      "cc_source_domain_count": 2898,
+      "verdict": "Promising"
     },
     {
       "name": "everythingbabies.org",
@@ -258,7 +265,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "thereedgroup.org",
@@ -290,39 +298,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
-    },
-    {
-      "name": "hentai2.org",
-      "tld": "org",
-      "dropped_date": "2026-05-13",
-      "wayback_snapshots": 22116,
-      "wayback_last_snapshot": "2025-11-24",
-      "open_page_rank": 1.03,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 62,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhentai2.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=hentai2.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=hentai2.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-13T07:49:03Z",
-      "first_seen_date": "2026-05-13",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "doctoryun.net",
@@ -354,7 +331,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "nightingaledeclaration.net",
@@ -386,7 +364,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "sfbrgenetics.org",
@@ -418,7 +397,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "rimmedia.net",
@@ -450,7 +430,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 41
+      "cc_source_domain_count": 41,
+      "verdict": "Promising"
     },
     {
       "name": "forellenhof.net",
@@ -482,7 +463,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "canvila.net",
@@ -514,7 +496,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "goldsave.net",
@@ -546,7 +529,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 84
+      "cc_source_domain_count": 84,
+      "verdict": "Promising"
     },
     {
       "name": "nanari.net",
@@ -578,7 +562,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "sjsinfo.net",
@@ -610,7 +595,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "cdecora.net",
@@ -642,7 +628,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "foleyhome.net",
@@ -674,7 +661,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "mangoshop.net",
@@ -706,7 +694,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "e-marty.net",
@@ -738,39 +727,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
-    },
-    {
-      "name": "tinbongda360.net",
-      "tld": "net",
-      "dropped_date": "2026-05-15",
-      "wayback_snapshots": 31070,
-      "wayback_last_snapshot": "2026-02-05",
-      "open_page_rank": 2.38,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 58,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtinbongda360.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=tinbongda360.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=tinbongda360.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-15T07:10:15Z",
-      "first_seen_date": "2026-05-15",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 2,
-      "cc_source_domain_count": 212
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "landclean.net",
@@ -802,7 +760,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "industribune.net",
@@ -834,7 +793,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "quachanh.net",
@@ -866,39 +826,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
-    },
-    {
-      "name": "dildoserver.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 5080,
-      "wayback_last_snapshot": "2025-10-14",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 57,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddildoserver.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=dildoserver.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=dildoserver.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:26:55Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "sommarkort.net",
@@ -930,7 +859,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "directpage.org",
@@ -962,7 +892,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "webtierarzt.net",
@@ -994,7 +925,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "larsensails.net",
@@ -1026,7 +958,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "ourvickers.net",
@@ -1058,7 +991,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "updatebola.net",
@@ -1090,7 +1024,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "4minutes.net",
@@ -1122,7 +1057,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 8
+      "cc_source_domain_count": 8,
+      "verdict": "Promising"
     },
     {
       "name": "appleprincess.net",
@@ -1154,7 +1090,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "computerco-op.net",
@@ -1186,7 +1123,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "futboll-live.net",
@@ -1218,7 +1156,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "tequilarista.org",
@@ -1250,7 +1189,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "moving-career.net",
@@ -1282,7 +1222,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "fastforwardhannover.net",
@@ -1314,7 +1255,8 @@
       "first_seen_date": "2026-05-15",
       "last_validated_date": "2026-05-17",
       "days_listed": 2,
-      "cc_source_domain_count": 215
+      "cc_source_domain_count": 215,
+      "verdict": "Promising"
     },
     {
       "name": "eastgrandlake.net",
@@ -1346,39 +1288,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
-    },
-    {
-      "name": "african-sex.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 16197,
-      "wayback_last_snapshot": "2026-03-29",
-      "open_page_rank": 1.57,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dafrican-sex.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=african-sex.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=african-sex.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:42:32Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 0,
-      "cc_source_domain_count": 11
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "archilink.net",
@@ -1410,7 +1321,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "storiesinstitches.net",
@@ -1442,7 +1354,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 8
+      "cc_source_domain_count": 8,
+      "verdict": "Promising"
     },
     {
       "name": "wheretomarie.net",
@@ -1474,7 +1387,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 9
+      "cc_source_domain_count": 9,
+      "verdict": "Caution"
     },
     {
       "name": "instanavigation.app",
@@ -1506,7 +1420,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 51
+      "cc_source_domain_count": 51,
+      "verdict": "Caution"
     },
     {
       "name": "gift-ideas.net",
@@ -1538,7 +1453,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "chaussuresisabel.net",
@@ -1570,7 +1486,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "jendelahati.net",
@@ -1602,7 +1519,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "genesisministries.net",
@@ -1634,7 +1552,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "gorabetgiris.net",
@@ -1666,7 +1585,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 7
+      "cc_source_domain_count": 7,
+      "verdict": "Caution"
     },
     {
       "name": "libportal.net",
@@ -1698,7 +1618,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 5
+      "cc_source_domain_count": 5,
+      "verdict": "Promising"
     },
     {
       "name": "businessdays.net",
@@ -1730,7 +1651,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 4
+      "cc_source_domain_count": 4,
+      "verdict": "Promising"
     },
     {
       "name": "singlesdatingsingles.net",
@@ -1762,7 +1684,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 24
+      "cc_source_domain_count": 24,
+      "verdict": "Caution"
     },
     {
       "name": "lmgestion.net",
@@ -1794,7 +1717,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "analyticalengine.net",
@@ -1826,7 +1750,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 13
+      "cc_source_domain_count": 13,
+      "verdict": "Promising"
     },
     {
       "name": "phillipallen.net",
@@ -1858,7 +1783,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Promising"
     },
     {
       "name": "fraizerdesigns.org",
@@ -1890,7 +1816,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "billysi.net",
@@ -1922,7 +1849,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 4
+      "cc_source_domain_count": 4,
+      "verdict": "Caution"
     },
     {
       "name": "lavisionradio.net",
@@ -1954,7 +1882,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "ruchitsurati.net",
@@ -1986,7 +1915,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Promising"
     },
     {
       "name": "markeyrealestate.net",
@@ -2018,7 +1948,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "cesvalencia.net",
@@ -2050,7 +1981,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "eewebdesign.net",
@@ -2082,39 +2014,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
-    },
-    {
-      "name": "xtubecinema.xyz",
-      "tld": "xyz",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 270,
-      "wayback_last_snapshot": "2025-07-10",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 51,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dxtubecinema.xyz"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=xtubecinema.xyz&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=xtubecinema.xyz&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:13:37Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "earthlingsunited.org",
@@ -2146,7 +2047,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "friends-search.net",
@@ -2178,7 +2080,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "cinemana.xyz",
@@ -2210,7 +2113,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "fc-united-nara.net",
@@ -2242,7 +2146,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "rawthoughts.net",
@@ -2274,7 +2179,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 10
+      "cc_source_domain_count": 10,
+      "verdict": "Promising"
     },
     {
       "name": "sogo-works.net",
@@ -2306,7 +2212,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 19
+      "cc_source_domain_count": 19,
+      "verdict": "Promising"
     },
     {
       "name": "tarimkredi.net",
@@ -2338,7 +2245,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "mysistahskeeper.org",
@@ -2370,7 +2278,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "linkvillage.org",
@@ -2402,7 +2311,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "lineland.net",
@@ -2434,7 +2344,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 8
+      "cc_source_domain_count": 8,
+      "verdict": "Caution"
     },
     {
       "name": "porolona.net",
@@ -2466,7 +2377,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "sereal.net",
@@ -2498,7 +2410,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 7
+      "cc_source_domain_count": 7,
+      "verdict": "Caution"
     },
     {
       "name": "developersforum.net",
@@ -2530,7 +2443,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "realjournalism.net",
@@ -2562,7 +2476,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "avatarprime.net",
@@ -2594,7 +2509,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 8
+      "cc_source_domain_count": 8,
+      "verdict": "Promising"
     },
     {
       "name": "wiring-diagram.net",
@@ -2626,7 +2542,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "kinpachi.net",
@@ -2658,7 +2575,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 4
+      "cc_source_domain_count": 4,
+      "verdict": "Caution"
     },
     {
       "name": "tmdhosting.net",
@@ -2690,7 +2608,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "foreverstream.xyz",
@@ -2722,7 +2641,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "frenchhistory.net",
@@ -2754,7 +2674,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "letatlin.net",
@@ -2786,7 +2707,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "virmana.net",
@@ -2818,7 +2740,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "tiendax.net",
@@ -2850,7 +2773,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "hrainc.net",
@@ -2882,7 +2806,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "onwingirisleri.net",
@@ -2914,7 +2839,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "japo-rhythm.net",
@@ -2946,7 +2872,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "pinkpanache.net",
@@ -2978,7 +2905,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "youying.xyz",
@@ -3010,7 +2938,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "hoverwatch.app",
@@ -3042,7 +2971,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "rtorlando.org",
@@ -3074,7 +3004,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "claudevanlingen.net",
@@ -3106,7 +3037,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 4
+      "cc_source_domain_count": 4,
+      "verdict": "Caution"
     },
     {
       "name": "clickeasy.net",
@@ -3138,7 +3070,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "biprint.net",
@@ -3170,7 +3103,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "canmaking.net",
@@ -3202,7 +3136,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "fernandoalonso-f1.net",
@@ -3234,7 +3169,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "nacenewengland.net",
@@ -3266,7 +3202,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "aventurier.net",
@@ -3298,7 +3235,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "bananaparadise.net",
@@ -3330,7 +3268,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "basstraps.net",
@@ -3362,7 +3301,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Promising"
     },
     {
       "name": "doublebalance.net",
@@ -3394,7 +3334,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "flower-talk.net",
@@ -3426,7 +3367,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "freevacationoffer.net",
@@ -3458,7 +3400,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "horse-breeds.net",
@@ -3490,7 +3433,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "superthemes.net",
@@ -3522,7 +3466,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "chicagoraja.net",
@@ -3554,7 +3499,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "expo-photo.net",
@@ -3586,7 +3532,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "peraklodge.net",
@@ -3618,7 +3565,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "webcontinuum.net",
@@ -3650,7 +3598,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "bsdholdings.net",
@@ -3682,7 +3631,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "devoting.net",
@@ -3714,7 +3664,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 12
+      "cc_source_domain_count": 12,
+      "verdict": "Promising"
     },
     {
       "name": "diceroll.xyz",
@@ -3746,7 +3697,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "einteractivo.net",
@@ -3778,7 +3730,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "goloo.net",
@@ -3810,7 +3763,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "ironthorn.net",
@@ -3842,7 +3796,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "jmdcontractors.net",
@@ -3874,7 +3829,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "chillody.org",
@@ -3906,7 +3862,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "genesisconsult.net",
@@ -3938,7 +3895,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "managerspiele.net",
@@ -3970,7 +3928,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "thelaserclinic.net",
@@ -4002,7 +3961,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "endtide.xyz",
@@ -4034,7 +3994,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "maginfo.net",
@@ -4066,7 +4027,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 5
+      "cc_source_domain_count": 5,
+      "verdict": "Caution"
     },
     {
       "name": "outoftheshadows.net",
@@ -4098,7 +4060,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "videers.xyz",
@@ -4130,7 +4093,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "goodmorningafrica.org",
@@ -4162,7 +4126,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Promising"
     },
     {
       "name": "venuewasadi.org",
@@ -4194,7 +4159,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "americastruckandtrailerrepair.net",
@@ -4226,7 +4192,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "imageworkz.net",
@@ -4258,7 +4225,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "africantradenetwork.net",
@@ -4290,7 +4258,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "cosanostra.site",
@@ -4322,7 +4291,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "inucara.net",
@@ -4354,7 +4324,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 17
+      "cc_source_domain_count": 17,
+      "verdict": "Promising"
     },
     {
       "name": "ju-jutsu-marche.net",
@@ -4386,7 +4357,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 3
+      "cc_source_domain_count": 3,
+      "verdict": "Caution"
     },
     {
       "name": "pinkiri.net",
@@ -4418,7 +4390,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "print-central.net",
@@ -4450,7 +4423,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "riomedical.net",
@@ -4482,7 +4456,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "mkproperties.org",
@@ -4514,7 +4489,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "multimediadesigns.org",
@@ -4546,7 +4522,8 @@
       "first_seen_date": "2026-05-05",
       "last_validated_date": "2026-05-17",
       "days_listed": 12,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "acexchange.net",
@@ -4578,7 +4555,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "diyhomeimprovement.net",
@@ -4610,7 +4588,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "yusisi.net",
@@ -4642,7 +4621,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "allinit.net",
@@ -4674,7 +4654,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "rimeback.net",
@@ -4706,7 +4687,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "transpirelife.org",
@@ -4738,7 +4720,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "baritepowder.net",
@@ -4770,7 +4753,8 @@
       "first_seen_date": "2026-05-15",
       "last_validated_date": "2026-05-17",
       "days_listed": 2,
-      "cc_source_domain_count": 6
+      "cc_source_domain_count": 6,
+      "verdict": "Caution"
     },
     {
       "name": "instalserv.net",
@@ -4802,7 +4786,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "betterhearingnh.net",
@@ -4834,7 +4819,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "chinazg.net",
@@ -4866,7 +4852,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 6
+      "cc_source_domain_count": 6,
+      "verdict": "Caution"
     },
     {
       "name": "goalstracker.net",
@@ -4898,7 +4885,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "metalexchange.net",
@@ -4930,7 +4918,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "horseadoption.net",
@@ -4962,7 +4951,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "harmonserver.xyz",
@@ -4994,7 +4984,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "idealps.net",
@@ -5026,7 +5017,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "oss-solutions.net",
@@ -5058,7 +5050,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "collegewala.live",
@@ -5090,7 +5083,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "chiminea.net",
@@ -5122,7 +5116,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 4
+      "cc_source_domain_count": 4,
+      "verdict": "Caution"
     },
     {
       "name": "mastermining.net",
@@ -5154,7 +5149,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 7
+      "cc_source_domain_count": 7,
+      "verdict": "Caution"
     },
     {
       "name": "blueproject.net",
@@ -5186,7 +5182,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "coinexc.xyz",
@@ -5218,7 +5215,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "espace-equilibre.net",
@@ -5250,7 +5248,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "max-cashback.net",
@@ -5282,7 +5281,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "riseupfamily.org",
@@ -5314,39 +5314,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
-    },
-    {
-      "name": "repelis.app",
-      "tld": "app",
-      "dropped_date": "2026-05-05",
-      "wayback_snapshots": 167,
-      "wayback_last_snapshot": "2025-01-16",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 38,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Drepelis.app"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=repelis.app&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=repelis.app&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-05T05:34:33Z",
-      "first_seen_date": "2026-05-05",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 12,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "orthochem.net",
@@ -5378,7 +5347,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "kontakten.org",
@@ -5410,7 +5380,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "learningprompting.org",
@@ -5442,7 +5413,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "norwegiandating.net",
@@ -5474,7 +5446,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 4
+      "cc_source_domain_count": 4,
+      "verdict": "Caution"
     },
     {
       "name": "ulcerdisease.net",
@@ -5506,7 +5479,8 @@
       "first_seen_date": "2026-05-15",
       "last_validated_date": "2026-05-17",
       "days_listed": 2,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "developerjobs.app",
@@ -5538,7 +5512,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "shellspastaemporium.net",
@@ -5570,7 +5545,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "zicloud.xyz",
@@ -5602,7 +5578,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "githanga.org",
@@ -5634,39 +5611,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": null
-    },
-    {
-      "name": "korean-sex.biz",
-      "tld": "biz",
-      "dropped_date": "2026-05-16",
-      "wayback_snapshots": 189921,
-      "wayback_last_snapshot": "2026-03-30",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 36,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dkorean-sex.biz"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=korean-sex.biz&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=korean-sex.biz&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-16T07:08:11Z",
-      "first_seen_date": "2026-05-16",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 1,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "alwaysbeauty.net",
@@ -5698,7 +5644,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "erconline.net",
@@ -5730,7 +5677,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "keralatour.net",
@@ -5762,7 +5710,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "bestone-answer.net",
@@ -5794,7 +5743,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "mansfieldstudios.net",
@@ -5826,7 +5776,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "awkert.shop",
@@ -5858,7 +5809,8 @@
       "first_seen_date": "2026-05-03",
       "last_validated_date": "2026-05-17",
       "days_listed": 14,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "parksquareapartments.net",
@@ -5890,7 +5842,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "promo-pro.online",
@@ -5922,7 +5875,8 @@
       "first_seen_date": "2026-05-09",
       "last_validated_date": "2026-05-17",
       "days_listed": 8,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "starfiregames.net",
@@ -5954,7 +5908,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "tailoredhome.net",
@@ -5986,7 +5941,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 0
+      "cc_source_domain_count": 0,
+      "verdict": "Caution"
     },
     {
       "name": "proplans.online",
@@ -6018,7 +5974,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "carolinabargaintrader.net",
@@ -6050,7 +6007,8 @@
       "first_seen_date": "2026-05-16",
       "last_validated_date": "2026-05-17",
       "days_listed": 1,
-      "cc_source_domain_count": 2
+      "cc_source_domain_count": 2,
+      "verdict": "Caution"
     },
     {
       "name": "thewineglass.net",
@@ -6082,7 +6040,8 @@
       "first_seen_date": "2026-05-14",
       "last_validated_date": "2026-05-17",
       "days_listed": 3,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "andersongenealogy.org",
@@ -6114,7 +6073,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "shost.store",
@@ -6146,7 +6106,8 @@
       "first_seen_date": "2026-05-15",
       "last_validated_date": "2026-05-17",
       "days_listed": 2,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "a9plays.net",
@@ -6178,7 +6139,8 @@
       "first_seen_date": "2026-05-17",
       "last_validated_date": "2026-05-17",
       "days_listed": 0,
-      "cc_source_domain_count": 1
+      "cc_source_domain_count": 1,
+      "verdict": "Caution"
     },
     {
       "name": "melissawest.shop",
@@ -6210,7 +6172,8 @@
       "first_seen_date": "2026-05-08",
       "last_validated_date": "2026-05-17",
       "days_listed": 9,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     },
     {
       "name": "moneyreset.net",
@@ -6242,7 +6205,8 @@
       "first_seen_date": "2026-05-13",
       "last_validated_date": "2026-05-17",
       "days_listed": 4,
-      "cc_source_domain_count": null
+      "cc_source_domain_count": null,
+      "verdict": "Caution"
     }
   ],
   "total_candidates_evaluated": 8052
