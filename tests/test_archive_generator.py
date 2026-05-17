@@ -12,6 +12,10 @@ Does NOT touch:
   - The real anthropic SDK (lazy-imported inside HaikuClient — tests use a
     custom in-memory client)
   - Real git or network — git_push=False or subprocess patched
+  - Real archive.org — wayback_excerpt.fetch_excerpt is auto-stubbed to
+    return None by every test via the autouse fixture below. Tests that
+    want to exercise the excerpt-wiring path do so by monkeypatching
+    ag.fetch_excerpt themselves AFTER this autouse fires.
 """
 
 from __future__ import annotations
@@ -25,6 +29,21 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scripts import archive_generator as ag
+
+
+@pytest.fixture(autouse=True)
+def _stub_fetch_excerpt(monkeypatch):
+    """Default-stub the Wayback excerpt fetch so tests never hit
+    archive.org. Returns None so the generated body matches the
+    'no-grounding' path. Tests can re-override with their own
+    monkeypatch.setattr(ag, 'fetch_excerpt', ...) if they need a
+    populated excerpt.
+
+    Also stub time.sleep so the 1s courtesy pace in the per-domain
+    loop doesn't multiply the test suite wall-clock (30 fixture
+    domains × 1s = 30s of dead sleep otherwise)."""
+    monkeypatch.setattr(ag, "fetch_excerpt", lambda *_a, **_k: None)
+    monkeypatch.setattr(ag.time, "sleep", lambda *_a, **_k: None)
 
 
 # ---------------------------------------------------------------------------
@@ -412,3 +431,139 @@ def test_generate_archive_skips_git_push_when_no_new_entries(tmp_path, monkeypat
     )
     assert result["status"] == "no_new"
     fake_push.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# generate_for_domains — dry-run helper (added 2026-05-18)
+# ---------------------------------------------------------------------------
+
+
+def test_generate_for_domains_writes_to_output_dir_only(tmp_path):
+    """Dry-run renders to the given output dir and does NOT touch the
+    real src/content/archive/ nor the archive-index."""
+    daily, _index, _content = _setup_dirs(tmp_path, [
+        _domain("alpha.com", verdict="Clean"),
+        _domain("beta.org", verdict="Clean"),
+        _domain("gamma.com", verdict="Clean"),
+    ])
+    out_dir = tmp_path / "review"
+    fake_index = tmp_path / "should_not_exist.json"  # never written
+
+    result = ag.generate_for_domains(
+        ["alpha.com", "beta.org"], out_dir,
+        daily_path=daily, client=_StubClient(), today=date(2026, 5, 18),
+    )
+
+    assert sorted(result["rendered"]) == ["alpha.com", "beta.org"]
+    assert result["missing"] == []
+    assert result["skipped_verdict"] == []
+    assert result["failed"] == []
+    assert (out_dir / "alpha.com.md").exists()
+    assert (out_dir / "beta.org.md").exists()
+    # gamma.com was in daily but NOT requested → not rendered.
+    assert not (out_dir / "gamma.com.md").exists()
+    # Index file path was never even touched.
+    assert not fake_index.exists()
+
+
+def test_generate_for_domains_reports_missing_names(tmp_path):
+    daily, _index, _content = _setup_dirs(tmp_path, [_domain("alpha.com")])
+    result = ag.generate_for_domains(
+        ["alpha.com", "nonexistent.com"], tmp_path / "out",
+        daily_path=daily, client=_StubClient(), today=date(2026, 5, 18),
+    )
+    assert result["rendered"] == ["alpha.com"]
+    assert result["missing"] == ["nonexistent.com"]
+
+
+def test_generate_for_domains_skips_caution_verdict(tmp_path):
+    """Even in dry-run, only Clean / Promising render — guards against
+    accidentally generating a /d/{spam} page for review."""
+    daily, _index, _content = _setup_dirs(tmp_path, [
+        _domain("clean.com", verdict="Clean"),
+        _domain("scam.com", verdict="Caution"),
+    ])
+    result = ag.generate_for_domains(
+        ["clean.com", "scam.com"], tmp_path / "out",
+        daily_path=daily, client=_StubClient(), today=date(2026, 5, 18),
+    )
+    assert result["rendered"] == ["clean.com"]
+    assert result["skipped_verdict"] == ["scam.com"]
+    assert not (tmp_path / "out" / "scam.com.md").exists()
+
+
+def test_generate_for_domains_isolates_per_domain_failures(tmp_path):
+    """One failing Haiku call doesn't kill the others (no breaker in
+    dry-run path)."""
+    daily, _index, _content = _setup_dirs(tmp_path, [
+        _domain("ok1.com"), _domain("broken.com"), _domain("ok2.org"),
+    ])
+    client = _StubClient(raise_on={"broken.com"})
+    result = ag.generate_for_domains(
+        ["ok1.com", "broken.com", "ok2.org"], tmp_path / "out",
+        daily_path=daily, client=client, today=date(2026, 5, 18),
+    )
+    assert sorted(result["rendered"]) == ["ok1.com", "ok2.org"]
+    assert result["failed"] == ["broken.com"]
+
+
+def test_generate_for_domains_returns_empty_when_no_eligible(tmp_path):
+    daily, _index, _content = _setup_dirs(tmp_path, [
+        _domain("scam.com", verdict="Caution"),
+    ])
+    result = ag.generate_for_domains(
+        ["scam.com"], tmp_path / "out",
+        daily_path=daily, client=_StubClient(), today=date(2026, 5, 18),
+    )
+    assert result["rendered"] == []
+    # Did not call the client at all (no eligible domains).
+    assert (tmp_path / "out").exists() is False or list((tmp_path / "out").iterdir()) == []
+
+
+# ---------------------------------------------------------------------------
+# CLI: --only / --output-dir branch
+# ---------------------------------------------------------------------------
+
+
+def test_cli_only_without_output_dir_errors(tmp_path):
+    rc = ag.main(["--only", "a.com"])
+    assert rc == 1
+
+
+def test_cli_output_dir_without_only_errors(tmp_path):
+    rc = ag.main(["--output-dir", str(tmp_path)])
+    assert rc == 1
+
+
+def test_cli_only_routes_to_dry_run(tmp_path, monkeypatch):
+    """--only + --output-dir routes to generate_for_domains, never to
+    generate_archive."""
+    daily = tmp_path / "daily.json"
+    daily.write_text(json.dumps({"domains": [_domain("alpha.com")]}), encoding="utf-8")
+    out_dir = tmp_path / "review"
+
+    # Spy on both entry points so we can prove which one fired.
+    dry_calls: list[Any] = []
+    prod_calls: list[Any] = []
+
+    def fake_dry(names, output_dir, **kw):
+        dry_calls.append({"names": names, "output_dir": output_dir})
+        return {"rendered": names, "missing": [], "skipped_verdict": [], "failed": []}
+
+    def fake_prod(**kw):
+        prod_calls.append(kw)
+        return {"status": "ok", "new_count": 0}
+
+    monkeypatch.setattr(ag, "generate_for_domains", fake_dry)
+    monkeypatch.setattr(ag, "generate_archive", fake_prod)
+
+    rc = ag.main([
+        "--daily-path", str(daily),
+        "--only", "alpha.com,beta.org",
+        "--output-dir", str(out_dir),
+    ])
+    assert rc == 0
+    assert len(dry_calls) == 1
+    assert dry_calls[0]["names"] == ["alpha.com", "beta.org"]
+    assert dry_calls[0]["output_dir"] == out_dir
+    assert prod_calls == []  # production path never invoked
