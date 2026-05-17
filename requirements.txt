@@ -4,3 +4,4 @@ wayback>=0.4.5
 dnspython==2.6.1
 duckdb>=1.0,<2
 anthropic>=0.40.0
+beautifulsoup4>=4.12.0

@@ -65,8 +65,11 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
+
+from scripts.wayback_excerpt import fetch_excerpt
 from typing import Any
 
 logger = logging.getLogger("scripts.archive_generator")
@@ -91,7 +94,16 @@ GIT_USER_NAME = "domainsifter-archive"
 GIT_USER_EMAIL = "99090280+oiramix@users.noreply.github.com"
 
 
-# --- Haiku system prompt (verbatim per spec) --------------------------------
+# --- Haiku system prompt ---------------------------------------------------
+#
+# 2026-05-18 revision: Historical use is now strictly grounded in the
+# Wayback excerpt fetched per-domain by scripts/wayback_excerpt.py. When
+# the excerpt is null or empty, the section is OMITTED. The previous
+# language ("based on the name structure", "the linguistic composition
+# suggests", "describe what kind of website this likely was") was an
+# invitation to hallucinate and produced the deepsand.net / waterangels.net
+# style invented descriptions that triggered this rewrite. All such
+# speculation-invitation phrases are excised throughout the prompt.
 
 HAIKU_SYSTEM_PROMPT = """You are writing SEO-optimized reference pages for DomainSifter, a domain-research service that publishes daily evaluations of recently-dropped (expired) domains. Each page documents one specific domain at the moment it became available for re-registration, including the historical web presence, authority signals, and DomainSifter's verdict.
 
@@ -107,13 +119,24 @@ The page must include, in this order:
 2. Lead paragraph (40-60 words): State plainly what this domain is, when it became available, and DomainSifter's verdict in one sentence. The first sentence must contain the full domain name exactly as a buyer would search it.
 
 3. Authority signals subsection (### Authority and historical presence):
-   2-3 short paragraphs interpreting the Wayback snapshot count, OpenPageRank score, and Common Crawl backlinks count in plain language. Tie each number to what it means for someone considering registering this domain. Avoid bullet-point-only sections — mix prose with the numbers.
+   2-3 short paragraphs interpreting the Wayback snapshot count, OpenPageRank score, and Common Crawl backlinks count in plain language. Tie each number to what it means for someone considering registering this domain. Avoid bullet-point-only sections — mix prose with the numbers. Do NOT speculate about the kind of website that produced these numbers in this subsection — that belongs in "Historical use" only.
 
 4. Historical use subsection (### Historical use):
-   Based on the wayback_last_snapshot date and what's reasonable to infer from the domain name itself (linguistic structure, TLD, length), describe in 1-2 sentences what kind of website this likely was. If the data doesn't support specific claims, stay general and honest ("the domain previously resolved to a website indexed by the Wayback Machine [N] times") — never invent specific content or business types.
+   This subsection is GROUNDED ONLY in the `wayback_excerpt` field of the input JSON.
+
+   When `wayback_excerpt` is present AND at least one of its fields (title, meta_description, h1, h2) is non-empty:
+     - Write 1-2 short paragraphs describing the site based ONLY on those signals. Quote or closely paraphrase the title and meta_description. Mention what the h1 / h2 headings reveal about the site's structure or topical focus.
+     - If the title or meta_description indicates a parked page, domain-for-sale notice, or generic placeholder/error page, report that factually (e.g. "The most recent snapshot showed a parked-page placeholder rather than active content").
+     - Do NOT speculate beyond what the excerpt directly states. Do NOT extrapolate "the site probably also did X."
+
+   When `wayback_excerpt` is null OR all four of its content fields (title, meta_description, h1, h2) are empty:
+     - OMIT the entire "### Historical use" subsection. Skip directly from "### Authority and historical presence" to "### Why we labeled this {verdict}".
+     - Do NOT write a stub. Do NOT write "the historical content could not be determined." Do NOT mention the snapshot count again here. Just leave the section out completely.
+
+   NEVER infer historical content from the domain name itself. Without a Wayback excerpt, you have no basis to describe what the site was. Silence is correct.
 
 5. Verdict subsection (### Why we labeled this {verdict}):
-   2-3 sentences explaining the verdict in terms a domain buyer cares about. Reference the actual signals. For Clean: explain what positive signals justified the highest confidence. For Promising: name the signal strengths that matter and any limitations.
+   2-3 sentences explaining the verdict in terms a domain buyer cares about. Reference the actual quantitative signals (snapshot count, OPR, backlinks). For Clean: explain what positive signals justified the highest confidence. For Promising: name the signal strengths that matter and any limitations.
 
 6. Closing line: A brief honest disclaimer that the evaluation reflects the state on {dropped_date} and that domain availability changes quickly. Encourage verification at the registrar.
 
@@ -125,7 +148,8 @@ CRITICAL CONSTRAINTS
 - Never use generic AI-ese ("In today's digital landscape...", "Discover the potential of...", "Unlock the power of...").
 - The exact domain name must appear at least 4 times naturally across the page.
 - Use the TLD naturally ("[domain].net" not just "[domain]").
-- Never claim a domain "is" something based on its name alone. Use language like "the name suggests" or "based on linguistic analysis."
+- NEVER describe what a domain "was", "likely was", "may have been", "could have served", or "appears to be" based on the domain name itself. The name is not evidence of historical content. Only the `wayback_excerpt` is.
+- NEVER write phrases like "based on the name structure", "the linguistic composition suggests", "the name suggests", or "likely operated as" anywhere on the page. These are speculation invitations and are forbidden.
 
 OUTPUT FORMAT
 Return only the Markdown body starting with the ## heading. No frontmatter, no meta-commentary, no preamble. The generator script will add frontmatter.
@@ -392,10 +416,36 @@ def generate_archive(
     consecutive_failures = 0
     for record in qualifying:
         name = record["name"]
+
+        # Wayback excerpt fetch for "Historical use" grounding (2026-05-18).
+        # Skipped when wayback_last_snapshot is null (the pipeline's wayback
+        # breaker tripped during enrichment for this candidate). Failures
+        # downgrade silently to excerpt=None — Haiku will OMIT the
+        # Historical use subsection rather than hallucinate. The 1s sleep
+        # paces us under archive.org's organic-traffic ceiling; with
+        # 30-50 archive-eligible domains per day that's 30-50 seconds of
+        # extra wall-clock, well within the systemd unit's tolerance.
+        excerpt = None
+        if record.get("wayback_last_snapshot"):
+            try:
+                excerpt = fetch_excerpt(
+                    record["name"],
+                    record["wayback_last_snapshot"],
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Wayback excerpt fetch failed for %s: %s — proceeding without grounding",
+                    record["name"], exc,
+                )
+                excerpt = None
+            time.sleep(1.0)
+
+        enriched_record = {**record, "wayback_excerpt": excerpt}
+
         try:
             body = client.generate(
                 system=HAIKU_SYSTEM_PROMPT,
-                user=_build_haiku_user_message(record),
+                user=_build_haiku_user_message(enriched_record),
             )
         except Exception as exc:
             consecutive_failures += 1
@@ -467,6 +517,147 @@ def generate_archive(
     }
 
 
+# --- Dry-run helper for pre-merge review (2026-05-18) -----------------------
+
+
+def _render_one_page(
+    record: dict,
+    *,
+    client: HaikuClient,
+    output_dir: Path,
+    today_iso: str,
+) -> tuple[bool, str | None]:
+    """Per-domain work: Wayback excerpt → Haiku call → write .md.
+
+    Returns (success, reason). reason is None on success, a short string
+    on failure ('excerpt-error', 'haiku-error', 'haiku-malformed').
+    Caller decides whether a failure aborts the run or just logs.
+
+    Pulled out of generate_archive's per-domain loop so the dry-run
+    helper can reuse it without inheriting the circuit-breaker
+    bookkeeping (which is meaningful only when processing dozens of
+    domains in one go, not for 1-2 review samples)."""
+    name = record["name"]
+
+    excerpt = None
+    if record.get("wayback_last_snapshot"):
+        try:
+            excerpt = fetch_excerpt(name, record["wayback_last_snapshot"])
+        except Exception as exc:
+            logger.warning(
+                "Wayback excerpt fetch failed for %s: %s — proceeding without grounding",
+                name, exc,
+            )
+            excerpt = None
+        time.sleep(1.0)
+
+    enriched_record = {**record, "wayback_excerpt": excerpt}
+
+    try:
+        body = client.generate(
+            system=HAIKU_SYSTEM_PROMPT,
+            user=_build_haiku_user_message(enriched_record),
+        )
+    except Exception as exc:
+        logger.warning("Haiku call failed for %s: %s", name, exc)
+        return False, "haiku-error"
+
+    if not body or "##" not in body:
+        logger.warning("Haiku returned empty / malformed body for %s; skipping.", name)
+        return False, "haiku-malformed"
+
+    slug = _slug_for(name)
+    md_path = output_dir / f"{slug}.md"
+    _atomic_write_text(md_path, _build_markdown_file(record, body, today_iso))
+    logger.info("Rendered %s → %s", name, md_path)
+    return True, None
+
+
+def generate_for_domains(
+    domain_names: list[str],
+    output_dir: Path,
+    *,
+    daily_path: Path = DAILY_DOMAINS_PATH,
+    client: HaikuClient | None = None,
+    today: date | None = None,
+) -> dict:
+    """Dry-run: process ONLY the named domains, write to `output_dir`,
+    do NOT update archive-index.json, do NOT push.
+
+    Used for pre-merge review — picks the named records out of the
+    current daily-domains.json (so the input data is real, just the
+    output destination is a scratch dir). Domains not present in
+    daily-domains.json are reported as missing. Domains present but
+    without a qualifying verdict are reported as skipped (we still
+    only generate /d/{name}-style content for Clean + Promising, even
+    in dry-run; protects against accidentally rendering a page for a
+    Caution domain).
+
+    Per-domain failures isolate but never abort — for 1-2 review
+    samples the circuit-breaker semantics are noise, not signal.
+
+    Returns: {"rendered": [name, ...], "missing": [...], "skipped_verdict": [...], "failed": [...]}.
+    """
+    today = today or date.today()
+    today_iso = today.isoformat()
+
+    daily_payload = _load_json(daily_path, default={"domains": []})
+    by_name = {d["name"]: d for d in (daily_payload.get("domains") or []) if d.get("name")}
+
+    requested = [n.strip() for n in domain_names if n.strip()]
+    missing = [n for n in requested if n not in by_name]
+    found = [by_name[n] for n in requested if n in by_name]
+    skipped_verdict = [d["name"] for d in found if d.get("verdict") not in QUALIFYING_VERDICTS]
+    eligible = [d for d in found if d.get("verdict") in QUALIFYING_VERDICTS]
+
+    if missing:
+        logger.warning(
+            "Names not present in daily-domains.json (skipping): %s", missing,
+        )
+    if skipped_verdict:
+        logger.warning(
+            "Names present but verdict not in {Clean, Promising} (skipping): %s",
+            skipped_verdict,
+        )
+    if not eligible:
+        logger.error("No eligible domains to render. Stopping.")
+        return {
+            "rendered": [], "missing": missing,
+            "skipped_verdict": skipped_verdict, "failed": [],
+        }
+
+    if client is None:
+        api_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY missing — required for Haiku calls.")
+        client = HaikuClient(api_key)
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    rendered: list[str] = []
+    failed: list[str] = []
+    for record in eligible:
+        ok, _reason = _render_one_page(
+            record, client=client, output_dir=output_dir, today_iso=today_iso,
+        )
+        if ok:
+            rendered.append(record["name"])
+        else:
+            failed.append(record["name"])
+
+    logger.info(
+        "Dry-run complete: %d rendered, %d failed, %d missing, %d skipped (verdict)",
+        len(rendered), len(failed), len(missing), len(skipped_verdict),
+    )
+    return {
+        "rendered": rendered,
+        "missing": missing,
+        "skipped_verdict": skipped_verdict,
+        "failed": failed,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="scripts.archive_generator",
@@ -484,6 +675,22 @@ def main(argv: list[str] | None = None) -> int:
         "--index-path", default=str(ARCHIVE_INDEX_PATH),
         help="Override archive-index.json path.",
     )
+    parser.add_argument(
+        "--only", default=None,
+        help=(
+            "Dry-run: comma-separated domain names. Processes ONLY these "
+            "domains (pulled from daily-domains.json), writes .md files to "
+            "--output-dir, does NOT update archive-index.json, does NOT "
+            "git-push. Intended for pre-merge review."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir", default=None,
+        help=(
+            "Required with --only. Destination directory for the dry-run "
+            ".md files. src/content/archive/ is left untouched."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -492,6 +699,31 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
         stream=sys.stdout,
     )
+
+    # Dry-run branch: --only + --output-dir bypass the production path
+    # entirely. No index update, no git push, no archive-index gate.
+    if args.only or args.output_dir:
+        if not (args.only and args.output_dir):
+            logger.error("--only and --output-dir must be passed together.")
+            return 1
+        names = [n.strip() for n in args.only.split(",") if n.strip()]
+        if not names:
+            logger.error("--only was empty after splitting on commas.")
+            return 1
+        try:
+            result = generate_for_domains(
+                names,
+                Path(args.output_dir),
+                daily_path=Path(args.daily_path),
+            )
+        except RuntimeError as exc:
+            logger.error("Dry-run aborted: %s", exc)
+            return 2
+        except Exception:  # pragma: no cover — defence-in-depth
+            logger.exception("Dry-run crashed.")
+            return 3
+        logger.info("Dry-run summary: %s", result)
+        return 0
 
     try:
         result = generate_archive(
