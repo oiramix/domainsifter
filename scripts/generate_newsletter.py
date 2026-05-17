@@ -106,13 +106,26 @@ def _domain_slug(name: str) -> str:
 
 
 def _verdict_from_score(score: int) -> str:
-    """Same thresholds as DomainTable.astro's verdictFromScore — keeps the
-    email and the live site visually consistent."""
+    """Score-only fallback for old payloads (sample-domains.json from before
+    the 2026-05-17 contract addition) that lack a server-computed verdict
+    field. Production reads should hit `_verdict_for_domain` instead, which
+    prefers the JSON's `verdict` field when present."""
     if score >= 70:
         return "Clean"
     if score >= 40:
         return "Promising"
     return "Caution"
+
+
+def _verdict_for_domain(domain: dict) -> str:
+    """Return the verdict for one domain entry. Prefer the JSON-provided
+    `verdict` field (server-computed in scripts/output.py since 2026-05-17,
+    using wayback / OPR / CC backlinks gates that aren't reachable from
+    the score alone). Fall back to score-only on legacy payloads."""
+    server = domain.get("verdict")
+    if isinstance(server, str) and server in ("Clean", "Promising", "Caution"):
+        return server
+    return _verdict_from_score(int(domain.get("score", 0) or 0))
 
 
 def _fmt_int(value: Any) -> str:
@@ -174,8 +187,7 @@ def _row_html(domain: dict, site_url: str) -> str:
     already produced them) plus UTM params we control."""
     name = domain.get("name", "")
     tld = domain.get("tld", "")
-    score = int(domain.get("score", 0) or 0)
-    verdict = _verdict_from_score(score)
+    verdict = _verdict_for_domain(domain)
     v_color, v_bg = _verdict_style(verdict)
     slug = _domain_slug(name)
 

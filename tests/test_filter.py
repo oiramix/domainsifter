@@ -10,7 +10,16 @@ CONFIG = {
         "max_domain_length": 30,
         "min_wayback_snapshots": 1,
     },
-    "rejected_keywords": ["porn", "casino", "viagra"],
+    "rejected_keywords": [
+        "sex", "porn", "casino", "viagra", "hentai", "xtube", "tinbongda",
+        "soap2day", "xxx",
+    ],
+    "rejected_keyword_prefixes": [
+        "porn", "hentai", "xtube", "tinbongda", "soap2day", "xxx",
+    ],
+    "soft_signal_keywords": [
+        "dating", "singles", "pump", "moonshot",
+    ],
 }
 
 
@@ -65,9 +74,169 @@ def test_keep_rejects_all_numeric():
 
 
 def test_keep_rejects_keyword_match_case_insensitive():
-    keep, reason = filter_mod.keep(_ok(name="bestcasinodeal.com"), CONFIG)
+    """Token matching keeps case-insensitivity but requires the keyword to
+    appear as a full token (split on hyphens/dots/digit boundaries) — the
+    bare-substring 'bestcasinodeal' that the old matcher caught is
+    intentionally NO longer caught (token model is strict equality).
+    Hyphenation makes 'casino' a token again."""
+    keep, reason = filter_mod.keep(_ok(name="best-CASINO-deal.com"), CONFIG)
     assert keep is False
     assert reason == "keyword:casino"
+
+
+# --- Token-aware matching (added 2026-05-17) -------------------------------
+
+def test_keep_rejects_exact_token_with_hyphen_split():
+    """african-sex.net → tokens ['african','sex','net']; 'sex' is in
+    rejected_keywords exact list → REJECT."""
+    keep, reason = filter_mod.keep(_ok(name="african-sex.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:sex"
+
+
+def test_keep_rejects_prefix_stem_with_letter_suffix():
+    """xtubecinema.xyz → coarse token 'xtubecinema' is one letters-only
+    label; prefix-stem 'xtube' matches via startswith → REJECT. This is
+    the case the old substring matcher caught via inclusion; the new
+    token matcher needs the prefix list to handle it."""
+    keep, reason = filter_mod.keep(_ok(name="xtubecinema.xyz"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:xtube"
+
+
+def test_keep_rejects_letter_keyword_via_digit_split_fine_token():
+    """hentai2.org → fine tokens ['hentai','2','org'] (digit boundary
+    splits 'hentai2'); 'hentai' is in exact keywords → REJECT."""
+    keep, reason = filter_mod.keep(_ok(name="hentai2.org"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:hentai"
+
+
+def test_keep_rejects_letter_keyword_with_higher_digit_suffix():
+    keep, reason = filter_mod.keep(_ok(name="porn99.org"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:porn"
+
+
+def test_keep_rejects_xxx_with_digit_suffix():
+    keep, reason = filter_mod.keep(_ok(name="xxx55.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:xxx"
+
+
+def test_keep_rejects_prefix_stem_with_letter_suffix_combo():
+    """xtubeXXX → coarse token 'xtubexxx' startswith 'xtube' → REJECT."""
+    keep, reason = filter_mod.keep(_ok(name="xtubeXXX.org"), CONFIG)
+    assert keep is False
+    # 'xxx' also matches exact, but the exact pass runs first, so reason
+    # could be either depending on iteration order. Just check rejection.
+    assert reason in ("keyword:xtube", "keyword:xxx")
+
+
+def test_keep_rejects_alphanumeric_keyword_via_coarse_match():
+    """soap2day.com → coarse token 'soap2day' equals exact keyword."""
+    keep, reason = filter_mod.keep(_ok(name="soap2day.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:soap2day"
+
+
+def test_keep_rejects_gambling_prefix_stem_with_digit_suffix():
+    """tinbongda360.net → fine tokens ['tinbongda','360','net']; exact
+    'tinbongda' in keywords → REJECT. (Also reachable via prefix on the
+    coarse 'tinbongda360' token, but exact wins.)"""
+    keep, reason = filter_mod.keep(_ok(name="tinbongda360.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:tinbongda"
+
+
+def test_keep_accepts_essex_no_substring_false_positive():
+    """'essex.com' must NOT match 'sex' — coarse token 'essex' is not
+    equal to 'sex' and (because 'sex' is intentionally NOT in
+    rejected_keyword_prefixes) doesn't match by startswith either."""
+    keep, reason = filter_mod.keep(_ok(name="essex.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_keep_accepts_unisex_no_substring_false_positive():
+    """unisex.net must NOT match 'sex' for the same reason as essex.com.
+    Bonus: unisex doesn't START with 'sex' even if 'sex' were prefixed."""
+    keep, reason = filter_mod.keep(_ok(name="unisex.net"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_keep_accepts_camera_no_substring_false_positive():
+    """camera.com must NOT match 'cam' — 'cam' is intentionally exact-only
+    (not in rejected_keyword_prefixes). Camera tokens are ['camera','com']."""
+    cfg = {**CONFIG, "rejected_keywords": [*CONFIG["rejected_keywords"], "cam"]}
+    keep, reason = filter_mod.keep(_ok(name="camera.com"), cfg)
+    assert keep is True
+    assert reason is None
+
+
+def test_keep_accepts_construction_no_false_positive():
+    keep, reason = filter_mod.keep(_ok(name="construction.com"), CONFIG)
+    assert keep is True
+
+
+def test_keep_accepts_deepsand_no_false_positive():
+    keep, reason = filter_mod.keep(_ok(name="deepsand.net"), CONFIG)
+    assert keep is True
+
+
+def test_keep_accepts_mastermining_no_false_positive():
+    keep, reason = filter_mod.keep(_ok(name="mastermining.net"), CONFIG)
+    assert keep is True
+
+
+def test_soft_signal_does_not_reject_in_filter():
+    """Soft-signal matches do NOT reject. The verdict computation in
+    output.py reads has_soft_signal() to force a Caution verdict, but
+    the candidate survives filter rejection."""
+    keep, reason = filter_mod.keep(
+        _ok(name="singlesdatingsingles.net"), CONFIG,
+    )
+    assert keep is True
+    assert reason is None
+
+
+def test_has_soft_signal_detects_dating_token():
+    assert filter_mod.has_soft_signal("singlesdatingsingles.net", CONFIG) is True
+
+
+def test_has_soft_signal_returns_false_for_clean_name():
+    assert filter_mod.has_soft_signal("marketglow.com", CONFIG) is False
+
+
+def test_has_soft_signal_detects_crypto_pump():
+    """pump99.com → fine tokens ['pump','99','com'] → 'pump' matches."""
+    assert filter_mod.has_soft_signal("pump99.com", CONFIG) is True
+
+
+def test_has_soft_signal_tolerates_missing_config_key():
+    """When config has no soft_signal_keywords entry, has_soft_signal
+    returns False — never raises."""
+    cfg = {"filter_thresholds": {}, "rejected_keywords": []}
+    assert filter_mod.has_soft_signal("anything.com", cfg) is False
+
+
+def test_tokenize_produces_expected_token_sets():
+    """Direct sanity check of the tokenizer — covered indirectly by the
+    keep_* tests above, but explicit here so regressions in _tokenize
+    fail loud."""
+    coarse, fine = filter_mod._tokenize("hentai2.org")
+    assert coarse == {"hentai2", "org"}
+    assert fine == {"hentai", "2", "org"}
+
+    coarse, fine = filter_mod._tokenize("African-Sex.NET")
+    assert coarse == {"african", "sex", "net"}
+    # No digit transitions → fine equals coarse here.
+    assert fine == coarse
+
+    coarse, fine = filter_mod._tokenize("soap2day.com")
+    assert coarse == {"soap2day", "com"}
+    assert fine == {"soap", "2", "day", "com"}
 
 
 def test_keep_rejects_when_spam_flagged():

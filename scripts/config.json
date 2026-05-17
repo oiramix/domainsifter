@@ -34,17 +34,38 @@
     "domain_length": 0.1,
     "cc_source_domain_count": 0.3
   },
+  "_keyword_lists_doc": "Token-aware keyword blocklist, expanded 2026-05-17 after adult/piracy/gambling domains (african-sex.net, xtubecinema.xyz, hentai2.org, tinbongda360.net) reached the published list with Promising verdicts under the old substring matcher. Matching uses split-on-dots/hyphens/digit-letter-boundaries tokenization (see scripts/filter.py:_tokenize). rejected_keywords are exact-match. rejected_keyword_prefixes is a curated subset that ALSO does startswith() against coarse tokens for digit/letter-suffix bypasses (xtubecinema, porn99) — entries here MUST be unambiguous (no common-English-word prefix conflicts; 'cam'/'tube'/'sex'/'slot'/'poker'/'pirate' are intentionally NOT here). soft_signal_keywords do NOT reject — output.py reads them to force a 'Caution' verdict on dating/snake-oil/get-rich-quick/crypto-speculative names.",
   "rejected_keywords": [
-    "porn",
-    "casino",
-    "viagra",
-    "pharma",
-    "xxx",
-    "adult",
-    "gambling",
-    "betting",
-    "escort",
-    "cialis"
+    "sex", "sexy", "sexo", "sexe", "porn", "porno", "nude", "naked",
+    "dildo", "fetish", "hentai", "milf", "tube", "webcam", "camgirl",
+    "cam", "xtube", "xvideo", "xnxx", "redtube", "youporn", "pornhub",
+    "r34", "e621", "xxx", "adult", "escort",
+    "viagra", "cialis", "weed", "cbd", "kratom", "marijuana", "cannabis",
+    "steroid", "opioid", "pharma",
+    "casino", "gambling", "betting", "poker", "slot", "roulette",
+    "blackjack", "baccarat", "bet365", "togel", "judi", "sbobet", "pkv",
+    "tinbongda", "bolaonline",
+    "repelis", "putlocker", "fmovies", "123movies", "soap2day",
+    "couchtuner", "solarmovie", "streameast", "1337x", "pirate", "cuevana",
+    "gnula", "pelisplus", "pelispedia",
+    "stresser", "booter", "ipstress", "ddos", "nightmarestress",
+    "scam", "fraud", "phishing", "warez", "torrent", "freebnb", "freeeth",
+    "airdropclaim",
+    "nazi", "jihad", "terrorist"
+  ],
+  "rejected_keyword_prefixes": [
+    "porn", "porno", "hentai", "milf", "dildo", "xtube", "xvideo", "xnxx",
+    "redtube", "youporn", "pornhub", "r34", "e621", "xxx",
+    "roulette", "blackjack", "baccarat", "bet365", "togel", "judi",
+    "sbobet", "pkv", "tinbongda", "bolaonline",
+    "repelis", "putlocker", "fmovies", "soap2day", "couchtuner",
+    "solarmovie", "streameast", "cuevana", "gnula", "pelisplus", "pelispedia"
+  ],
+  "soft_signal_keywords": [
+    "dating", "hookup", "singles", "tinder", "romance",
+    "miracle", "cure", "detox", "cleanse",
+    "getrich", "instantcash", "easymoney",
+    "pump", "moonshot", "shitcoin", "memecoin"
   ],
   "lexical_thresholds": {
     "max_digit_ratio": 0.30,
@@ -87,6 +108,14 @@
   "max_candidates_for_publication": 300,
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,
+  "verdict_thresholds": {
+    "_doc": "Tightened 2026-05-17. Promising used to be earned by score >= 40 alone; the tag became meaningless when ~all published rows wore it (89/89 on 2026-05-16). New bar requires significant historical web presence (wayback >= 1000) AND at least one external authority signal (OPR >= 1.5 OR CC backlinks >= 10). Candidates clearing only the score threshold demote to Caution instead. Clean (the top tier) is unchanged — score >= 70 wins. Soft-signal keyword matches (dating, snake-oil, get-rich-quick, crypto-speculative) force Caution regardless of the above. Verdict is computed in scripts/output.py:_compute_verdict and serialized as a JSON field — frontend and newsletter read it instead of recomputing from score (single source of truth).",
+    "clean_min_score": 70,
+    "promising_min_score": 40,
+    "promising_min_wayback_snapshots": 1000,
+    "promising_min_open_page_rank": 1.5,
+    "promising_min_cc_source_domain_count": 10
+  },
   "enrichment_time_budget_seconds": 3000,
   "availability_budget_seconds": 2700,
   "diagnostic_logging": false,

@@ -1,11 +1,19 @@
 """Write the daily JSON contract consumed by the Astro frontend.
 
 The site reads `src/data/daily-domains.json`. The shape is locked in
-PLAN.md Principle 5 with two schema migrations applied:
+PLAN.md Principle 5 with three schema migrations applied:
   - 2026-04-27 evening: single `affiliate_link` → `registrars[]` array
   - 2026-04-28 evening: added `total_candidates_evaluated` (top-level) so
     the frontend can render "Showing N of M candidates evaluated today"
     without inventing a count.
+  - 2026-05-17: added `verdict` per-domain field ("Clean"/"Promising"/
+    "Caution"). Previously computed client-side from score alone in
+    DomainTable.astro and generate_newsletter.py; the new tightened
+    Promising rule needs wayback + OPR + cc_source_domain_count, and
+    soft-signal keyword detection lives in filter.py — easier to keep
+    one Python implementation than to replicate the rule (and the
+    soft-signal config lookup) in two places. Frontend / email fall
+    back to score-only if the field is absent (sample data, old JSON).
 
 Output shape:
     {
@@ -18,7 +26,7 @@ Output shape:
                 "wayback_snapshots": 142, "wayback_last_snapshot": "2024-08-15",
                 "open_page_rank": 3.7, "cert_history": true,
                 "previous_registrar": "GoDaddy", "score": 78,
-                "cc_source_domain_count": 247,
+                "cc_source_domain_count": 247, "verdict": "Clean",
                 "registrars": [{"name": "Namecheap", "url": "https://..."}, ...]
             }
         ]
@@ -59,6 +67,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts import filter as filter_mod
+
 logger = logging.getLogger(__name__)
 
 CONTRACT_FIELDS = (
@@ -91,6 +101,8 @@ CONTRACT_FIELDS = (
     # NOT added to _ENRICHMENT_FIELDS_FOR_COMPLETENESS — absence from the CC
     # graph is informational, not a quality deficit.
     "cc_source_domain_count",
+    # Server-computed verdict (added 2026-05-17). See `_compute_verdict`.
+    "verdict",
 )
 
 # Enrichment fields used to compute completeness ratio. A candidate's
@@ -125,7 +137,57 @@ def _build_registrars(name: str, configured: list[dict]) -> list[dict]:
     return out
 
 
-def _project(candidate: dict, registrars_config: list[dict]) -> dict:
+def _compute_verdict(candidate: dict, config: dict) -> str:
+    """Server-side verdict assignment. Tightened 2026-05-17 — see
+    config.verdict_thresholds._doc.
+
+    Rules:
+      - Soft-signal keyword in name (dating, snake-oil, get-rich, crypto)
+        → "Caution" regardless of score. The forced-Caution short-circuits
+        before the Clean check so a high-score scammy name still warns.
+      - score >= clean_min_score (default 70) → "Clean".
+      - score >= promising_min_score (default 40) AND wayback >=
+        promising_min_wayback_snapshots (default 1000) AND (OPR >=
+        promising_min_open_page_rank OR cc_source_domain_count >=
+        promising_min_cc_source_domain_count) → "Promising".
+      - Anything else that survived filters → "Caution".
+
+    None / missing wayback/opr/cc fields coerce to 0 (failing the strict
+    Promising gate; demoting to Caution is the conservative call when an
+    enrichment source was down).
+    """
+    name = candidate.get("name", "")
+    if filter_mod.has_soft_signal(name, config):
+        return "Caution"
+
+    thresholds = config.get("verdict_thresholds", {}) or {}
+    clean_min = float(thresholds.get("clean_min_score", 70))
+    promising_min_score = float(thresholds.get("promising_min_score", 40))
+    promising_min_wayback = float(
+        thresholds.get("promising_min_wayback_snapshots", 1000)
+    )
+    promising_min_opr = float(thresholds.get("promising_min_open_page_rank", 1.5))
+    promising_min_cc = float(
+        thresholds.get("promising_min_cc_source_domain_count", 10)
+    )
+
+    score = float(candidate.get("score") or 0)
+    if score >= clean_min:
+        return "Clean"
+
+    if score >= promising_min_score:
+        wayback = float(candidate.get("wayback_snapshots") or 0)
+        opr = float(candidate.get("open_page_rank") or 0)
+        cc = float(candidate.get("cc_source_domain_count") or 0)
+        if wayback >= promising_min_wayback and (
+            opr >= promising_min_opr or cc >= promising_min_cc
+        ):
+            return "Promising"
+
+    return "Caution"
+
+
+def _project(candidate: dict, registrars_config: list[dict], config: dict) -> dict:
     name = candidate.get("name", "")
     return {
         "name": name,
@@ -148,6 +210,7 @@ def _project(candidate: dict, registrars_config: list[dict]) -> dict:
         "last_validated_date": candidate.get("last_validated_date"),
         "days_listed": candidate.get("days_listed", 0),
         "cc_source_domain_count": candidate.get("cc_source_domain_count"),
+        "verdict": _compute_verdict(candidate, config),
     }
 
 
@@ -253,7 +316,7 @@ def build_payload(
 
     # Stage 3: project + assemble
     registrars_config = config.get("registrars") or []
-    domains = [_project(c, registrars_config) for c in capped]
+    domains = [_project(c, registrars_config, config) for c in capped]
     when = (generated_at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     today_count = sum(1 for d in domains if (d.get("days_listed") or 0) == 0)

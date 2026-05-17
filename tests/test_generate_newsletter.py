@@ -152,16 +152,46 @@ def test_domain_slug_format():
     assert gn._domain_slug("frostledge.xyz") == "drop-frostledge.xyz"
 
 
-def test_verdict_thresholds_match_site():
-    """Same thresholds as DomainTable.astro's verdictFromScore. If those
-    diverge, the email and the site will give the same domain different
-    verdicts — confusing UX."""
+def test_verdict_from_score_fallback_thresholds():
+    """The score-only fallback path used when payloads predate the
+    2026-05-17 server-computed verdict field (sample-domains.json,
+    legacy JSON). Production payloads carry an explicit verdict and
+    _verdict_for_domain reads that instead — see the next test."""
     assert gn._verdict_from_score(100) == "Clean"
     assert gn._verdict_from_score(70) == "Clean"
     assert gn._verdict_from_score(69) == "Promising"
     assert gn._verdict_from_score(40) == "Promising"
     assert gn._verdict_from_score(39) == "Caution"
     assert gn._verdict_from_score(0) == "Caution"
+
+
+def test_verdict_for_domain_prefers_server_field():
+    """When the JSON entry carries an explicit `verdict`, that wins over
+    the score-only fallback — tightened Promising rules live in
+    scripts/output.py and the newsletter just renders the decision."""
+    # Server says Caution despite a high score — newsletter must honor it
+    # (e.g., a soft-signal dating domain that scored 90).
+    assert gn._verdict_for_domain({"score": 90, "verdict": "Caution"}) == "Caution"
+    # Server says Promising; newsletter uses that label even if the
+    # score-only fallback would have agreed.
+    assert gn._verdict_for_domain({"score": 55, "verdict": "Promising"}) == "Promising"
+    # Server says Clean.
+    assert gn._verdict_for_domain({"score": 75, "verdict": "Clean"}) == "Clean"
+
+
+def test_verdict_for_domain_falls_back_to_score_when_missing():
+    """No verdict field (older JSON, sample data) → fall back to
+    score-only thresholds."""
+    assert gn._verdict_for_domain({"score": 80}) == "Clean"
+    assert gn._verdict_for_domain({"score": 55}) == "Promising"
+    assert gn._verdict_for_domain({"score": 20}) == "Caution"
+
+
+def test_verdict_for_domain_falls_back_when_value_invalid():
+    """A malformed verdict (non-string, unknown enum) → fall back to score."""
+    assert gn._verdict_for_domain({"score": 80, "verdict": "Unknown"}) == "Clean"
+    assert gn._verdict_for_domain({"score": 80, "verdict": None}) == "Clean"
+    assert gn._verdict_for_domain({"score": 20, "verdict": 123}) == "Caution"
 
 
 def test_fmt_int_handles_none_and_commas():

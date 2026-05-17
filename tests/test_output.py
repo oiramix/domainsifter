@@ -429,3 +429,101 @@ def test_cc_source_domain_count_not_in_completeness_calculation():
 def test_cc_source_domain_count_in_contract_fields():
     """Architectural assertion: the field is part of the locked schema."""
     assert "cc_source_domain_count" in output.CONTRACT_FIELDS
+
+
+# --- verdict (added 2026-05-17) ----------------------------------------------
+
+VERDICT_CFG = {
+    **CONFIG,
+    "verdict_thresholds": {
+        "clean_min_score": 70,
+        "promising_min_score": 40,
+        "promising_min_wayback_snapshots": 1000,
+        "promising_min_open_page_rank": 1.5,
+        "promising_min_cc_source_domain_count": 10,
+    },
+    "soft_signal_keywords": ["dating", "pump"],
+}
+
+
+def _verdict_of(payload: dict) -> str:
+    return payload["domains"][0]["verdict"]
+
+
+def test_verdict_clean_for_high_score():
+    """Clean is unchanged — score >= 70 wins regardless of wayback / OPR / CC."""
+    cand = _cand("clean.com", 75, wayback_snapshots=0, open_page_rank=0,
+                 cc_source_domain_count=None)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Clean"
+
+
+def test_verdict_promising_requires_wayback_gate():
+    """score >= promising_min but wayback < 1000 → demote to Caution."""
+    cand = _cand("light.com", 55, wayback_snapshots=500, open_page_rank=3.0,
+                 cc_source_domain_count=100)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_promising_requires_authority_signal():
+    """score >= promising_min, wayback >= 1000, but OPR=0 and CC=0 → Caution."""
+    cand = _cand("traces.com", 55, wayback_snapshots=5000, open_page_rank=0,
+                 cc_source_domain_count=0)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_promising_satisfied_via_opr():
+    cand = _cand("ok-opr.com", 55, wayback_snapshots=1500, open_page_rank=1.5,
+                 cc_source_domain_count=0)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Promising"
+
+
+def test_verdict_promising_satisfied_via_cc_backlinks():
+    cand = _cand("ok-cc.com", 55, wayback_snapshots=1500, open_page_rank=0,
+                 cc_source_domain_count=10)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Promising"
+
+
+def test_verdict_below_promising_min_is_caution():
+    cand = _cand("low.com", 35, wayback_snapshots=99999, open_page_rank=9.0,
+                 cc_source_domain_count=99999)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_soft_signal_forces_caution_even_at_clean_score():
+    """A high-scoring domain whose name carries a soft-signal token still
+    warns the reader. The forced-Caution check short-circuits before
+    Clean."""
+    cand = _cand(
+        "datingmegahub.com", 90,
+        wayback_snapshots=5000, open_page_rank=8.0, cc_source_domain_count=2000,
+    )
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_soft_signal_forces_caution_on_passing_candidate():
+    cand = _cand(
+        "pump99.io", 55,
+        wayback_snapshots=2000, open_page_rank=3.0, cc_source_domain_count=50,
+    )
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_tolerates_missing_wayback_field():
+    """Coerces None to 0 for the Promising gate — conservative: a missing
+    enrichment field shouldn't earn the higher tier."""
+    cand = _cand("nowb.com", 55, wayback_snapshots=None, open_page_rank=3.0,
+                 cc_source_domain_count=100)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_field_in_contract():
+    assert "verdict" in output.CONTRACT_FIELDS

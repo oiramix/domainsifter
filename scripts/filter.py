@@ -22,7 +22,10 @@ Reject rules (any one triggers rejection):
     R2  single-character apex    — labels[0] length < min_domain_length
     R3  too long                 — labels[0] length > max_domain_length
     R4  all-numeric apex         — labels[0] is digits only
-    R5  rejected keyword         — any rejected_keywords substring in apex
+    R5  rejected keyword         — token-aware match against
+                                   rejected_keywords (exact) OR
+                                   rejected_keyword_prefixes (startswith).
+                                   See `_matched_hard_keyword`.
     R6  spam_flagged             — Safe Browsing match
     R7  surbl_listed             — SURBL match (only on `is True`)
     R8  spamhaus_listed          — Spamhaus DBL match (only on `is True`)
@@ -35,6 +38,30 @@ Reject rules (any one triggers rejection):
                                    per-domain query failed; conservative
                                    reject. (Caller decides whether to
                                    enforce by passing strict_spam_check.)
+
+Keyword matching, 2026-05-17 (replaces the prior naive substring match
+that false-positived 'essex' on 'sex', 'camera' on 'cam'):
+
+    Tokens = apex split on dots, hyphens, AND digit/letter transitions,
+    lowercased. So 'african-sex.net' → {'african','sex','net'};
+    'casino77.com' → {'casino','77','com'}; 'hentai2.org' →
+    {'hentai','2','org'}. The whole-coarse-label is ALSO retained
+    ('soap2day' stays one token alongside its digit-split pieces) so
+    multi-character keywords containing digits still match exactly.
+
+    Match modes:
+      exact      — token == keyword. Applied to ALL `rejected_keywords`.
+      prefix     — token.startswith(stem) AND token != stem. Applied to
+                   `rejected_keyword_prefixes` only (a curated subset
+                   of unambiguous abuse stems). Catches numeric/letter-
+                   suffix bypasses like xtubecinema, porn99, hentai77x
+                   without false-positiving 'essex' on 'sex' (essex
+                   doesn't start with 'sex').
+
+    Soft signals (dating, snake-oil, get-rich-quick, crypto-speculative,
+    listed in `soft_signal_keywords`) use exact match only. They do NOT
+    reject the candidate at the filter — they're a flag the verdict
+    computation reads to force "Caution" (see output.py:_verdict).
 
 DNSBL three-state semantics (R7, R8): `surbl_listed` and `spamhaus_listed`
 can be True / False / None / missing. Only `is True` rejects; `None`
@@ -54,8 +81,97 @@ unavailable" (signal: missing).
 from __future__ import annotations
 
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+# Splits on: dot, hyphen, or a boundary between a digit and a letter (either
+# direction). Captures the spec's "dots, hyphens, digit/letter transitions"
+# in a single pass.
+_TOKEN_SPLIT_RE = re.compile(
+    r"[.\-]|(?<=\d)(?=[a-z])|(?<=[a-z])(?=\d)",
+    re.IGNORECASE,
+)
+# Coarser variant: hyphens + dots only. Keeps alphanumeric labels intact
+# ('soap2day' stays one token) so multi-char keywords with digits still
+# exact-match, and so prefix-matching can target whole labels like
+# 'xtubecinema' against the stem 'xtube'.
+_COARSE_SPLIT_RE = re.compile(r"[.\-]")
+
+
+def _tokenize(name: str) -> tuple[set[str], set[str]]:
+    """Return (coarse, fine) lowercase token sets.
+
+    coarse — split on dots and hyphens only; preserves alphanumeric mixes.
+    fine   — also split on digit/letter transitions.
+
+    Coarse drives prefix matching (we don't want 'porn' to prefix-match
+    against '99' or 'p'); fine drives exact matching for pure-letter
+    keywords against digit-suffixed names ('porn99' → 'porn' is a fine
+    token, matches exact keyword 'porn'). Both sets are unioned for the
+    exact-match pass.
+    """
+    lower = name.lower()
+    coarse = {t for t in _COARSE_SPLIT_RE.split(lower) if t}
+    fine = {t for t in _TOKEN_SPLIT_RE.split(lower) if t}
+    return coarse, fine
+
+
+def _matched_hard_keyword(
+    name: str,
+    rejected_keywords: list[str],
+    rejected_keyword_prefixes: list[str],
+) -> str | None:
+    """Return the keyword that triggers a hard reject, or None."""
+    if not name:
+        return None
+    coarse, fine = _tokenize(name)
+    all_tokens = coarse | fine
+
+    exact_set = {kw.lower() for kw in rejected_keywords if kw}
+    for tok in all_tokens:
+        if tok in exact_set:
+            return tok
+
+    prefixes = [p.lower() for p in rejected_keyword_prefixes if p]
+    for tok in coarse:
+        for stem in prefixes:
+            # Strict prefix: token starts with stem AND is longer than stem
+            # (equal length is exact, already handled above).
+            if len(tok) > len(stem) and tok.startswith(stem):
+                return stem
+    return None
+
+
+def _matched_soft_signal(name: str, soft_signal_keywords: list[str]) -> str | None:
+    """Return the soft-signal keyword that matches (substring), or None.
+
+    Soft signals use SUBSTRING matching inside the apex label so compound
+    bypasses like 'singlesdatingsingles' or 'datingmegahub' still trip the
+    Caution gate. Substring is OK here (unlike hard rejects, which it
+    false-positived all over) because soft signals only flip the verdict to
+    Caution, never reject — a wrong Caution on 'secure.com' (contains
+    'cure') is an over-warning, not a deletion. False-positive cost <<
+    false-negative cost for the abuse categories listed in
+    config.soft_signal_keywords (dating / snake-oil / get-rich / crypto-
+    speculative — all words you'd avoid in a legitimate brand anyway).
+    """
+    if not name or not soft_signal_keywords:
+        return None
+    apex_lower = name.split(".", 1)[0].lower()
+    for kw in soft_signal_keywords:
+        if kw and kw.lower() in apex_lower:
+            return kw.lower()
+    return None
+
+
+def has_soft_signal(name: str, config: dict) -> bool:
+    """Public helper for the verdict computation in output.py. True when the
+    name contains a token matching any `soft_signal_keywords` entry."""
+    return _matched_soft_signal(
+        name, config.get("soft_signal_keywords", []) or []
+    ) is not None
 
 
 def _is_punycode(name: str) -> bool:
@@ -72,7 +188,8 @@ def keep_structural(candidate: dict, config: dict) -> tuple[bool, str | None]:
     thresholds = config.get("filter_thresholds", {})
     min_len = thresholds.get("min_domain_length", 2)
     max_len = thresholds.get("max_domain_length", 30)
-    rejected_keywords = config.get("rejected_keywords", [])
+    rejected_keywords = config.get("rejected_keywords", []) or []
+    rejected_keyword_prefixes = config.get("rejected_keyword_prefixes", []) or []
 
     if _is_punycode(name):
         return False, "punycode"
@@ -82,10 +199,12 @@ def keep_structural(candidate: dict, config: dict) -> tuple[bool, str | None]:
         return False, f"too_long(>{max_len})"
     if apex_label.isdigit():
         return False, "all_numeric"
-    apex_lower = apex_label.lower()
-    for kw in rejected_keywords:
-        if kw and kw.lower() in apex_lower:
-            return False, f"keyword:{kw}"
+
+    matched = _matched_hard_keyword(
+        apex_label, rejected_keywords, rejected_keyword_prefixes,
+    )
+    if matched:
+        return False, f"keyword:{matched}"
 
     return True, None
 

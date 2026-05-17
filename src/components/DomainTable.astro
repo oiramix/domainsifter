@@ -35,6 +35,13 @@ interface PipelineDomain {
   // in the latest CC release; null when the apex isn't in that release's
   // graph at all. Older payloads and sample data omit it entirely.
   cc_source_domain_count?: number | null;
+  // Server-computed verdict (added 2026-05-17). Pipeline writes this in
+  // scripts/output.py:_compute_verdict using the tightened Promising
+  // criteria (wayback >= 1000 AND (OPR >= 1.5 OR CC backlinks >= 10))
+  // plus soft-signal keyword check. Frontend prefers this when present;
+  // legacy payloads (sample data, pre-migration JSON) fall back to
+  // score-only via verdictFromScore.
+  verdict?: 'Clean' | 'Promising' | 'Caution';
 }
 
 interface PipelinePayload {
@@ -90,6 +97,15 @@ const verdictFromScore = (score: number): Verdict => {
   if (score >= 70) return 'Clean';
   if (score >= 40) return 'Promising';
   return 'Caution';
+};
+
+// Prefer the server-computed verdict (richer rules: wayback + OPR + CC
+// backlinks + soft-signal). Fall back to score-only on legacy payloads.
+const verdictFor = (d: PipelineDomain): Verdict => {
+  if (d.verdict === 'Clean' || d.verdict === 'Promising' || d.verdict === 'Caution') {
+    return d.verdict;
+  }
+  return verdictFromScore(d.score);
 };
 
 const droppedDaysAgo = (isoDate: string): string => {
@@ -310,7 +326,7 @@ const carryoverSubheader = (n: number): string => {
             </div>
             <div role="rowgroup" class="divide-y divide-stone-100" data-table-body data-scope="today">
               {todayDomains.map((d, i) => {
-                const verdict = verdictFromScore(d.score);
+                const verdict = verdictFor(d);
                 const popoverId = `pop-today-row-${i}`;
                 return (
                   <div
@@ -399,7 +415,7 @@ const carryoverSubheader = (n: number): string => {
         <!-- Mobile cards for Card 1 -->
         <ul class="md:hidden space-y-3 p-3 max-h-[80vh] overflow-y-auto" data-card-list data-scope="today">
           {todayDomains.map((d, i) => {
-            const verdict = verdictFromScore(d.score);
+            const verdict = verdictFor(d);
             const popoverId = `pop-today-card-${i}`;
             return (
               <li
@@ -556,7 +572,7 @@ const carryoverSubheader = (n: number): string => {
             </div>
             <div role="rowgroup" class="divide-y divide-stone-100" data-table-body data-scope="carryover">
               {carryoverDomains.map((d, i) => {
-                const verdict = verdictFromScore(d.score);
+                const verdict = verdictFor(d);
                 const popoverId = `pop-carry-row-${i}`;
                 return (
                   <div
@@ -638,7 +654,7 @@ const carryoverSubheader = (n: number): string => {
              data always has first_seen_date == dropped_date). -->
         <ul class="md:hidden space-y-3 p-3 max-h-[80vh] overflow-y-auto" data-card-list data-scope="carryover">
           {carryoverDomains.map((d, i) => {
-            const verdict = verdictFromScore(d.score);
+            const verdict = verdictFor(d);
             const popoverId = `pop-carry-card-${i}`;
             return (
               <li
