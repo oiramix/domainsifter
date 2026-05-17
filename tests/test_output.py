@@ -527,3 +527,67 @@ def test_verdict_tolerates_missing_wayback_field():
 
 def test_verdict_field_in_contract():
     assert "verdict" in output.CONTRACT_FIELDS
+
+
+# --- wayback_unknown (added 2026-05-17) --------------------------------------
+
+
+def test_wayback_unknown_field_in_contract():
+    """Persisted to JSON so tomorrow's carryover.age_out_wayback_unknown
+    can see and increment the counter."""
+    assert "wayback_unknown" in output.CONTRACT_FIELDS
+    assert "wayback_unknown_attempts" in output.CONTRACT_FIELDS
+
+
+def test_wayback_unknown_exempts_completeness_penalty():
+    """When wayback enrichment couldn't reach the server (breaker open / per-
+    call failure), the candidate carries wayback_unknown=True. The two
+    wayback fields are null. Without an exemption the candidate would lose
+    2/5 completeness points and very likely fail the publish_min_enrichment_
+    completeness=0.50 gate. Silent drop. The exemption fixes that."""
+    cfg = {
+        **CONFIG,
+        "publish_min_score": 0,
+        "publish_min_enrichment_completeness": 0.80,
+    }
+    cand = _cand(
+        "wb-down.com", 60,
+        wayback_snapshots=None, wayback_last_snapshot=None,
+        open_page_rank=3.0, cert_history=True, previous_registrar="X",
+    )
+    cand["wayback_unknown"] = True
+    # Without exemption: completeness = 3/5 = 0.60 < 0.80 → dropped.
+    # With exemption: wayback fields count as populated → 5/5 = 1.0 → passes.
+    payload = output.build_payload([cand], cfg)
+    assert payload["domain_count"] == 1
+    assert payload["domains"][0]["wayback_unknown"] is True
+
+
+def test_wayback_unknown_zero_attempts_serializes_as_null():
+    """First-day wayback_unknown candidates have attempts=0 (carryover will
+    tick to 1 tomorrow). Serialize as null, not 0, so the JSON file stays
+    minimal for the >99% of entries that never hit this state."""
+    cand = _cand("first.com", 60, wayback_snapshots=None)
+    cand["wayback_unknown"] = True
+    payload = output.build_payload([cand], CONFIG)
+    d = payload["domains"][0]
+    assert d["wayback_unknown"] is True
+    assert d["wayback_unknown_attempts"] is None
+
+
+def test_wayback_unknown_existing_attempts_pass_through():
+    """A carryover entry with attempts=2 must round-trip the integer."""
+    cand = _cand("dayN.com", 60, wayback_snapshots=None)
+    cand["wayback_unknown"] = True
+    cand["wayback_unknown_attempts"] = 2
+    payload = output.build_payload([cand], CONFIG)
+    d = payload["domains"][0]
+    assert d["wayback_unknown_attempts"] == 2
+
+
+def test_wayback_unknown_false_serializes_as_null():
+    """Most candidates never see wayback_unknown. They should NOT carry
+    `wayback_unknown: false` in the JSON — keeps the payload compact."""
+    cand = _cand("normal.com", 80, wayback_snapshots=42)
+    payload = output.build_payload([cand], CONFIG)
+    assert payload["domains"][0]["wayback_unknown"] is None

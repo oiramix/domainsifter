@@ -103,6 +103,15 @@ CONTRACT_FIELDS = (
     "cc_source_domain_count",
     # Server-computed verdict (added 2026-05-17). See `_compute_verdict`.
     "verdict",
+    # Wayback-unknown flag + carryover age counter (added 2026-05-17).
+    # Set True when scripts/enrichment/wayback.py couldn't reach Wayback
+    # (breaker open or per-call failure). Persisted to JSON so tomorrow's
+    # carryover.age_out_wayback_unknown can increment the attempts counter
+    # and eventually drop the entry after DEFAULT_MAX_WAYBACK_UNKNOWN_DAYS.
+    # Absence of the flag means wayback either succeeded or was never
+    # attempted for this candidate — both safe.
+    "wayback_unknown",
+    "wayback_unknown_attempts",
 )
 
 # Enrichment fields used to compute completeness ratio. A candidate's
@@ -211,16 +220,33 @@ def _project(candidate: dict, registrars_config: list[dict], config: dict) -> di
         "days_listed": candidate.get("days_listed", 0),
         "cc_source_domain_count": candidate.get("cc_source_domain_count"),
         "verdict": _compute_verdict(candidate, config),
+        "wayback_unknown": bool(candidate.get("wayback_unknown")) or None,
+        "wayback_unknown_attempts": (
+            int(candidate.get("wayback_unknown_attempts"))
+            if candidate.get("wayback_unknown_attempts") not in (None, 0)
+            else None
+        ),
     }
 
 
 def _enrichment_completeness(candidate: dict) -> float:
     """Fraction in [0.0, 1.0] of enrichment fields that are populated.
     'Populated' means: key present AND value not None. Empty string and 0
-    count as populated (they ARE data — just zero / empty)."""
-    populated = sum(
-        1 for f in _ENRICHMENT_FIELDS_FOR_COMPLETENESS if candidate.get(f) is not None
-    )
+    count as populated (they ARE data — just zero / empty).
+
+    Wayback exemption (2026-05-17): when a candidate carries
+    `wayback_unknown=True` (the breaker was open / call failed during its
+    enrichment), the two wayback fields are counted as populated here. The
+    absence is upstream's fault, not the candidate's; penalizing it in the
+    completeness gate would silently drop good domains on flaky-Wayback days.
+    """
+    wayback_unknown = bool(candidate.get("wayback_unknown"))
+    populated = 0
+    for f in _ENRICHMENT_FIELDS_FOR_COMPLETENESS:
+        if candidate.get(f) is not None:
+            populated += 1
+        elif wayback_unknown and f.startswith("wayback_"):
+            populated += 1
     return populated / len(_ENRICHMENT_FIELDS_FOR_COMPLETENESS)
 
 

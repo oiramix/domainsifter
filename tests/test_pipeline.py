@@ -344,8 +344,9 @@ def test_bucket_overflow_triggers_random_shuffle_not_length_asc(monkeypatch, cfg
 
 def test_global_cap_applies_before_bucketing_when_over_total(monkeypatch, cfg):
     """global_cap is a safety net engaged BEFORE per-host bucketing. When
-    total survivors exceed it, random-shuffle and trim to global_cap, then
-    bucket what remains."""
+    total survivors exceed it, trim by trigram-match-count desc + apex-
+    length asc (changed 2026-05-17 from random shuffle), then bucket what
+    remains."""
     from scripts.enrichment import rdap as rdap_mod
 
     # Two TLDs → two distinct hosts.
@@ -376,6 +377,84 @@ def test_global_cap_applies_before_bucketing_when_over_total(monkeypatch, cfg):
     # And no bucket got individually re-trimmed past its per-host cap.
     for s in stats.values():
         assert s["before"] == s["after"], "per-host trim ran inappropriately"
+
+
+def test_global_cap_trim_prefers_high_quality_candidates(monkeypatch, cfg):
+    """Change 2 (2026-05-17): when global_cap engages, the kept candidates
+    should have a higher mean trigram-match-count than the discarded ones.
+
+    Mix natural-English-looking names (high trigram match — 'gardenpath',
+    'rivermeadow', etc.) with keysmash names (low trigram match — 'kvkxh',
+    'zqxrt') and confirm the kept set is dominated by the natural ones."""
+    from scripts.enrichment import rdap as rdap_mod
+    from scripts import lexical_filter as lex
+
+    monkeypatch.setattr(rdap_mod, "resolve_rdap_host", lambda *_a, **_k: "rdap.solo")
+
+    high_quality = [
+        "gardenpath.com", "rivermeadow.org", "ironforge.net",
+        "northstar.io",   "marketglow.co",   "silverleaf.app",
+    ]
+    low_quality = [
+        "kvkxhmt.com", "zqxrtbn.org", "wpqhd.net",
+        "xptbnz.io",   "kjjkzq.co",   "mkqzrx.app",
+    ]
+    cands = [{"name": n} for n in high_quality + low_quality]
+
+    cfg = {
+        **cfg,
+        "availability_check": {"max_runtime_per_host_seconds": 900, "global_cap": 6},
+        "api_min_interval_seconds": {"rdap": 0.4},
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+    final, _ = pipeline._bucket_and_cap_for_availability(
+        cands, cfg, today=date(2026, 5, 17),
+    )
+
+    assert len(final) == 6
+    kept_names = {c["name"] for c in final}
+    discarded = {n for n in (high_quality + low_quality) if n not in kept_names}
+
+    # Quality property: every kept candidate's trigram score >= every
+    # discarded candidate's score. Stronger than just "mean is higher" —
+    # the ranking is total-order so the cut is at a single threshold.
+    min_kept_score = min(lex.trigram_match_count(n) for n in kept_names)
+    max_discarded_score = max(lex.trigram_match_count(n) for n in discarded)
+    assert min_kept_score >= max_discarded_score, (
+        f"global_cap trim kept lower-quality candidates than it discarded: "
+        f"min kept score={min_kept_score}, max discarded score={max_discarded_score}"
+    )
+
+    # Sanity: keep the high-quality natural names, discard the keysmash.
+    assert all(n in kept_names for n in high_quality), (
+        f"natural-English names should win the trim: missing "
+        f"{set(high_quality) - kept_names}"
+    )
+
+
+def test_global_cap_trim_is_deterministic_across_runs(monkeypatch, cfg):
+    """Same input → same trim regardless of date (the ranking is purely a
+    function of the candidate names). Reproducibility matters for debugging
+    a published-list audit against the lexical-survivors dump."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    monkeypatch.setattr(rdap_mod, "resolve_rdap_host", lambda *_a, **_k: "rdap.solo")
+    cfg = {
+        **cfg,
+        "availability_check": {"max_runtime_per_host_seconds": 900, "global_cap": 3},
+        "api_min_interval_seconds": {"rdap": 0.4},
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+    cands = [{"name": f"{n}.com"} for n in [
+        "gardenpath", "marketglow", "ironforge", "kvkxh", "zqxrt", "wpqhd",
+    ]]
+    a, _ = pipeline._bucket_and_cap_for_availability(
+        list(cands), cfg, today=date(2026, 5, 1),
+    )
+    b, _ = pipeline._bucket_and_cap_for_availability(
+        list(cands), cfg, today=date(2026, 5, 17),
+    )
+    assert [c["name"] for c in a] == [c["name"] for c in b]
 
 
 def test_bucket_cap_is_deterministic_per_day(monkeypatch, cfg):
@@ -923,98 +1002,11 @@ def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cf
     assert [d["name"] for d in written["domains"]] == ["great.com"]
 
 
-def test_main_dns_prefilter_routes_candidates_before_rdap(monkeypatch, cfg, tmp_path):
-    """End-to-end: with dns_check.enabled=True, candidates whose apex still
-    has NS records are rejected BEFORE the RDAP availability check runs;
-    dns_available=None candidates fail open and still reach RDAP. This is
-    the central architectural property of the 2026-05-12 pre-filter — it
-    cuts RDAP load without compromising the final list (everything RDAP
-    would have approved still arrives there).
-    """
-    cfg = {
-        **cfg,
-        "dns_check": {
-            "enabled": True,
-            "workers": 2,
-            "timeout_seconds": 1,
-            "throttle_seconds": 0.0,
-        },
-    }
-    cfg_path = tmp_path / "config.json"
-    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
-
-    monkeypatch.setenv("CZDS_USERNAME", "u")
-    monkeypatch.setenv("CZDS_PASSWORD", "p")
-    monkeypatch.setenv("SAFE_BROWSING_KEY", "k")
-    _set_r2_env(monkeypatch)
-    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
-
-    # Bypass structural + lexical filters — this test cares only about
-    # DNS-prefilter → RDAP routing, and short invented names like
-    # "broken.com" land on the lexical trigram threshold by accident.
-    monkeypatch.setattr(
-        pipeline.filter_mod, "filter_candidates_structural",
-        lambda cands, _cfg: list(cands),
-    )
-    monkeypatch.setattr(
-        pipeline.lexical_filter, "filter_candidates",
-        lambda cands, _cfg, **_kw: list(cands),
-    )
-
-    today = date.today()
-    monkeypatch.setattr(
-        pipeline,
-        "collect_drops",
-        lambda _cfg, _tok, today, **_kw: ([
-            {"name": "available.com", "tld": "com", "dropped_date": today.isoformat()},
-            {"name": "registered.com", "tld": "com", "dropped_date": today.isoformat()},
-            {"name": "broken.com", "tld": "com", "dropped_date": today.isoformat()},
-        ], []),
-    )
-
-    # Patch check_dns_availability directly — keeps the test independent
-    # of dnspython internals and the system resolver. Each candidate gets
-    # one of the three contract states.
-    def fake_dns_check(apex, **_kw):
-        if apex == "available.com":
-            return {"dns_available": True, "ns_records": []}
-        if apex == "registered.com":
-            return {"dns_available": False, "ns_records": ["ns1.parking.example"]}
-        return {"dns_available": None, "ns_records": []}
-
-    monkeypatch.setattr(
-        pipeline.dns_prefilter, "check_dns_availability", fake_dns_check,
-    )
-
-    # Track every domain RDAP receives — the routing assertion is "RDAP
-    # never sees registered.com because the pre-filter rejected it".
-    rdap_seen: list[str] = []
-
-    from scripts.enrichment import rdap as rdap_mod
-
-    def fake_rdap_check(domain, _c):
-        rdap_seen.append(domain)
-        return {"is_available": True, "rdap_http": 404, "rdap_status": [],
-                "rdap_expiration": None, "previous_registrar": None}
-
-    monkeypatch.setattr(rdap_mod, "check_availability", fake_rdap_check)
-    monkeypatch.setattr(
-        pipeline, "enrich_all",
-        lambda cands, _cfg: [
-            {**c, "wayback_snapshots": 50, "wayback_last_snapshot": "2024-01-01",
-             "open_page_rank": 3.0, "cert_history": True,
-             "spam_flagged": False, "surbl_listed": False,
-             "spamhaus_listed": False, "previous_registrar": "Acme"}
-            for c in cands
-        ],
-    )
-
-    rc = pipeline.main(["--config", str(cfg_path)])
-    assert rc == 0
-
-    # The hard property: registered.com was rejected pre-RDAP.
-    # available.com (True) and broken.com (None, fail-open) both reached RDAP.
-    assert sorted(rdap_seen) == ["available.com", "broken.com"]
+# DNS pre-filter end-to-end integration test was removed 2026-05-17 when
+# the DNS pre-filter stage itself was removed from pipeline.py. Reason:
+# the May 15-17 audit showed the stage rejecting ~0% of candidates while
+# adding 20-25 min per run. scripts/dns_prefilter.py itself is left in
+# place pending a follow-up deletion sweep.
 
 
 # --- cc_backlinks integration (wire-in 2026-05-14) --------------------------

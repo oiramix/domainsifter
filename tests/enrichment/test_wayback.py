@@ -138,7 +138,7 @@ def test_enrich_returns_empty_dict_on_wayback_exception(monkeypatch):
     _patch_client(monkeypatch, WaybackException("simulated 503 / rate-limit / etc."))
 
     failures_before = wayback._BREAKER.consecutive_failures
-    assert wayback.enrich("example.com", CONFIG) == {}
+    assert wayback.enrich("example.com", CONFIG) == {"wayback_unknown": True}
     assert wayback._BREAKER.consecutive_failures == failures_before + 1
 
 
@@ -150,7 +150,7 @@ def test_enrich_returns_empty_dict_on_rate_limit_error(monkeypatch):
     _patch_session(monkeypatch)
     _patch_client(monkeypatch, RateLimitError("simulated 429", 60))
 
-    assert wayback.enrich("example.com", CONFIG) == {}
+    assert wayback.enrich("example.com", CONFIG) == {"wayback_unknown": True}
     assert wayback._BREAKER.consecutive_failures == 1
 
 
@@ -161,7 +161,7 @@ def test_enrich_returns_empty_dict_on_generic_exception(monkeypatch):
     _patch_session(monkeypatch)
     _patch_client(monkeypatch, ConnectionError("network down"))
 
-    assert wayback.enrich("example.com", CONFIG) == {}
+    assert wayback.enrich("example.com", CONFIG) == {"wayback_unknown": True}
     assert wayback._BREAKER.consecutive_failures == 1
 
 
@@ -179,7 +179,7 @@ def test_enrich_short_circuits_when_breaker_open(monkeypatch):
         wayback._BREAKER.record_failure()
     assert wayback._BREAKER.is_open()
 
-    assert wayback.enrich("example.com", CONFIG) == {}
+    assert wayback.enrich("example.com", CONFIG) == {"wayback_unknown": True}
     fake_client.search.assert_not_called()
 
 

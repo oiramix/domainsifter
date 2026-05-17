@@ -114,6 +114,60 @@ def test_filter_by_age_handles_malformed_date_as_migration():
     assert dropped == 0
 
 
+# --- age_out_wayback_unknown (added 2026-05-17) -----------------------------
+
+
+def test_age_out_wayback_unknown_passes_through_unflagged_entries():
+    """Entries without wayback_unknown set are not touched (no counter,
+    no drop). Only flagged entries get the counter treatment."""
+    entries = [
+        _entry("clean.com", wayback_snapshots=42),
+        _entry("alsoclean.org"),
+    ]
+    survivors, dropped = carryover.age_out_wayback_unknown(entries)
+    assert dropped == 0
+    assert survivors == entries  # passed through untouched
+
+
+def test_age_out_wayback_unknown_increments_counter():
+    """First pass over a flagged entry sets attempts=1; second pass = 2."""
+    entries = [_entry("foo.com", wayback_unknown=True)]
+    s1, d1 = carryover.age_out_wayback_unknown(entries)
+    assert d1 == 0
+    assert s1[0]["wayback_unknown_attempts"] == 1
+    # The carryover entry is the SAME object on subsequent days (loaded from
+    # JSON each run), so simulate by feeding the survivors back in.
+    s2, d2 = carryover.age_out_wayback_unknown(s1)
+    assert d2 == 0
+    assert s2[0]["wayback_unknown_attempts"] == 2
+
+
+def test_age_out_wayback_unknown_drops_after_max_days():
+    """Default max is 3 — an entry at attempts=3 going into the next pass
+    ticks to 4 and is dropped (data too stale to matter)."""
+    entries = [_entry("foo.com", wayback_unknown=True, wayback_unknown_attempts=3)]
+    survivors, dropped = carryover.age_out_wayback_unknown(entries)
+    assert dropped == 1
+    assert survivors == []
+
+
+def test_age_out_wayback_unknown_respects_custom_max():
+    """An operator can tighten or loosen the bound via config."""
+    entries = [_entry("foo.com", wayback_unknown=True, wayback_unknown_attempts=1)]
+    survivors, dropped = carryover.age_out_wayback_unknown(entries, max_unknown_days=1)
+    # attempts=1 + 1 increment = 2, > max_unknown_days=1 → drop
+    assert dropped == 1
+    assert survivors == []
+
+
+def test_age_out_wayback_unknown_does_not_mutate_input():
+    """Defence-in-depth: caller's list is intact after the call."""
+    original = [_entry("foo.com", wayback_unknown=True)]
+    snapshot = json.loads(json.dumps(original))
+    carryover.age_out_wayback_unknown(original)
+    assert original == snapshot
+
+
 # --- validate_against_zone ---------------------------------------------------
 
 

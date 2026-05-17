@@ -292,6 +292,22 @@ def _trigram_match_ratio(label: str) -> float:
     return matches / total
 
 
+def trigram_match_count(name: str) -> int:
+    """Public accessor: number of English-natural trigrams in the apex.
+
+    Used by scripts/pipeline.py for the global_cap quality ranking — at the
+    trim site there are no enrichment signals yet, so the only quantitative
+    quality prior is "how English-like does the name look?" Higher = more
+    likely to be a memorable / former-real-site name. Pure function of the
+    name; safe to call thousands of times at the trim stage.
+    """
+    if not name:
+        return 0
+    apex = name.split(".", 1)[0]
+    matches, _ = _trigram_stats(apex)
+    return matches
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------

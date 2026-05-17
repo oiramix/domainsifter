@@ -307,6 +307,41 @@ def test_keep_tolerates_missing_wayback_field():
     assert reason is None
 
 
+def test_keep_passes_wayback_unknown_candidate():
+    """Three-state semantics (2026-05-17): a candidate carrying
+    wayback_unknown=True (breaker open / call failed) PASSES the post-
+    enrichment filter, distinct from the no_wayback_confirmed reject when
+    snapshots=0. Without this, good domains on flaky-Wayback days are
+    silently dropped."""
+    cand = _ok()
+    del cand["wayback_snapshots"]
+    cand["wayback_unknown"] = True
+    keep, reason = filter_mod.keep(cand, CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_filter_logs_wayback_unknown_pass_through_distinctly(caplog):
+    """`wayback_unknown` candidates that pass the filter must be counted in
+    a SEPARATE log line from rejection counts so an operator scanning a
+    flaky-Wayback-day run can see how many candidates were affected. Also
+    confirms the no_wayback reject is renamed to `no_wayback_confirmed`."""
+    import logging
+    cands = [
+        _ok(name="ok.com"),                                   # passes cleanly
+        _ok(name="zero.com", wayback_snapshots=0),            # rejected
+        {**_ok(name="unknown.com"), "wayback_unknown": True}, # pass-through
+        # ↑ retain the other defaults so only the wayback path differs
+    ]
+    cands[2].pop("wayback_snapshots", None)
+    with caplog.at_level(logging.INFO, logger="scripts.filter"):
+        filter_mod.filter_candidates_post_enrichment(cands, CONFIG)
+    msgs = " ".join(rec.message for rec in caplog.records)
+    assert "no_wayback_confirmed" in msgs
+    assert "wayback_unknown_carried_forward" in msgs
+    assert "informational pass-throughs" in msgs
+
+
 def test_keep_strict_rejects_when_spam_field_missing():
     cand = _ok()
     del cand["spam_flagged"]

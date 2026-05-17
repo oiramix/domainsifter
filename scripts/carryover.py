@@ -39,6 +39,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_AGE_DAYS = 14
+DEFAULT_MAX_WAYBACK_UNKNOWN_DAYS = 3
 
 
 def load_existing(path: Path | str) -> list[dict]:
@@ -96,6 +97,43 @@ def filter_by_age(
             dropped += 1
             continue
         survivors.append(e)
+    return survivors, dropped
+
+
+def age_out_wayback_unknown(
+    entries: list[dict],
+    max_unknown_days: int = DEFAULT_MAX_WAYBACK_UNKNOWN_DAYS,
+) -> tuple[list[dict], int]:
+    """Increment `wayback_unknown_attempts` for any entry still flagged
+    wayback_unknown=True, then drop entries that have been flagged for
+    `max_unknown_days` consecutive runs.
+
+    Why this lives in the carryover module: it's a per-day stateful update
+    that mutates the carry-forward list. Same shape as filter_by_age — drop
+    after N days of an unwanted state. The counter starts at 1 on the day
+    the entry is first added to carryover with the flag set, and ticks up
+    each subsequent carryover pass while the flag persists. Drop when
+    counter > max_unknown_days (so a max of 3 means: kept on days 1, 2, 3;
+    dropped on the day it would tick to 4).
+
+    Returns (survivors, dropped_count).
+
+    Future: when wayback retry-on-carryover ships, successful retries should
+    clear the flag here (entries with `wayback_unknown` not True pass through
+    unchanged). Same pattern will apply for `cert_history_unknown` once
+    crt.sh gets the same circuit-breaker-surfacing treatment.
+    """
+    survivors: list[dict] = []
+    dropped = 0
+    for e in entries:
+        if not e.get("wayback_unknown"):
+            survivors.append(e)
+            continue
+        attempts = int(e.get("wayback_unknown_attempts") or 0) + 1
+        if attempts > max_unknown_days:
+            dropped += 1
+            continue
+        survivors.append({**e, "wayback_unknown_attempts": attempts})
     return survivors, dropped
 
 

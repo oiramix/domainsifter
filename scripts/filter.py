@@ -29,10 +29,20 @@ Reject rules (any one triggers rejection):
     R6  spam_flagged             — Safe Browsing match
     R7  surbl_listed             — SURBL match (only on `is True`)
     R8  spamhaus_listed          — Spamhaus DBL match (only on `is True`)
-    R9  no Wayback history       — wayback_snapshots < min_wayback_snapshots
-                                   (only enforced when the field is present —
-                                   a Wayback API failure leaves the field
-                                   absent and we don't punish the domain)
+    R9  no Wayback history       — wayback_snapshots < min_wayback_snapshots.
+                                   Three-state semantics (codified 2026-05-17):
+                                     field present, >= 1  → pass
+                                     field present, == 0  → REJECT
+                                                            (`no_wayback_confirmed`)
+                                     field absent, wayback_unknown=True →
+                                                            PASS with log
+                                                            (`wayback_unknown`)
+                                     field absent, no flag → pass (legacy path,
+                                                            should not occur
+                                                            with the 2026-05-17
+                                                            enricher change)
+                                   The carryover age-out in pipeline.py drops
+                                   wayback_unknown candidates after 3 days.
     R10 spam_check field missing — when SAFE_BROWSING_KEY is configured, a
                                    missing spam_flagged field means the
                                    per-domain query failed; conservative
@@ -291,15 +301,34 @@ def _apply(
 ) -> list[dict]:
     kept: list[dict] = []
     reasons: dict[str, int] = {}
+    passthrough_counts: dict[str, int] = {}
     for cand in candidates:
         ok, reason = decide(cand)
         if ok:
             kept.append(cand)
+            # Count informational pass-throughs separately from rejections
+            # so flaky-Wayback days surface in the log line without faking
+            # a rejection. Today: only wayback_unknown is tracked here; the
+            # same pattern (crt.sh + cert_history) is queued for follow-up.
+            if cand.get("wayback_unknown") is True:
+                passthrough_counts["wayback_unknown_carried_forward"] = (
+                    passthrough_counts.get("wayback_unknown_carried_forward", 0) + 1
+                )
         else:
             key = (reason or "unknown").split("(", 1)[0]
+            # Rename the "no_wayback" reason to "no_wayback_confirmed" so
+            # it's visually distinct from wayback_unknown_carried_forward
+            # in the log line.
+            if key == "no_wayback":
+                key = "no_wayback_confirmed"
             reasons[key] = reasons.get(key, 0) + 1
     if reasons:
         logger.info("%s rejections: %s", log_prefix, dict(sorted(reasons.items())))
+    if passthrough_counts:
+        logger.info(
+            "%s informational pass-throughs: %s",
+            log_prefix, dict(sorted(passthrough_counts.items())),
+        )
     logger.info("%s kept %d / %d candidates", log_prefix, len(kept), len(candidates))
     return kept
 
