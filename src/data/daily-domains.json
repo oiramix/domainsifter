@@ -1,42 +1,9 @@
 {
   "generated_at": "2026-05-17T13:11:17Z",
-  "domain_count": 188,
+  "domain_count": 187,
   "today_count": 86,
-  "carryover_count": 102,
+  "carryover_count": 101,
   "domains": [
-    {
-      "name": "deepsand.net",
-      "tld": "net",
-      "dropped_date": "2026-05-16",
-      "wayback_snapshots": 10139,
-      "wayback_last_snapshot": "2025-12-15",
-      "open_page_rank": 2.27,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 70,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddeepsand.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=deepsand.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=deepsand.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-16T07:14:09Z",
-      "first_seen_date": "2026-05-16",
-      "last_validated_date": "2026-05-17",
-      "days_listed": 1,
-      "cc_source_domain_count": 1590,
-      "verdict": "Clean"
-    },
     {
       "name": "usimin.net",
       "tld": "net",
