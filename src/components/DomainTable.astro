@@ -74,8 +74,27 @@ const allDomains = payload.domains;
 
 // Split into the two card buckets. days_listed === 0 → today; > 0 → carryover.
 // Missing / undefined days_listed (sample data, migration) → treated as today.
-const todayDomains = allDomains.filter((d) => (d.days_listed ?? 0) === 0);
-const carryoverDomains = allDomains.filter((d) => (d.days_listed ?? 0) > 0);
+//
+// Public-tier cap (2026-05-17): each card shows the top N by score, where
+// N = PUBLIC_DOMAIN_CAP. The full list stays in daily-domains.json — the cap
+// is a presentation gate, not a data gate, so future paid-tier surfaces can
+// read the JSON unmodified. If a card has fewer than N qualifying entries
+// (low-drop day, early-week carryover), the slice is a no-op.
+const PUBLIC_DOMAIN_CAP = 30;
+const byScoreDesc = (a: PipelineDomain, b: PipelineDomain): number =>
+  (b.score ?? 0) - (a.score ?? 0);
+const todayDomains = allDomains
+  .filter((d) => (d.days_listed ?? 0) === 0)
+  .sort(byScoreDesc)
+  .slice(0, PUBLIC_DOMAIN_CAP);
+const carryoverDomains = allDomains
+  .filter((d) => (d.days_listed ?? 0) > 0)
+  .sort(byScoreDesc)
+  .slice(0, PUBLIC_DOMAIN_CAP);
+const todayCountUncapped = allDomains.filter((d) => (d.days_listed ?? 0) === 0).length;
+const carryoverCountUncapped = allDomains.filter((d) => (d.days_listed ?? 0) > 0).length;
+const todayIsCapped = todayCountUncapped > PUBLIC_DOMAIN_CAP;
+const carryoverIsCapped = carryoverCountUncapped > PUBLIC_DOMAIN_CAP;
 
 const lastUpdatedLabel = isPreview
   ? 'Preview data'
@@ -202,6 +221,13 @@ const carryoverSubheader = (n: number): string => {
       <p class="mt-1 text-sm text-stone-600">
         Availability checked at last update. Popular drops can be claimed within hours — verify at the registrar before buying.
       </p>
+      {(todayIsCapped || carryoverIsCapped) && (
+        <p class="mt-2 text-xs text-stone-500" data-cap-notice>
+          Showing top {PUBLIC_DOMAIN_CAP} by score per panel.
+          <span class="text-stone-400"> · </span>
+          <span class="text-stone-600">Full list available with paid plan (coming soon).</span>
+        </p>
+      )}
     </div>
 
     <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -247,7 +273,7 @@ const carryoverSubheader = (n: number): string => {
     <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
       <h3 class="text-lg font-semibold text-ink">Today's drops</h3>
       <p class="mt-1 text-sm text-stone-600" data-today-subheader>
-        {todaySubheader(todayDomains.length)}
+        {todaySubheader(todayCountUncapped)}
       </p>
     </header>
 
@@ -504,7 +530,7 @@ const carryoverSubheader = (n: number): string => {
     <header class="px-4 sm:px-6 py-4 border-b border-stone-100">
       <h3 class="text-lg font-semibold text-ink">Recent drops</h3>
       <p class="mt-1 text-sm text-stone-600" data-carryover-subheader>
-        {carryoverSubheader(carryoverDomains.length)}
+        {carryoverSubheader(carryoverCountUncapped)}
       </p>
     </header>
 
