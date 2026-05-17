@@ -1690,3 +1690,56 @@ In STATE.md (operational pending items above):
 - +14 from CC wire-in (test_score.py, test_output.py, test_pipeline.py, test_cc_backlinks.py inversion)
 - +48 from newsletter (tests/test_generate_newsletter.py)
 - End-of-day 2026-05-13: 452; end-of-day 2026-05-14: 514. Net +62 today.
+
+## 2026-05-17 — Weekend shipping session (Sat–Sun, 9 commits)
+
+Pipeline filtering, verdict logic, newsletter source, display cap, and a new SEO archive subsystem all landed this weekend. Tests: 600 → 628 pass.
+
+### Commits
+
+- `bc2c63e` — filter expansion (token-aware, prefix-stem) + verdict tightening; ~75 hard-reject keywords; soft-signal tier forces Caution
+- `128dcba` — one-shot `scripts/refilter_today.py` re-applies new filters to existing JSON (195 → 188 after refilter, 7 rejected)
+- `dd5dc96` — three-fix plumbing: DNS prefilter killed (was 0% rejection 3 days running, ~25min cost), score-based trim by `trigram_match_count` at global_cap (was random-shuffle), `wayback_unknown` flag distinguishes circuit-breaker-tripped from confirmed-no-history; carryover for 3 days then ages out
+- `07c5a07` — display cap to top 30 per panel (`PUBLIC_DOMAIN_CAP=30`); pipeline writes all to JSON, cap is frontend-only
+- `bc32080` — IPv6 RDAP diagnostic script (parked; OVH only has /128, ticket pending for /64)
+- `b303a55` — newsletter source: fresh-today only (`days_listed == 0`); three skip states: `skipped_empty`, `skipped_no_fresh`, `skipped_duplicate`
+- `beb90ff` — honest cap disclosure copy + newsletter signup hook (removed "paid plan coming soon" vaporware promise)
+- `8d55fc7` — SEO archive subsystem (see below)
+- `9610df3` — first archive backfill: 33 Clean+Promising pages pushed live
+- `e57bf61` — systemd: chain `archive_generator` to pipeline via `ExecStartPost` (no time-based scheduling)
+
+### SEO archive subsystem
+
+Standalone subsystem separate from the pipeline. Architecture:
+
+1. `scripts/archive_generator.py` — reads `daily-domains.json`, filters to verdict ∈ {Clean, Promising} not already in archive index, calls Anthropic Haiku per qualifying domain to write 250–400 word SEO-optimized Markdown body, writes to `src/content/archive/{name}.md`, updates `src/data/archive-index.json`, commits and pushes
+2. `src/pages/d/[domain].astro` — per-domain page with 3 JSON-LD blocks (Article + Dataset + BreadcrumbList), breadcrumbs, similar-domain cross-links
+3. `src/pages/archive/[...page].astro` — paginated index, 50/page, TLD + verdict filters
+4. Sitemap auto-discovered by `@astrojs/sitemap`
+5. Pages are frozen at archive time; not re-validated (snapshot model)
+
+**Inclusion criteria:** verdict ∈ {Clean, Promising} only. Caution and rejected excluded — no /d/{spam-domain} pages indexable in Google.
+
+**Model:** `claude-haiku-4-5-20251001`, 800 max tokens, temp 0.4.
+
+**Cost:** $0.13 for first 33-page backfill. Estimated $1.50–4.50/month steady state.
+
+**Trigger:** `systemd/domainsifter-archive.service` (separate unit) fires via `ExecStartPost` in `domainsifter.service`. Runs whenever pipeline completes, no fixed time. Pipeline failures don't block archive; archive failures don't block pipeline (separate exit codes, separate journal logs).
+
+**Operator setup completed:** ANTHROPIC_API_KEY in `.env`, `anthropic-0.102.0` installed via pip, unit files copied to `/etc/systemd/system/`, systemd `daemon-reload` done. Archive service shows `loaded ... static, inactive (dead)` — correct state for triggered-on-demand.
+
+### Newsletter source fix
+
+Pre-fix bug: newsletter pulled top 20 by score from full `daily-domains.json` (188 entries), so high-scoring carryover dominated fresh today. "Today's top picks" framing was inaccurate for 3 days. Drafts never sent because owner caught it. Fix in `b303a55` filters to `days_listed == 0` before top-20 selection. Volume varies by day (Friday's pattern was 5 fresh, today was 86) — owner accepts variance under "we serve what we filter and find."
+
+### Open items
+
+- **Tomorrow morning (May 18 ~09:00 EEST):** validate pipeline + archive chain. Daily report email should show pipeline runtime ~25 min shorter (DNS prefilter dead), "trimming by trigram quality" log line, Buttondown draft with `days_listed == 0` content only, and a new archive commit for any fresh Clean+Promising domains
+- **`crt.sh _unknown` handling** — same pattern as `wayback_unknown`, not yet implemented (logged for later)
+- **Delete `scripts/dns_prefilter.py`** after a few quiet cycles confirm it's truly unused
+- **Re-enrich `wayback_unknown` carryover** — currently ages out at 3 days without retry
+- **Homepage copy honesty audit** — "95% rejection rate", "12+ spam signals", "content language detection" claims need verification or removal
+- **gmoregistry 45-54% unknown rate** — diagnostic session needed
+- **OVH /64 IPv6 ticket** — pending response; IPv4 purchases gated on paid-tier revenue
+- **`.com` addition to CZDS** — gated on validating tomorrow's pipeline run with new filters
+- **Paid tier** — future, not scoped
