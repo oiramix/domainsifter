@@ -1,9 +1,17 @@
 """Daily newsletter draft generator — Buttondown API integration.
 
-Reads `src/data/daily-domains.json`, takes the top N domains by score, builds
-an HTML email body, and POSTs it to Buttondown as a draft. The draft is
-never auto-sent — Mario uses Buttondown's dashboard "Send draft" to QA
-against his own email, then flips status to `about_to_send` when satisfied.
+Reads `src/data/daily-domains.json`, filters to fresh-today entries
+(days_listed == 0), takes the top N by score, builds an HTML email body,
+and POSTs it to Buttondown as a draft. The draft is never auto-sent —
+Mario uses Buttondown's dashboard "Send draft" to QA against his own
+email, then flips status to `about_to_send` when satisfied.
+
+Why filter to fresh-today (changed 2026-05-17): the pipeline writes
+~150-200 domains per day — ~50-100 fresh plus the 14-day carryover. The
+"Today's top expired domain picks" framing only makes sense for fresh
+drops; sending top-20-by-score across the union routinely shipped 1-14-
+day-old carryover under that header. Owner policy: serve only fresh, no
+top-up from carryover, no minimum count floor.
 
 Idempotency: queries Buttondown's existing drafts before creating; if a draft
 whose subject matches today's exact subject line is already there, skip.
@@ -23,7 +31,7 @@ CLI:
         [--dry-run]   # build the HTML, print to stdout, no Buttondown call
 
 Exit codes:
-    0 — draft created OR skipped (duplicate / disabled / empty)
+    0 — draft created OR skipped (duplicate / disabled / empty / no-fresh)
     1 — config or input file missing / unreadable
     2 — Buttondown API failure
 
@@ -421,6 +429,21 @@ def _pick_top_n(domains: list[dict], n: int) -> list[dict]:
     )[: max(0, n)]
 
 
+def _filter_to_fresh_today(domains: list[dict]) -> list[dict]:
+    """Return only domains whose `days_listed == 0` — the pipeline's marker
+    for "first appeared in today's run." Carryover entries (days_listed
+    1-14) are visible on the site but stale from the newsletter's POV;
+    sending them under a "Today's top expired domain picks" header would
+    be inaccurate. See carryover.annotate_today_drops() in scripts/carryover.py.
+
+    Treats missing days_listed as 0 — matches the frontend's same fallback
+    in DomainTable.astro (legacy payloads / sample data). Defensible because
+    the only producer that omits the field is sample-domains.json, which
+    represents a notional "all fresh" preview state.
+    """
+    return [d for d in domains if (d.get("days_listed") or 0) == 0]
+
+
 def generate_newsletter(
     config: dict,
     payload: dict,
@@ -454,7 +477,21 @@ def generate_newsletter(
         )
         return {"status": "skipped_empty"}
 
-    top_domains = _pick_top_n(domains, top_n)
+    fresh_today = _filter_to_fresh_today(domains)
+    if not fresh_today:
+        # Distinct status from skipped_empty: there ARE domains in the JSON
+        # (carryover), they're just stale-from-fresh-today's perspective.
+        # Sending a draft of carryover would mislabel days-old finds as
+        # "today's drops." Owner's policy: serve only what's fresh, even if
+        # that means no draft on a low-drop day.
+        logger.info(
+            "No fresh domains today (all %d entries are carryover); "
+            "skipping draft creation.",
+            len(domains),
+        )
+        return {"status": "skipped_no_fresh"}
+
+    top_domains = _pick_top_n(fresh_today, top_n)
     if not top_domains:
         logger.warning("top_n=%d yielded zero domains; skipping newsletter.", top_n)
         return {"status": "skipped_empty"}

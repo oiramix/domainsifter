@@ -257,6 +257,38 @@ def test_pick_top_n_handles_negative_n_as_zero():
 
 
 # ---------------------------------------------------------------------------
+# Fresh-today filter (added 2026-05-17)
+# ---------------------------------------------------------------------------
+
+
+def test_filter_to_fresh_today_keeps_only_days_listed_zero():
+    cands = [
+        _domain("fresh1.com", 80, tld="com"),     # days_listed=0 by default
+        {**_domain("old1.com", 90), "days_listed": 1},
+        {**_domain("old14.com", 95), "days_listed": 14},
+        _domain("fresh2.org", 70),
+    ]
+    out = gn._filter_to_fresh_today(cands)
+    assert {d["name"] for d in out} == {"fresh1.com", "fresh2.org"}
+
+
+def test_filter_to_fresh_today_treats_missing_days_listed_as_zero():
+    """Sample-domains.json may omit the field; the frontend treats missing
+    as today, so the newsletter does too. Keeps the preview-data path
+    rendering something instead of an empty draft on cold-start."""
+    cands = [{"name": "legacy.com", "score": 80, "registrars": []}]
+    assert len(gn._filter_to_fresh_today(cands)) == 1
+
+
+def test_filter_to_fresh_today_returns_empty_when_all_carryover():
+    cands = [
+        {**_domain("a.com", 80), "days_listed": 1},
+        {**_domain("b.com", 90), "days_listed": 7},
+    ]
+    assert gn._filter_to_fresh_today(cands) == []
+
+
+# ---------------------------------------------------------------------------
 # HTML body generation
 # ---------------------------------------------------------------------------
 
@@ -578,6 +610,96 @@ def test_generate_newsletter_empty_domains_skipped():
 def test_generate_newsletter_missing_domains_key_skipped():
     out = gn.generate_newsletter(_config(), {})
     assert out["status"] == "skipped_empty"
+
+
+def test_generate_newsletter_skips_when_all_carryover():
+    """Distinct status: JSON has entries but none are fresh-today. Was a
+    silent quality loss before — the carryover would ship under the
+    "today's drops" banner. Now returns a dedicated status and no API
+    call fires (verified by passing no session — would AttributeError if
+    POST was attempted)."""
+    cands = [
+        {**_domain("a.com", 80), "days_listed": 1},
+        {**_domain("b.com", 90), "days_listed": 14},
+        {**_domain("c.com", 75), "days_listed": 3},
+    ]
+    out = gn.generate_newsletter(
+        _config(), {"domains": cands},
+        api_key="KEY", today=date(2026, 5, 17),
+    )
+    assert out["status"] == "skipped_no_fresh"
+
+
+def test_generate_newsletter_renders_only_fresh_in_mixed_payload():
+    """7 fresh-today + 50 carryover → draft body contains the 7 fresh names
+    and zero of the carryover names. Top-N cap (20) doesn't bite because
+    fresh count (7) is below it."""
+    fresh = [_domain(f"fresh{i}.com", 80 - i) for i in range(7)]
+    carry = [
+        {**_domain(f"old{i}.com", 95 - i), "days_listed": (i % 14) + 1}
+        for i in range(50)
+    ]
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    out = gn.generate_newsletter(
+        _config(), {"domains": fresh + carry},
+        api_key="KEY", today=date(2026, 5, 17), session=session,
+    )
+    assert out["status"] == "created"
+    # Every fresh name appears; no carryover name does.
+    for i in range(7):
+        assert f"fresh{i}.com" in captured["body"]
+    for i in range(50):
+        assert f"old{i}.com" not in captured["body"], (
+            f"carryover name 'old{i}.com' leaked into draft body"
+        )
+
+
+def test_generate_newsletter_top20_cap_within_fresh_set():
+    """When fresh-today exceeds top_n, the cap applies to the fresh subset.
+    25 fresh entries → top 20 by score appear; lowest-5 by score do not."""
+    fresh = [_domain(f"f{i:02d}.com", 100 - i) for i in range(25)]
+    carry = [{**_domain(f"c{i}.com", 99), "days_listed": 2} for i in range(10)]
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    out = gn.generate_newsletter(
+        _config(), {"domains": carry + fresh},  # carryover ordered first
+        api_key="KEY", today=date(2026, 5, 17), session=session,
+    )
+    assert out["status"] == "created"
+    assert out["domain_count"] == 20
+    # Top 20 fresh (scores 100..81) appear; bottom 5 fresh (scores 80..76) don't.
+    for i in range(20):
+        assert f"f{i:02d}.com" in captured["body"]
+    for i in range(20, 25):
+        assert f"f{i:02d}.com" not in captured["body"]
+    # No carryover ever appears even though it scored 99.
+    for i in range(10):
+        assert f"c{i}.com" not in captured["body"]
 
 
 def test_generate_newsletter_dry_run_returns_body_no_post():
