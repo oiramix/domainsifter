@@ -1,0 +1,29 @@
+# /etc/systemd/system/domainsifter-archive.service
+# DomainSifter archive page generator — runs after the daily pipeline
+# completes. Generates SEO-optimized reference pages for Clean+Promising
+# domains via Anthropic Haiku, commits to repo, pushes to GitHub.
+# Cloudflare Pages rebuilds on push.
+#
+# Triggered by domainsifter.service via ExecStartPost. No time-based
+# scheduling; whenever the pipeline ends, this kicks in.
+#
+# Cost: ~$0.005/page Haiku, ~30-50 pages/day, ~$1.50-4.50/month.
+# Requires ANTHROPIC_API_KEY in .env (loaded via EnvironmentFile).
+#
+# Manual trigger: systemctl start domainsifter-archive.service
+# Logs: journalctl -u domainsifter-archive.service -f
+
+[Unit]
+Description=DomainSifter archive page generator
+After=domainsifter.service
+Requires=domainsifter.service
+
+[Service]
+Type=oneshot
+User=domainsifter
+Group=domainsifter
+WorkingDirectory=/home/domainsifter/domainsifter
+EnvironmentFile=/home/domainsifter/domainsifter/.env
+ExecStart=/home/domainsifter/domainsifter/.venv/bin/python -m scripts.archive_generator
+StandardOutput=journal
+StandardError=journal

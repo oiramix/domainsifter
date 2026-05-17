@@ -5,10 +5,12 @@
 # 2026-05-11.
 #
 # INSTALL (server-side, run as root once):
-#   cp /home/domainsifter/domainsifter/systemd/domainsifter.service /etc/systemd/system/
-#   cp /home/domainsifter/domainsifter/systemd/domainsifter.timer   /etc/systemd/system/
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter.service         /etc/systemd/system/
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter.timer           /etc/systemd/system/
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter-archive.service /etc/systemd/system/
 #   systemctl daemon-reload
 #   systemctl enable --now domainsifter.timer
+#   systemctl enable domainsifter-archive.service
 #   systemctl list-timers       # confirm the next 06:30 UTC firing
 #
 # Logs: journalctl -u domainsifter.service -f
@@ -26,6 +28,7 @@ Group=domainsifter
 WorkingDirectory=/home/domainsifter/domainsifter
 EnvironmentFile=/home/domainsifter/domainsifter/.env
 ExecStart=/home/domainsifter/domainsifter/scripts/run-daily.sh
+ExecStartPost=/bin/systemctl start --no-block domainsifter-archive.service
 StandardOutput=journal
 StandardError=journal
 # Explicit memory accounting so `systemctl show -p MemoryPeak` reports a
