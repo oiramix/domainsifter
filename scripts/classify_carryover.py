@@ -267,14 +267,65 @@ def _git_commit_and_push(
         ["git", "push", push_url, "main"],
         cwd=str(REPO_ROOT), capture_output=True, text=True,
     )
+
+    # The token appears in the URL we passed as argv and may be echoed
+    # back by git in either stdout or stderr (varies by git version and
+    # by the specific error path). Redact before logging anything to
+    # avoid leaking the token to journalctl / report emails / log files.
+    def _redact(text: str | None) -> str:
+        if not text:
+            return ""
+        return text.replace(github_token, "[REDACTED]")
+
+    sanitized_stdout = _redact(push.stdout).strip()
+    sanitized_stderr = _redact(push.stderr).strip()
+
+    # ALWAYS surface git's actual output, regardless of returncode. On
+    # success this contains the `<old>..<new>  main -> main` line that
+    # proves the ref was actually updated; on the silent-success-no-op
+    # path it instead says `Everything up-to-date`; on failure it
+    # contains the real error message. The 2026-05-18 first-backfill
+    # incident lost ~$0.20 of Anthropic spend because returncode=0
+    # was reported but origin/main was unchanged — without the stderr
+    # logged, the operator had no signal between "push worked" and
+    # "push silently did nothing".
+    if sanitized_stdout:
+        logger.info("git push stdout:\n%s", sanitized_stdout)
+    if sanitized_stderr:
+        logger.info("git push stderr:\n%s", sanitized_stderr)
+
     if push.returncode != 0:
-        # Don't dump push.stderr — some git versions echo the URL on
-        # failure, and that URL contains the token.
         raise RuntimeError(
-            f"git push failed with exit code {push.returncode}; local commit "
-            f"is in place. Inspect and resolve manually before next run."
+            f"git push failed with exit code {push.returncode}. "
+            f"Local commit is in place. See `git push stderr` log line above "
+            f"for the actual git error; inspect and resolve manually before "
+            f"retry."
         )
-    logger.info("Pushed commit: %s", title)
+
+    # Belt-and-suspenders post-push verification. Catches the silent-
+    # success class (returncode 0 but origin/main unchanged) even without
+    # knowing the root cause. Fetches the same ref the push targeted,
+    # compares local HEAD to origin/main, and raises if they diverge.
+    # The fetch is cheap; the RuntimeError preserves the local commit
+    # for operator inspection.
+    _git(["fetch", "origin", "main"])
+    local_head = _git(["rev-parse", "HEAD"]).stdout.strip()
+    origin_head = _git(["rev-parse", "origin/main"]).stdout.strip()
+    if local_head != origin_head:
+        raise RuntimeError(
+            f"git push reported success but origin/main is at "
+            f"{origin_head[:7]} while local HEAD is {local_head[:7]}. "
+            f"The push did not actually update the remote ref. Local "
+            f"commit is in place. Inspect remote state, do not retry "
+            f"the backfill until this is resolved (a blind retry would "
+            f"either silently lose data again OR push a different "
+            f"classifier output if the now-stale classifications get "
+            f"re-run)."
+        )
+
+    logger.info(
+        "Pushed commit: %s (origin/main now at %s)", title, origin_head[:7],
+    )
 
 
 # --- Orchestration ---------------------------------------------------------

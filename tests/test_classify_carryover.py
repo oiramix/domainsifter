@@ -411,25 +411,39 @@ class TestRunLive:
         })
         client = _ScriptedClient(["legitimate", "toxic", "parked"])
 
-        # Stub git: record commands, fake "no staged changes" → False so commit happens
+        # Stub git: record commands, simulate the relevant returncode +
+        # stdout per command. `rev-parse HEAD` and `rev-parse origin/main`
+        # return the same SHA so the post-push verification passes; the
+        # silent-success-mismatch case has its own test below.
         git_calls: list[list[str]] = []
+        SAME_SHA = "abc1234567890abcdef1234567890abcdef12345"
         def _fake_git(args, *, cwd=cc.REPO_ROOT, check=True):
             git_calls.append(args)
             result = MagicMock()
             if args[:2] == ["diff", "--cached"]:
-                result.returncode = 1   # there are staged changes
+                result.returncode = 1
+                result.stdout = ""
+            elif args[:1] == ["rev-parse"]:
+                result.returncode = 0
+                result.stdout = SAME_SHA + "\n"
             else:
                 result.returncode = 0
+                result.stdout = ""
             return result
         monkeypatch.setattr(cc, "_git", _fake_git)
 
-        # Mock the bare-subprocess push call (it's not routed through _git
-        # so the token URL never lands in our recorded args).
+        # Mock the bare-subprocess push call. Provide realistic stdout/
+        # stderr so the new logging path has data to redact + emit.
         push_calls = []
         def _fake_push(args, *, cwd, capture_output, text):
             push_calls.append(args)
             r = MagicMock()
             r.returncode = 0
+            r.stdout = ""
+            r.stderr = (
+                "To https://github.com/oiramix/domainsifter.git\n"
+                "   abc1234..def5678  main -> main\n"
+            )
             return r
         monkeypatch.setattr(cc.subprocess, "run", _fake_push)
 
@@ -474,6 +488,125 @@ class TestRunLive:
         assert push_argv[0] == "git" and push_argv[1] == "push"
         assert "test-token-xyz" in push_argv[2]
         assert push_argv[-1] == "main"
+
+    def test_silent_success_push_detected(
+        self, monkeypatch, sample_payload, tmp_paths, write_payload, caplog,
+    ):
+        """Regression test for the 2026-05-18 incident: git push returns 0
+        but origin/main is not actually updated. The post-push verification
+        must detect this and raise rather than logging 'Pushed commit:'
+        and silently letting the trap discard the local commit."""
+        write_payload(sample_payload)
+        _stub_fetch(monkeypatch, {"alpha.com": {"title": "X"}})
+        client = _ScriptedClient(["legitimate"])
+
+        LOCAL_HEAD = "aaaaaaa1111111111111111111111111111aaaa"
+        ORIGIN_HEAD = "bbbbbbb2222222222222222222222222222bbbb"
+
+        def _fake_git(args, *, cwd=cc.REPO_ROOT, check=True):
+            result = MagicMock()
+            if args[:2] == ["diff", "--cached"]:
+                result.returncode = 1
+                result.stdout = ""
+            elif args == ["rev-parse", "HEAD"]:
+                result.returncode = 0
+                result.stdout = LOCAL_HEAD + "\n"
+            elif args == ["rev-parse", "origin/main"]:
+                # The smoking gun: origin/main is at a DIFFERENT SHA than
+                # local HEAD even though git push returned 0.
+                result.returncode = 0
+                result.stdout = ORIGIN_HEAD + "\n"
+            else:
+                result.returncode = 0
+                result.stdout = ""
+            return result
+        monkeypatch.setattr(cc, "_git", _fake_git)
+
+        def _fake_push(args, *, cwd, capture_output, text):
+            r = MagicMock()
+            r.returncode = 0  # PRETENDS success
+            r.stdout = ""
+            r.stderr = "Everything up-to-date\n"
+            return r
+        monkeypatch.setattr(cc.subprocess, "run", _fake_push)
+
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token-xyz")
+
+        with caplog.at_level("ERROR"):
+            rc = cc.run(
+                daily_path=tmp_paths["daily"],
+                excerpts_path=tmp_paths["sidecar"],
+                force=False, only_unknown=False, limit=None,
+                dry_run=False, no_push=False,
+                today=date(2026, 5, 18),
+                client_factory=lambda: client,
+            )
+        assert rc == 2  # commit-and-push raised → run() returns 2
+        # Error message should reference both SHAs so the operator can
+        # see the divergence in the log.
+        assert any(
+            ORIGIN_HEAD[:7] in m and LOCAL_HEAD[:7] in m for m in caplog.messages
+        )
+
+    def test_push_failure_logs_sanitized_stderr(
+        self, monkeypatch, sample_payload, tmp_paths, write_payload, caplog,
+    ):
+        """When git push fails non-zero, the actual stderr must surface
+        in the log (sanitized to redact the token) so the operator can
+        diagnose. The 2026-05-18 incident showed that swallowing stderr
+        is dangerous — never repeat that."""
+        write_payload(sample_payload)
+        _stub_fetch(monkeypatch, {"alpha.com": {"title": "X"}})
+        client = _ScriptedClient(["legitimate"])
+
+        TOKEN = "ghp_supersecretxyz123"
+        # Simulate a realistic git auth-failure stderr that echoes the URL.
+        ERROR_STDERR = (
+            f"remote: Permission to oiramix/domainsifter.git denied.\n"
+            f"fatal: unable to access "
+            f"'https://x-access-token:{TOKEN}@github.com/oiramix/domainsifter.git/': "
+            f"The requested URL returned error: 403\n"
+        )
+
+        def _fake_git(args, *, cwd=cc.REPO_ROOT, check=True):
+            result = MagicMock()
+            if args[:2] == ["diff", "--cached"]:
+                result.returncode = 1
+                result.stdout = ""
+            else:
+                result.returncode = 0
+                result.stdout = ""
+            return result
+        monkeypatch.setattr(cc, "_git", _fake_git)
+
+        def _fake_push(args, *, cwd, capture_output, text):
+            r = MagicMock()
+            r.returncode = 128
+            r.stdout = ""
+            r.stderr = ERROR_STDERR
+            return r
+        monkeypatch.setattr(cc.subprocess, "run", _fake_push)
+
+        monkeypatch.setenv("GITHUB_TOKEN", TOKEN)
+
+        with caplog.at_level("INFO"):
+            rc = cc.run(
+                daily_path=tmp_paths["daily"],
+                excerpts_path=tmp_paths["sidecar"],
+                force=False, only_unknown=False, limit=None,
+                dry_run=False, no_push=False,
+                today=date(2026, 5, 18),
+                client_factory=lambda: client,
+            )
+        assert rc == 2
+        # The stderr content (sanitized) must appear in logs
+        all_log_text = "\n".join(caplog.messages)
+        assert "Permission to oiramix/domainsifter.git denied" in all_log_text
+        assert "403" in all_log_text
+        # Token must NOT appear anywhere (verbatim or partial)
+        assert TOKEN not in all_log_text
+        # Redaction placeholder present
+        assert "[REDACTED]" in all_log_text
 
     def test_no_push_skips_push(
         self, monkeypatch, sample_payload, tmp_paths, write_payload,
@@ -554,7 +687,9 @@ class TestRunLive:
         _stub_fetch(monkeypatch, {"alpha.com": {"title": "New"}})
         client = _ScriptedClient(["legitimate"])
 
-        # Stub git so the test doesn't push.
+        # no_push=True below means _git is never called; a plain MagicMock
+        # is fine here (the new rev-parse verification only runs inside
+        # _git_commit_and_push, which is gated by no_push).
         monkeypatch.setattr(cc, "_git", MagicMock(return_value=MagicMock(returncode=1)))
         monkeypatch.setattr(cc.subprocess, "run", MagicMock(return_value=MagicMock(returncode=0)))
         monkeypatch.setenv("GITHUB_TOKEN", "tok")
