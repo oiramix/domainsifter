@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-05-18T08:30:23Z",
-  "domain_count": 187,
+  "generated_at": "2026-05-18T17:25:17Z",
+  "domain_count": 175,
   "today_count": 2,
-  "carryover_count": 185,
+  "carryover_count": 173,
   "domains": [
     {
       "name": "usimin.net",
@@ -37,42 +37,9 @@
       "cc_source_domain_count": null,
       "verdict": "Clean",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "waterangels.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 2304,
-      "wayback_last_snapshot": "2025-12-16",
-      "open_page_rank": 2.27,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 69,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwaterangels.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=waterangels.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=waterangels.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:36:13Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 1517,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "collegelabor.org",
@@ -107,7 +74,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "afritunes.net",
@@ -142,7 +111,9 @@
       "cc_source_domain_count": 473,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "coolkidscreations.net",
@@ -177,42 +148,9 @@
       "cc_source_domain_count": 1197,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "airshower.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 1140,
-      "wayback_last_snapshot": "2026-02-18",
-      "open_page_rank": 2.33,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 66,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dairshower.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=airshower.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=airshower.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:23:39Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 2898,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "everythingbabies.org",
@@ -247,7 +185,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "thereedgroup.org",
@@ -282,42 +222,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "doctoryun.net",
-      "tld": "net",
-      "dropped_date": "2026-05-14",
-      "wayback_snapshots": 23636,
-      "wayback_last_snapshot": "2026-03-27",
-      "open_page_rank": 1.16,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 62,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddoctoryun.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=doctoryun.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=doctoryun.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-14T07:10:02Z",
-      "first_seen_date": "2026-05-14",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 4,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "nightingaledeclaration.net",
@@ -352,7 +259,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "sfbrgenetics.org",
@@ -387,7 +296,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "rimmedia.net",
@@ -422,7 +333,9 @@
       "cc_source_domain_count": 41,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "forellenhof.net",
@@ -457,7 +370,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "canvila.net",
@@ -492,42 +407,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "goldsave.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 1082,
-      "wayback_last_snapshot": "2025-07-20",
-      "open_page_rank": 1.26,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 60,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgoldsave.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=goldsave.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=goldsave.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:08:07Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 84,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "parked"
     },
     {
       "name": "nanari.net",
@@ -562,7 +444,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "sjsinfo.net",
@@ -597,7 +481,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "cdecora.net",
@@ -632,7 +518,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "foleyhome.net",
@@ -667,7 +555,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "mangoshop.net",
@@ -702,7 +592,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "e-marty.net",
@@ -737,7 +629,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "landclean.net",
@@ -772,42 +666,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "industribune.net",
-      "tld": "net",
-      "dropped_date": "2026-05-13",
-      "wayback_snapshots": 19520,
-      "wayback_last_snapshot": "2026-02-11",
-      "open_page_rank": 2.5,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 58,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dindustribune.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=industribune.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=industribune.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-13T07:25:26Z",
-      "first_seen_date": "2026-05-13",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 5,
-      "cc_source_domain_count": null,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "quachanh.net",
@@ -842,7 +703,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "directpage.org",
@@ -877,7 +740,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "sommarkort.net",
@@ -912,7 +777,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "webtierarzt.net",
@@ -947,7 +814,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "parked"
     },
     {
       "name": "larsensails.net",
@@ -982,7 +851,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "ourvickers.net",
@@ -1017,7 +888,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "updatebola.net",
@@ -1052,7 +925,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "4minutes.net",
@@ -1087,7 +962,9 @@
       "cc_source_domain_count": 8,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "appleprincess.net",
@@ -1122,7 +999,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "computerco-op.net",
@@ -1157,7 +1036,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "futboll-live.net",
@@ -1192,7 +1073,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "moving-career.net",
@@ -1227,7 +1110,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "fastforwardhannover.net",
@@ -1262,7 +1147,9 @@
       "cc_source_domain_count": 215,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "eastgrandlake.net",
@@ -1297,7 +1184,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "instanavigation.app",
@@ -1332,7 +1221,9 @@
       "cc_source_domain_count": 51,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "archilink.net",
@@ -1367,42 +1258,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "storiesinstitches.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 2034,
-      "wayback_last_snapshot": "2026-03-30",
-      "open_page_rank": 2.54,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dstoriesinstitches.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=storiesinstitches.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=storiesinstitches.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:39:18Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 8,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "wheretomarie.net",
@@ -1437,7 +1295,9 @@
       "cc_source_domain_count": 9,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "gift-ideas.net",
@@ -1472,7 +1332,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "chaussuresisabel.net",
@@ -1507,7 +1369,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "jendelahati.net",
@@ -1542,7 +1406,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "genesisministries.net",
@@ -1577,7 +1443,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "gorabetgiris.net",
@@ -1612,7 +1480,9 @@
       "cc_source_domain_count": 7,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "libportal.net",
@@ -1647,7 +1517,9 @@
       "cc_source_domain_count": 5,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "businessdays.net",
@@ -1682,7 +1554,9 @@
       "cc_source_domain_count": 4,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "singlesdatingsingles.net",
@@ -1717,7 +1591,9 @@
       "cc_source_domain_count": 24,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "lmgestion.net",
@@ -1752,7 +1628,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "fraizerdesigns.org",
@@ -1787,7 +1665,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "analyticalengine.net",
@@ -1822,42 +1702,9 @@
       "cc_source_domain_count": 13,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "phillipallen.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 2862,
-      "wayback_last_snapshot": "2026-04-02",
-      "open_page_rank": 2.49,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 53,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dphillipallen.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=phillipallen.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=phillipallen.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:47:17Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 1,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "billysi.net",
@@ -1892,7 +1739,9 @@
       "cc_source_domain_count": 4,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "lavisionradio.net",
@@ -1927,7 +1776,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "ruchitsurati.net",
@@ -1962,7 +1813,9 @@
       "cc_source_domain_count": null,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "markeyrealestate.net",
@@ -1997,7 +1850,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "earthlingsunited.org",
@@ -2032,7 +1887,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "cesvalencia.net",
@@ -2067,7 +1924,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "eewebdesign.net",
@@ -2102,7 +1961,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "friends-search.net",
@@ -2137,7 +1998,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "mysistahskeeper.org",
@@ -2172,7 +2035,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "linkvillage.org",
@@ -2207,7 +2072,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "cinemana.xyz",
@@ -2242,7 +2109,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "fc-united-nara.net",
@@ -2277,7 +2146,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "rawthoughts.net",
@@ -2312,7 +2183,9 @@
       "cc_source_domain_count": 10,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "sogo-works.net",
@@ -2347,7 +2220,9 @@
       "cc_source_domain_count": 19,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "tarimkredi.net",
@@ -2382,7 +2257,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "lineland.net",
@@ -2417,7 +2294,9 @@
       "cc_source_domain_count": 8,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "porolona.net",
@@ -2452,7 +2331,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "sereal.net",
@@ -2487,7 +2368,9 @@
       "cc_source_domain_count": 7,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "developersforum.net",
@@ -2522,7 +2405,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "realjournalism.net",
@@ -2557,7 +2442,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "avatarprime.net",
@@ -2592,7 +2479,9 @@
       "cc_source_domain_count": 8,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "wiring-diagram.net",
@@ -2627,7 +2516,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "kinpachi.net",
@@ -2662,7 +2553,9 @@
       "cc_source_domain_count": 4,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "tmdhosting.net",
@@ -2697,7 +2590,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "foreverstream.xyz",
@@ -2732,7 +2627,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "frenchhistory.net",
@@ -2767,7 +2664,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "letatlin.net",
@@ -2802,7 +2701,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "virmana.net",
@@ -2837,7 +2738,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "tiendax.net",
@@ -2872,7 +2775,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "hrainc.net",
@@ -2907,7 +2812,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "onwingirisleri.net",
@@ -2942,7 +2849,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "hoverwatch.app",
@@ -2977,7 +2886,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "rtorlando.org",
@@ -3012,7 +2923,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "youying.xyz",
@@ -3047,7 +2960,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "japo-rhythm.net",
@@ -3082,7 +2997,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "pinkpanache.net",
@@ -3117,7 +3034,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "claudevanlingen.net",
@@ -3152,7 +3071,9 @@
       "cc_source_domain_count": 4,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "clickeasy.net",
@@ -3187,7 +3108,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "biprint.net",
@@ -3222,7 +3145,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "canmaking.net",
@@ -3257,7 +3182,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "fernandoalonso-f1.net",
@@ -3292,7 +3219,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "nacenewengland.net",
@@ -3327,7 +3256,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "aventurier.net",
@@ -3362,7 +3293,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "bananaparadise.net",
@@ -3397,7 +3330,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "basstraps.net",
@@ -3432,7 +3367,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "doublebalance.net",
@@ -3467,7 +3404,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "flower-talk.net",
@@ -3502,7 +3441,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "freevacationoffer.net",
@@ -3537,42 +3478,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "horse-breeds.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 2306,
-      "wayback_last_snapshot": "2025-12-19",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 46,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhorse-breeds.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=horse-breeds.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=horse-breeds.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:31:30Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 2,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "superthemes.net",
@@ -3607,7 +3515,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "chicagoraja.net",
@@ -3642,7 +3552,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "expo-photo.net",
@@ -3677,7 +3589,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "peraklodge.net",
@@ -3712,7 +3626,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "parked"
     },
     {
       "name": "webcontinuum.net",
@@ -3747,7 +3663,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "chillody.org",
@@ -3782,7 +3700,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "diceroll.xyz",
@@ -3817,7 +3737,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "bsdholdings.net",
@@ -3852,42 +3774,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "devoting.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 2475,
-      "wayback_last_snapshot": "2025-07-17",
-      "open_page_rank": 0.82,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 45,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddevoting.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=devoting.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=devoting.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:06:43Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 12,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "einteractivo.net",
@@ -3922,7 +3811,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "goloo.net",
@@ -3957,7 +3848,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "ironthorn.net",
@@ -3992,7 +3885,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "jmdcontractors.net",
@@ -4027,7 +3922,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "genesisconsult.net",
@@ -4062,7 +3959,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "managerspiele.net",
@@ -4097,7 +3996,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "thelaserclinic.net",
@@ -4132,7 +4033,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "goodmorningafrica.org",
@@ -4167,7 +4070,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "venuewasadi.org",
@@ -4202,7 +4107,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "endtide.xyz",
@@ -4237,7 +4144,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "videers.xyz",
@@ -4272,7 +4181,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "parked"
     },
     {
       "name": "maginfo.net",
@@ -4307,7 +4218,9 @@
       "cc_source_domain_count": 5,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "outoftheshadows.net",
@@ -4342,7 +4255,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "americastruckandtrailerrepair.net",
@@ -4377,7 +4292,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "imageworkz.net",
@@ -4412,7 +4329,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "mkproperties.org",
@@ -4447,7 +4366,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "multimediadesigns.org",
@@ -4482,7 +4403,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "cosanostra.site",
@@ -4517,7 +4440,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "africantradenetwork.net",
@@ -4552,7 +4477,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "inucara.net",
@@ -4587,7 +4514,9 @@
       "cc_source_domain_count": 17,
       "verdict": "Promising",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "ju-jutsu-marche.net",
@@ -4622,7 +4551,9 @@
       "cc_source_domain_count": 3,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "pinkiri.net",
@@ -4657,7 +4588,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "print-central.net",
@@ -4692,7 +4625,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "riomedical.net",
@@ -4727,7 +4662,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "acexchange.net",
@@ -4762,7 +4699,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "diyhomeimprovement.net",
@@ -4797,42 +4736,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "yusisi.net",
-      "tld": "net",
-      "dropped_date": "2026-05-14",
-      "wayback_snapshots": 351,
-      "wayback_last_snapshot": "2025-07-19",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 43,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dyusisi.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=yusisi.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=yusisi.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-14T07:19:21Z",
-      "first_seen_date": "2026-05-14",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 4,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "transpirelife.org",
@@ -4867,7 +4773,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "allinit.net",
@@ -4902,7 +4810,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "rimeback.net",
@@ -4937,7 +4847,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "baritepowder.net",
@@ -4972,7 +4884,9 @@
       "cc_source_domain_count": 6,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "instalserv.net",
@@ -5007,7 +4921,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "betterhearingnh.net",
@@ -5042,7 +4958,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "chinazg.net",
@@ -5077,7 +4995,9 @@
       "cc_source_domain_count": 6,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "goalstracker.net",
@@ -5112,7 +5032,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "metalexchange.net",
@@ -5147,7 +5069,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "harmonserver.xyz",
@@ -5182,7 +5106,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "parked"
     },
     {
       "name": "horseadoption.net",
@@ -5217,7 +5143,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "idealps.net",
@@ -5252,7 +5180,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "oss-solutions.net",
@@ -5287,7 +5217,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "collegewala.live",
@@ -5322,7 +5254,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "grammerly.xyz",
@@ -5357,7 +5291,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "chiminea.net",
@@ -5392,7 +5328,9 @@
       "cc_source_domain_count": 4,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "mastermining.net",
@@ -5427,7 +5365,9 @@
       "cc_source_domain_count": 7,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "riseupfamily.org",
@@ -5462,7 +5402,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "coinexc.xyz",
@@ -5497,7 +5439,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "blueproject.net",
@@ -5532,7 +5476,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "espace-equilibre.net",
@@ -5567,7 +5513,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "max-cashback.net",
@@ -5602,7 +5550,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "orthochem.net",
@@ -5637,7 +5587,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "kontakten.org",
@@ -5672,42 +5624,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "learningprompting.org",
-      "tld": "org",
-      "dropped_date": "2026-05-14",
-      "wayback_snapshots": 310,
-      "wayback_last_snapshot": "2026-03-15",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 37,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlearningprompting.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=learningprompting.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=learningprompting.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-14T07:37:32Z",
-      "first_seen_date": "2026-05-14",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 4,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "parked"
     },
     {
       "name": "norwegiandating.net",
@@ -5742,7 +5661,9 @@
       "cc_source_domain_count": 4,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "ulcerdisease.net",
@@ -5777,7 +5698,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "empty"
     },
     {
       "name": "developerjobs.app",
@@ -5812,7 +5735,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "githanga.org",
@@ -5847,7 +5772,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "zicloud.xyz",
@@ -5882,7 +5809,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "shellspastaemporium.net",
@@ -5917,7 +5846,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "alwaysbeauty.net",
@@ -5952,7 +5883,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "erconline.net",
@@ -5987,7 +5920,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "keralatour.net",
@@ -6022,7 +5957,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "bestone-answer.net",
@@ -6057,42 +5994,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
-    },
-    {
-      "name": "mansfieldstudios.net",
-      "tld": "net",
-      "dropped_date": "2026-05-17",
-      "wayback_snapshots": 2178,
-      "wayback_last_snapshot": "2026-03-26",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 35,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmansfieldstudios.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=mansfieldstudios.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=mansfieldstudios.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-05-17T07:38:48Z",
-      "first_seen_date": "2026-05-17",
-      "last_validated_date": "2026-05-18",
-      "days_listed": 1,
-      "cc_source_domain_count": 2,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "parksquareapartments.net",
@@ -6127,7 +6031,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "promo-pro.online",
@@ -6162,7 +6068,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "legitimate"
     },
     {
       "name": "proplans.online",
@@ -6197,7 +6105,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "starfiregames.net",
@@ -6232,7 +6142,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "tailoredhome.net",
@@ -6267,7 +6179,9 @@
       "cc_source_domain_count": 0,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "carolinabargaintrader.net",
@@ -6302,7 +6216,9 @@
       "cc_source_domain_count": 2,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "thewineglass.net",
@@ -6337,7 +6253,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "milbstoree.shop",
@@ -6372,7 +6290,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "andersongenealogy.org",
@@ -6407,7 +6327,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "shost.store",
@@ -6442,7 +6364,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "melissawest.shop",
@@ -6477,7 +6401,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "a9plays.net",
@@ -6512,7 +6438,9 @@
       "cc_source_domain_count": 1,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     },
     {
       "name": "moneyreset.net",
@@ -6547,7 +6475,9 @@
       "cc_source_domain_count": null,
       "verdict": "Caution",
       "wayback_unknown": null,
-      "wayback_unknown_attempts": null
+      "wayback_unknown_attempts": null,
+      "snapshot_classifier_version": "v1",
+      "snapshot_category": "unknown"
     }
   ],
   "total_candidates_evaluated": 0
