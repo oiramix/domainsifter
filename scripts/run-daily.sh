@@ -2,10 +2,10 @@
 # Daily pipeline runner for the OVH self-hosted setup.
 #
 # Replicates what the GHA workflow used to do end-to-end:
-#   1. git pull --ff-only origin main  (sync to latest code)
-#   2. pip install -r requirements.txt (idempotent; cheap if up-to-date)
-#   3. python -m scripts.pipeline      (writes src/data/daily-domains.json)
-#   4. git add + commit + push         (publishes the refreshed JSON)
+#   1. git fetch + reset --hard origin/main (defensive sync — see Step 1)
+#   2. pip install -r requirements.txt      (idempotent; cheap if up-to-date)
+#   3. python -m scripts.pipeline           (writes src/data/daily-domains.json)
+#   4. git add + commit + push              (publishes the refreshed JSON)
 #
 # Invoked by systemd/domainsifter.timer at 06:30 UTC daily. Logs to
 # journalctl via systemd's StandardOutput=journal capture.
@@ -17,12 +17,14 @@
 # on the push command line.
 #
 # Failure mode: any step's non-zero exit aborts the run via `set -e` and
-# leaves a clear error in journalctl. If `git push` fails (e.g. remote
-# diverged due to a manual workflow_dispatch race with the GHA fallback),
-# the local commit stays unpushed and the NEXT day's `git pull --ff-only`
-# will refuse to merge — manual server-side cleanup is required at that
-# point. Run `git status` on the server; the unpushed commit will be the
-# tip of main.
+# leaves a clear error in journalctl. Step 1's `reset --hard origin/main`
+# discards any local divergence (wrong branch, dirty tree, unpushed
+# commits from a failed previous run) before doing anything else, so
+# manual server-side state cannot corrupt the next run. If `git push`
+# fails, the local commit stays on the server until the next morning,
+# when Step 1 discards it — acceptable, since the pipeline regenerates
+# daily and a missed publish day re-publishes the next morning. We hit
+# the old `git pull --ff-only` failure mode twice (2026-05-17, -05-18).
 #
 # Email report: an EXIT trap fires scripts/send_report.py on success OR
 # failure, sending the journalctl log of this systemd invocation to
@@ -95,9 +97,29 @@ trap send_report EXIT
 
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] daily run starting"
 
-# Step 1: sync to latest code on main. --ff-only fails loudly if local
-# diverged from origin (which on a deploy-only server should never happen).
-git pull --ff-only origin main
+# Step 1: defensive sync to origin/main. This server is cron-driven;
+# persistent state lives on origin only. Any local divergence (manual ops,
+# dry-runs, partial previous runs, wrong branch from an interactive
+# session) gets discarded here. Runs BEFORE anything else so we never
+# publish from stale or unintended code.
+#
+# Why not `git pull --ff-only` as before: pull refuses to merge if the
+# local branch diverged, requiring manual server-side cleanup. We hit
+# that twice in 24h (2026-05-17 manual-push race; 2026-05-18 wrong
+# branch left over from dry-run review). reset --hard makes the script
+# idempotent on any local state.
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] git-sync: fetching origin/main"
+git fetch origin main || {
+  echo "ERROR: git fetch origin main failed — cannot sync with remote, aborting" >&2
+  exit 1
+}
+CURRENT_BRANCH="$(git branch --show-current)"
+if [[ "${CURRENT_BRANCH}" != "main" ]]; then
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] git-sync: not on main (was '${CURRENT_BRANCH}'), switching"
+  git checkout -f main
+fi
+git reset --hard origin/main
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] git-state: branch=main HEAD=$(git rev-parse --short HEAD)"
 
 # Step 2: ensure deps are current. pip is idempotent — fast on no-change days.
 .venv/bin/pip install --quiet -r requirements.txt
