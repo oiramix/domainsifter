@@ -23,6 +23,15 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# Stay "active (exited)" after ExecStart+ExecStartPost finish, so that
+# domainsifter-archive.service's Requires=domainsifter.service check still
+# passes when systemd processes the start job queued by ExecStartPost.
+# Without this, oneshot transitions to inactive (dead) immediately after
+# ExecStartPost returns — the archive service's start job then sees
+# domainsifter.service as inactive and fails with "Dependency failed".
+# This is why no /d/ pages were chain-generated between the 2026-05-17
+# chain install and 2026-05-18: the archive service never ran.
+RemainAfterExit=yes
 User=domainsifter
 Group=domainsifter
 WorkingDirectory=/home/domainsifter/domainsifter
