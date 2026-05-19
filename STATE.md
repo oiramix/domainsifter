@@ -1691,6 +1691,92 @@ In STATE.md (operational pending items above):
 - +48 from newsletter (tests/test_generate_newsletter.py)
 - End-of-day 2026-05-13: 452; end-of-day 2026-05-14: 514. Net +62 today.
 
+## 2026-05-17 evening through 2026-05-19 — Archive chain rollout, three infrastructure bugs, content classifier
+
+Eight commits on main across three days. Headline: the archive chain shipped in `e57bf61` (prior section) had three undiagnosed infrastructure bugs that prevented it from ever firing automatically — all surfaced and fixed by 2026-05-19 evening. Validation moment is tomorrow's 06:30 UTC cron. Separately: content classifier subsystem shipped as standalone code + one-shot backfill; pipeline-wiring (Phase 4) deferred to a separate session.
+
+### Wayback grounding for archive_generator (2026-05-17 evening)
+
+`1ae2b7d` (merge of `feat/wayback-grounding`) wired `scripts/wayback_excerpt.py` into archive_generator's per-domain Haiku call. The "Historical use" section now quotes/paraphrases real snapshot title + meta + h1 + h2 instead of speculating from the domain name. Stops the deepsand.net / waterangels.net class of hallucinated descriptions.
+
+Surfaced a real product issue: deepsand.net was scored 70 / verdict Clean by the existing rules but its most-recent Wayback snapshot was a Chinese adult-content takeover. Verdict system has no concept of snapshot content — score + soft-signal keyword detection couldn't catch it.
+
+### Manual deepsand.net removal (2026-05-17 evening)
+
+`eb2bb49` — surgical eviction from `src/data/daily-domains.json` + `src/data/archive-index.json` + deletion of `src/content/archive/deepsand.net.md`. One-time pollution fix while we designed the systemic answer (content classifier, below).
+
+### Push-race fix in run-daily.sh (2026-05-18 morning)
+
+`5a4c4d6` — defensive precondition stanza added as Step 1 of run-daily.sh:
+
+- `git fetch origin main`
+- if not on main, switch
+- `git reset --hard origin/main` (discards any local divergence)
+- emit `git-state: branch=main HEAD=<sha>` log line
+
+Motivated by two consecutive failures: 2026-05-17 manual trigger created a push race with the next morning's cron; 2026-05-18 morning cron failed because OVH was left on `feat/wayback-grounding` overnight from the dry-run review session. Both classes self-heal now — origin is the source of truth for OVH state; no manual checkout state can corrupt the next cron.
+
+### Archive chain `RemainAfterExit=yes` (2026-05-18 morning)
+
+`174d455` — `Type=oneshot` services without `RemainAfterExit=yes` transition to inactive (dead) immediately after `ExecStart` + `ExecStartPost` finish. The chained `domainsifter-archive.service`'s `Requires=domainsifter.service` check then sees the pipeline service as inactive and fails with "Dependency failed". One-line fix in the `[Service]` block.
+
+Same commit shipped `scripts/deploy_systemd.sh` — one-command unit-file deploy (compare-and-copy under `systemd/`, single `daemon-reload`). Replaces the multi-step manual `cp + daemon-reload` block that had been the source of two prior install bugs.
+
+### Content classifier subsystem (2026-05-18 afternoon/evening)
+
+Standalone code + backfill only — pipeline-wiring is Phase 4. Shipped:
+
+- `scripts/snapshot_classifier.py` — `classify_all(candidates, *, client, pause_seconds=1.0)` public API. Anthropic Haiku at `temperature=0.0` + `max_tokens=8` over the wayback_excerpt fields. Four categories (`legitimate`, `parked`, `toxic`, `empty`) plus `unknown` for all failure paths. Soft-fail everywhere; no circuit breaker (pipeline must complete on a 100% Anthropic outage day).
+- `scripts/classify_carryover.py` — one-shot backfill CLI with `--dry-run`, `--limit N`, `--force`, `--only-unknown`, `--no-push`. Atomic writes to daily-domains.json + the new sidecar `src/data/wayback_excerpts.json`. Toxic entries evicted in the same commit (no labeled-toxic entry sits in the published list even briefly).
+- New persisted fields per entry: `snapshot_category` (one of five strings), `snapshot_classifier_version` (currently `"v1"` — bump when prompt changes alter labels on identical input).
+- Sidecar architecture keeps daily-domains.json small for frontend page-load; archive_generator will read the sidecar in Phase 4 instead of refetching.
+
+Phases:
+
+- Phase 1: `5527828` on `feat/snapshot-classifier`, merged to main as `7af2d97`. 66 new tests, 739/739 pass.
+- Phase 2: dry-run on real carryover. 3-of-3 toxic spot-checks (`learningprompting.org`, `phillipallen.net`, `coolkidscreations.net`) eyeball-confirmed on Wayback.
+- Phase 3 live backfill: commit `80b312d`. Classified all 187 entries — 25 legitimate, 6 parked, 12 toxic, 14 empty, 130 unknown. Anthropic spend ~$0.20.
+
+Twelve toxic entries evicted: airshower.net, devoting.net, doctoryun.net, goldsave.net, horse-breeds.net, industribune.net, learningprompting.org, mansfieldstudios.net, phillipallen.net, storiesinstitches.net, waterangels.net, yusisi.net.
+
+Final state: 175 entries published (173 cleaned carryover + 2 fresh from morning cron).
+
+One Phase 2 → Phase 3 discrepancy worth tracking: `coolkidscreations.net` was eyeball-confirmed toxic in Phase 2 but classified `unknown` in Phase 3 because `fetch_excerpt` returned None on the live run (Wayback Availability / snapshot fetch flake). Currently published at verdict Promising / score 67. Saved as a memory for Phase 4 design — argues for retry-once on fetch failure plus verdict-downgrade for high-wayback-snapshots + unknown.
+
+Phase 4 (pipeline wiring) DEFERRED to a separate session. Design fully agreed: classifier stage between enrichment and post-enrichment filter; `snapshot_toxic` rejection in `scripts/filter.py`; parked/empty Caution-downgrade in `scripts/output.py:_compute_verdict`; archive_generator reads pre-computed excerpts from sidecar; methodology page update; `env_check` soft-fail loud-warning for missing ANTHROPIC_API_KEY.
+
+### Push-failure verification (2026-05-18 evening)
+
+First Phase 3 attempt appeared to silently lose the backfill from OVH's perspective. Two-issue chain: (a) `classify_carryover.py` swallowed git push stdout/stderr to avoid leaking the token in logs, so a returncode=0 from push was reported as "Pushed commit:" without verifying origin/main actually moved; (b) the OVH bash wrapper's `trap EXIT` ran `git reset --hard origin/main`, which on OVH reset to a STALE local remote-tracking ref because `git push <bare-url> main` doesn't auto-update `refs/remotes/origin/main` the way `git push origin main` does. The push HAD succeeded on github.com (commit `80b312d` was on origin/main); only OVH's local state was wiped.
+
+Fix in `dce5951`: `classify_carryover.py` now logs git push stdout AND stderr verbatim with token redacted to `[REDACTED]`, and post-push verifies `git rev-parse HEAD == git rev-parse origin/main` via explicit `git fetch origin main`. Raises RuntimeError if returncode=0 but origin unchanged. Two new regression tests cover both the silent-success and push-failure paths. Trap-based bash wrapper deprecated — the hardened `run-daily.sh` precondition handles any stranded state on the next cron.
+
+### Polkit fix for archive chain trigger (2026-05-19)
+
+2026-05-19 06:30 UTC cron exposed the third latent bug:
+
+```
+May 19 07:30:34 systemctl[140062]: Failed to start
+  domainsifter-archive.service: Interactive authentication required.
+```
+
+`domainsifter.service` runs as `User=domainsifter` and ExecStartPosts `systemctl start domainsifter-archive.service`. Without a polkit grant, polkit's default policy requires interactive auth for a non-root user to manage units — which fails silently under cron (no TTY). Every "successful" chain run to date had been a sudo-triggered manual test (bypassing polkit via root). The automated cron path under the domainsifter user had never had permission.
+
+Fix in `74cfa8c`: `systemd/50-domainsifter.rules` — scoped grant. Allows exactly `action.id == "org.freedesktop.systemd1.manage-units" AND action.lookup("unit") == "domainsifter-archive.service" AND subject.user == "domainsifter"`. No other operations, no other units, no other users.
+
+`scripts/deploy_systemd.sh` extended to copy `*.rules` → `/etc/polkit-1/rules.d/`. Polkit auto-reloads via inotify per polkit(8) on Debian — no daemon-reload analogue. Verified via the Debian bookworm man page: "Both directories are monitored so if a rules file is changed, added or removed, existing rules are purged and all files are read and processed again."
+
+### Operational pattern established
+
+Every server-side change now ships with a deploy script in the same commit. Mario runs one bash line on OVH per deploy. No multi-step manual command blocks. The `deploy_systemd.sh` pattern is the standard going forward.
+
+### Open items as of 2026-05-19 evening
+
+- **Phase 4 classifier wiring** (next architectural session): classifier stage between enrichment and post-enrichment filter; `snapshot_toxic` rejection in `scripts/filter.py`; parked/empty Caution-downgrade in `scripts/output.py:_compute_verdict`; archive_generator reads pre-computed excerpts from the sidecar; methodology page update; env_check soft-fail loud-warning for missing ANTHROPIC_API_KEY. The coolkidscreations.net Wayback-flake case argues for retry-once + high-wayback-unknown verdict-downgrade.
+- **GMO RDAP Retry-After fix**: diagnostic complete. `rdap.gmoregistry.net/help` says "wait at least a minute after 429"; our hardcoded `1s + 2s` retries are inside their cooldown window. Recommended fix: honor `Retry-After` header + per-host floor (60s for GMO). Not implemented yet.
+- **2026-05-20 06:30 UTC cron is validation moment** for all three infrastructure fixes (`5a4c4d6` run-daily precondition; `174d455` RemainAfterExit; `74cfa8c` polkit grant). First run where the archive chain should fire end-to-end.
+- **Paid-tier feature ideas** captured in conversation but not yet in STRATEGIC_NOTES.md: extended retention window (90 days vs 14 free), registration history (mark sold instead of dropping), toxic-snapshot visibility for research-tier users. Design when closer to shipping.
+
 ## 2026-05-17 — Weekend shipping session (Sat–Sun, 9 commits)
 
 Pipeline filtering, verdict logic, newsletter source, display cap, and a new SEO archive subsystem all landed this weekend. Tests: 600 → 628 pass.
