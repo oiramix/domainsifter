@@ -425,3 +425,72 @@ def test_post_enrichment_filter_skips_dnsbl_log_when_all_known(caplog):
 
     log_messages = " ".join(rec.message for rec in caplog.records)
     assert "DNSBL signal distribution" not in log_messages
+
+
+# --- snapshot_category rejection (Phase 4 wire-in, 2026-05-20) -------------
+
+
+class TestSnapshotToxicRejection:
+    def test_toxic_rejected_with_snapshot_toxic_reason(self):
+        cand = _ok(snapshot_category="toxic")
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is False
+        assert reason == "snapshot_toxic"
+
+    def test_legitimate_passes(self):
+        cand = _ok(snapshot_category="legitimate")
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is True
+        assert reason is None
+
+    def test_parked_passes_filter_handled_in_verdict(self):
+        # Parked is verdict-downgrade, not filter-reject — must pass here.
+        cand = _ok(snapshot_category="parked")
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is True
+        assert reason is None
+
+    def test_empty_passes_filter_handled_in_verdict(self):
+        # Same as parked — verdict-downgrade, not reject.
+        cand = _ok(snapshot_category="empty")
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is True
+        assert reason is None
+
+    def test_unknown_passes_no_signal_no_reject(self):
+        # `unknown` is the soft-fail path; must never reject.
+        cand = _ok(snapshot_category="unknown")
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is True
+        assert reason is None
+
+    def test_missing_snapshot_category_passes(self):
+        # Pre-Phase-4 entries (legacy carryover, sample data) have no
+        # snapshot_category at all — must pass to avoid breaking the
+        # migration window.
+        cand = _ok()  # no snapshot_category key
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is True
+        assert reason is None
+
+    def test_toxic_beats_clean_wayback(self):
+        # Toxic rejection fires regardless of wayback count — content
+        # check overrides count check.
+        cand = _ok(snapshot_category="toxic", wayback_snapshots=10_000)
+        keep, reason = filter_mod.keep_post_enrichment(cand, CONFIG)
+        assert keep is False
+        assert reason == "snapshot_toxic"
+
+    def test_filter_candidates_post_enrichment_evicts_toxic(self):
+        # Integration: full filter call evicts toxic entries from the list.
+        cands = [
+            _ok(name="good.com", snapshot_category="legitimate"),
+            _ok(name="bad.com", snapshot_category="toxic"),
+            _ok(name="park.com", snapshot_category="parked"),
+            _ok(name="empt.com", snapshot_category="empty"),
+            _ok(name="huh.com", snapshot_category="unknown"),
+        ]
+        kept = filter_mod.filter_candidates_post_enrichment(cands, CONFIG)
+        names = {c["name"] for c in kept}
+        assert "bad.com" not in names
+        assert names == {"good.com", "park.com", "empt.com", "huh.com"}

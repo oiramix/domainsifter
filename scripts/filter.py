@@ -242,6 +242,17 @@ def keep_post_enrichment(
     if candidate.get("spamhaus_listed") is True:
         return False, "spamhaus_listed"
 
+    # Snapshot content classifier (Stage 4b, added 2026-05-20). Hard reject
+    # on toxic — adult / gambling spam / pharma scam / malware / phishing
+    # primary-purpose sites identified by the most-recent Wayback snapshot's
+    # title/meta/h1/h2. Parked + empty do NOT reject here — they're
+    # verdict-downgraded to Caution in output._compute_verdict instead.
+    # `unknown` (classifier never ran OR fetch failed OR API down) passes
+    # through; the soft-fail design accepts that a fraction of candidates
+    # may slip past unclassified on flaky days.
+    if candidate.get("snapshot_category") == "toxic":
+        return False, "snapshot_toxic"
+
     if "wayback_snapshots" in candidate:
         if candidate["wayback_snapshots"] < min_wayback:
             return False, f"no_wayback(<{min_wayback})"

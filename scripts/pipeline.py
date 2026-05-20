@@ -81,6 +81,7 @@ from scripts import (
     lexical_filter,
     output,
     score,
+    snapshot_classifier,
     zone_parser,
 )
 
@@ -704,6 +705,103 @@ def _bucket_and_cap_for_availability(
     return final, stats
 
 
+def _write_sidecar_excerpts(
+    classified: list[dict],
+    sidecar_path: Path,
+) -> int:
+    """Persist the wayback_excerpt field from classified candidates to the
+    sidecar JSON at `sidecar_path`. Mutates input — strips the inline
+    wayback_excerpt key from each record after writing so it doesn't
+    propagate to downstream stages (output's CONTRACT_FIELDS doesn't list
+    it, but stripping early keeps the in-memory dicts smaller and matches
+    scripts/classify_carryover.py's strip_inline_excerpts pattern).
+
+    Merge behavior: existing sidecar entries for names NOT in `classified`
+    are preserved (today's classifier only sees today's enriched set —
+    historical sidecar entries from prior runs survive). Names in
+    `classified` overwrite the sidecar entry — today's excerpt is fresher
+    than yesterday's if the entry was re-classified.
+
+    Returns the count of sidecar entries written (today's new + existing
+    preserved). 0 means nothing to write because the classifier didn't
+    touch any record (empty candidate set / classifier short-circuited).
+
+    The sidecar write happens BEFORE the post-enrichment filter so toxic
+    entries that get rejected still have their excerpt in the sidecar for
+    forensics (`why was X classified toxic?` — answerable months later
+    from git history of this file).
+    """
+    updates: dict[str, dict | None] = {}
+    for record in classified:
+        name = record.get("name")
+        if not name:
+            continue
+        # snapshot_classifier_version is stamped on every classifier-touched
+        # record (success, soft-fail, or no-client pass-through). Its
+        # absence means the classifier never ran on this record.
+        if not record.get("snapshot_classifier_version"):
+            continue
+        updates[name] = record.get("wayback_excerpt")
+
+    if not updates:
+        logger.info(
+            "Sidecar wayback excerpts: no classifier-touched records this run; "
+            "sidecar untouched at %s",
+            sidecar_path,
+        )
+        return 0
+
+    existing: dict = {}
+    if sidecar_path.exists():
+        try:
+            with open(sidecar_path, "r", encoding="utf-8") as fh:
+                loaded = json.load(fh)
+            if isinstance(loaded, dict):
+                existing = loaded
+            else:
+                logger.warning(
+                    "Sidecar %s is not a dict (corrupted?); resetting to empty.",
+                    sidecar_path,
+                )
+        except (OSError, ValueError) as exc:
+            logger.warning(
+                "Sidecar %s unreadable (%s); starting fresh (prior entries lost).",
+                sidecar_path, exc,
+            )
+
+    merged = {**existing, **updates}
+
+    # Atomic write — temp file + os.replace, same pattern as
+    # output.write_output and classify_carryover._atomic_write_json.
+    sidecar_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=sidecar_path.name + ".",
+        dir=str(sidecar_path.parent),
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(merged, fh, ensure_ascii=False, indent=2, sort_keys=False)
+            fh.write("\n")
+        os.replace(tmp_name, sidecar_path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+    # Strip inline wayback_excerpt — sidecar is the canonical location.
+    for record in classified:
+        record.pop("wayback_excerpt", None)
+
+    logger.info(
+        "Sidecar wayback excerpts: wrote %d total entries (%d new/updated from today's classifier) to %s",
+        len(merged), len(updates), sidecar_path,
+    )
+    return len(merged)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="DomainSifter daily pipeline")
     parser.add_argument(
@@ -847,6 +945,33 @@ def main(argv: list[str] | None = None) -> int:
     # Stage 4: enrichment (sequential, paced) — runs only on confirmed-
     # available candidates. Set is typically small (5-50).
     enriched = enrich_all(available, config)
+
+    # Stage 4b: snapshot content classification (added 2026-05-20).
+    # Mutates each enriched record in place to add:
+    #   wayback_excerpt — dict|None, moved to sidecar by the call below
+    #   snapshot_category — one of legitimate / parked / toxic / empty /
+    #                       unknown
+    #   snapshot_classifier_version — currently "v1"
+    # Soft-fail by design (per env_check's OPTIONAL_ENV_VAR_WARNINGS): if
+    # ANTHROPIC_API_KEY is missing OR every Haiku call errors, every entry
+    # gets snapshot_category="unknown" and the pipeline continues. Toxic
+    # is rejected by Stage 5 (snapshot_toxic reason); parked + empty get
+    # verdict-downgraded by output._compute_verdict at write time.
+    # pause_seconds=1.0 paces archive.org's Availability API at ~1 req/s,
+    # matching scripts/archive_generator.py's pre-existing cadence.
+    classifier_client = snapshot_classifier.make_default_client()
+    snapshot_classifier.classify_all(
+        enriched, client=classifier_client, pause_seconds=1.0,
+    )
+
+    # Persist excerpts to sidecar BEFORE Stage 5 so toxic-rejected entries
+    # still have their excerpt available for forensics. Mutates `enriched`
+    # to strip the inline wayback_excerpt key after writing — sidecar is
+    # the canonical location.
+    sidecar_path = Path(config.get(
+        "sidecar_excerpts_path", "src/data/wayback_excerpts.json",
+    ))
+    _write_sidecar_excerpts(enriched, sidecar_path)
 
     # Stage 5: post-enrichment filter
     survivors = filter_mod.filter_candidates_post_enrichment(
