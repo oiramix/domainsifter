@@ -1691,6 +1691,39 @@ In STATE.md (operational pending items above):
 - +48 from newsletter (tests/test_generate_newsletter.py)
 - End-of-day 2026-05-13: 452; end-of-day 2026-05-14: 514. Net +62 today.
 
+## 2026-05-20 — Archive chain validated end-to-end, Phase 4 classifier wiring shipped
+
+### Archive chain fired automatically for the first time (2026-05-20 06:30 UTC)
+
+The three infrastructure fixes from 2026-05-17/18/19 worked together: `5a4c4d6` (run-daily.sh defensive sync) + `174d455` (RemainAfterExit=yes) + `74cfa8c` (polkit grant). `domainsifter-archive.service` started cleanly at 07:49:16 UTC after pipeline finished. Processed 12 new qualifying domains, archived 5 successfully; 7 failed due to a transient Anthropic 529 overload event (not our bug). Consecutive-failures circuit breaker (5/5) never tripped because successes interspersed with failures kept resetting the counter. Archive commit `archive: add 5 new pages for 2026-05-20` auto-pushed by `domainsifter-pipeline` git author. Total archive count: 37 pages (was 32 — 33 minus deepsand.net, plus 5 new). Stranded 7 self-heal tomorrow automatically — verified `archive_generator._filter_qualifying` has no date filter, iterates all Clean/Promising not in archive-index.json.
+
+### Phase 4 classifier wiring shipped (2026-05-20 evening)
+
+Merge commit `34755aa` (feature commit `2c20a0e` on `feat/classifier-pipeline-wiring`). New Stage 4b in `scripts/pipeline.py` between enrichment and post-enrichment filter. Toxic candidates rejected at filter with reason `snapshot_toxic`. Parked + empty candidates verdict-downgraded to Caution in `_compute_verdict`. Legitimate + unknown pass through normally. Sidecar consolidation: pipeline writes `src/data/wayback_excerpts.json` (merge with existing, atomic write), archive_generator reads sidecar first with `fetch_excerpt` fallback. "sidecar-null" semantic: if classifier saw a domain and got None from Wayback, archive_generator trusts that and doesn't refetch (prevents race with classifier's earlier verdict). `env_check` soft-fails with a loud WARNING if `ANTHROPIC_API_KEY` is missing — every candidate gets `snapshot_category=unknown`, pipeline still publishes. `src/components/Methodology.astro` gained a new step 6 "Review snapshot content". 800 tests pass (was 741, +59 new). Operational footprint: zero — no systemd changes, no run-daily.sh changes, no server-side deploys. Existing `ANTHROPIC_API_KEY` in OVH's `.env` (already used by archive_generator) is reused.
+
+### Today's pipeline run metrics (clean baseline before Phase 4)
+
+- 48,499 drops → 5,086 RDAP-checked → 62 available → 43 scored → 214 published
+- Verdict distribution: real Promising count for the first time in a week (multiple on homepage: animeyt2.net, realbench.net, antaryami.net, orememo.net, lightwayart.net, memoryarabworld.net among others)
+- Newsletter draft: 20 fresh domains (real volume, not 2-3 like recent days)
+- Zero breakers tripped, zero RDAP 429s (GMO bucket didn't run — .shop had 0 drops today, weekend zone pattern)
+
+### Open items as of 2026-05-20 evening
+
+**Next session — .com TLD rollout (high priority).** CZDS approval confirmed live (2026-05-09 email, valid until 2037). Pipeline-side blocker only: .com not in current TLD config. KS-6 has 128 GB ECC, well above .com zone's ~15.5 GB peak parse. Verisign RDAP throttle 4.0s already calibrated (from 2026-05-15). Phase 4 ships FIRST per architectural decision — classifier needs to be in production before .com floods the funnel with potentially-toxic candidates. Expected impact: roughly 5× current daily fresh pool (~40-60/day → probably ~200-300/day). Scope: add .com to `scripts/config.json` TLD list + CZDS download list, manual trigger to validate first-day memory + timing.
+
+**Validation pending — Phase 4 first production run.** Tomorrow 2026-05-21 06:30 UTC: first cron with classifier wired in. Expected log markers: Stage 4b classifier output, `snapshot_toxic` rejections (if any), sidecar write line, archive chain firing cleanly with no redundant Wayback fetches. Soft-fail design: if classifier breaks, pipeline still publishes (degraded to all-unknown), no hard failures.
+
+**Deferred — GMO Retry-After fix.** Diagnostic complete: rdap.gmoregistry.net `/help` says "wait at least a minute after 429"; our hardcoded 1s+2s retry delays are inside their cooldown window. Today's .shop drop count was 0 so no .shop bucket ran — fix not urgent but still real. Recommended approach: honor Retry-After header + per-host floor (60s for GMO, 5s default), keep 3-attempt retry budget. Not implemented yet.
+
+**Deferred — Paid tier feature design.** Extended retention window (90 days vs free 14), registration history (mark sold instead of deleting), toxic visibility for research-tier users, live backlink verification at purchase time. Captured in conversation, not yet in STRATEGIC_NOTES.md. Design when closer to shipping — domain data goes stale quickly so no value in building data retention infrastructure now.
+
+### Pattern established
+
+Every server-side change ships with a deploy script in the same commit (`deploy_systemd.sh` pattern). Mario runs one bash line on OVH per deploy. No multi-step manual command blocks. This commit (Phase 4) had zero server-side deploys needed — same pattern applied: if it needs a deploy script, it ships in the same commit.
+
+---
+
 ## 2026-05-17 evening through 2026-05-19 — Archive chain rollout, three infrastructure bugs, content classifier
 
 Eight commits on main across three days. Headline: the archive chain shipped in `e57bf61` (prior section) had three undiagnosed infrastructure bugs that prevented it from ever firing automatically — all surfaced and fixed by 2026-05-19 evening. Validation moment is tomorrow's 06:30 UTC cron. Separately: content classifier subsystem shipped as standalone code + one-shot backfill; pipeline-wiring (Phase 4) deferred to a separate session.
