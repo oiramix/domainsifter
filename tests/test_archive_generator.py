@@ -41,9 +41,17 @@ def _stub_fetch_excerpt(monkeypatch):
 
     Also stub time.sleep so the 1s courtesy pace in the per-domain
     loop doesn't multiply the test suite wall-clock (30 fixture
-    domains × 1s = 30s of dead sleep otherwise)."""
+    domains × 1s = 30s of dead sleep otherwise).
+
+    Phase 4 addition (2026-05-20): stub _load_sidecar_excerpts to
+    return {} by default — tests that explicitly want sidecar coverage
+    monkeypatch their own dict. Without this stub, every test would
+    read the real production src/data/wayback_excerpts.json, which
+    could mask real bugs if a test fixture name happens to collide
+    with a real domain in the sidecar."""
     monkeypatch.setattr(ag, "fetch_excerpt", lambda *_a, **_k: None)
     monkeypatch.setattr(ag.time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setattr(ag, "_load_sidecar_excerpts", lambda *_a, **_k: {})
 
 
 # ---------------------------------------------------------------------------

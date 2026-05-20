@@ -87,6 +87,10 @@ def cfg(tmp_path):
             {"name": "NameSilo", "link_template": "https://ns.example/?q={name}"},
         ],
         "output_path": str(tmp_path / "daily.json"),
+        # Redirect Stage 4b's sidecar write to a tmp file — without this the
+        # default "src/data/wayback_excerpts.json" relative path resolves
+        # against the repo root and tests pollute the real production file.
+        "sidecar_excerpts_path": str(tmp_path / "wayback_excerpts.json"),
         "filter_thresholds": {
             "min_domain_length": 2,
             "max_domain_length": 30,

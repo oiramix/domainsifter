@@ -88,6 +88,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DAILY_DOMAINS_PATH = REPO_ROOT / "src" / "data" / "daily-domains.json"
 ARCHIVE_INDEX_PATH = REPO_ROOT / "src" / "data" / "archive-index.json"
 ARCHIVE_CONTENT_DIR = REPO_ROOT / "src" / "content" / "archive"
+# Sidecar with pre-computed Wayback excerpts (Phase 4, 2026-05-20). Written
+# by scripts/pipeline.py's Stage 4b classifier; archive_generator reads it
+# instead of refetching from archive.org, eliminating ~60s of wall-clock per
+# day's archive run. Falls back to per-domain fetch_excerpt for any name
+# not present in the sidecar (covers backfilled carryover from before
+# Phase 4 + transient sidecar-write failures).
+SIDECAR_EXCERPTS_PATH = REPO_ROOT / "src" / "data" / "wayback_excerpts.json"
 
 GITHUB_REPO_URL_TEMPLATE = "https://x-access-token:{token}@github.com/oiramix/domainsifter.git"
 GIT_USER_NAME = "domainsifter-archive"
@@ -362,6 +369,100 @@ def _git_commit_and_push(
     logger.info("Pushed commit: %s", msg)
 
 
+# --- Wayback excerpt resolution (sidecar-first, fetch-fallback) ------------
+
+
+def _load_sidecar_excerpts(
+    sidecar_path: Path = SIDECAR_EXCERPTS_PATH,
+) -> dict[str, dict | None]:
+    """Load the wayback_excerpts.json sidecar into a name → excerpt map.
+
+    Returns an empty dict on missing OR corrupt sidecar — caller then falls
+    back to per-domain `fetch_excerpt` for every domain (same path as
+    pre-Phase-4 behaviour). A logged warning surfaces the degraded state
+    in the daily report email.
+    """
+    if not sidecar_path.exists():
+        logger.info(
+            "Sidecar %s not present — will fetch each excerpt from Wayback directly.",
+            sidecar_path,
+        )
+        return {}
+    try:
+        with open(sidecar_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:
+        logger.warning(
+            "Sidecar %s unreadable (%s); falling back to per-domain fetch.",
+            sidecar_path, exc,
+        )
+        return {}
+    if not isinstance(data, dict):
+        logger.warning(
+            "Sidecar %s is not a dict (got %s); falling back to per-domain fetch.",
+            sidecar_path, type(data).__name__,
+        )
+        return {}
+    return data
+
+
+def _resolve_excerpt(
+    record: dict, sidecar: dict[str, dict | None],
+) -> tuple[dict | None, str]:
+    """Return (excerpt, source) for a domain record.
+
+    `source` is one of:
+      - "sidecar-hit"  — sidecar had a dict; no archive.org call
+      - "sidecar-null" — sidecar had explicit None; classifier saw this
+                         domain but Wayback returned no usable content;
+                         do NOT refetch (would just produce None again
+                         for any persistent-state reason)
+      - "fetch"        — sidecar absent for this name; called fetch_excerpt
+                         (caller should sleep 1s after this — archive.org
+                         courtesy)
+      - "fetch-error"  — fetch_excerpt raised (transient or persistent;
+                         logged warning); caller treats as None and still
+                         sleeps to honor pacing
+      - "no-snapshot"  — record has no wayback_last_snapshot AND not in
+                         sidecar; nothing to do (no API hit, no sleep)
+
+    The sidecar-null branch is the key correctness bit: if Phase 4's
+    classifier ran on this domain and got None back from fetch_excerpt,
+    refetching here would either get None again (persistent: no closest
+    snapshot, all content fields empty, etc.) OR worse — racing the
+    classifier's verdict by using a different snapshot than what the
+    classifier saw. Trust the classifier's view, don't second-guess it.
+    """
+    name = record["name"]
+    if name in sidecar:
+        cached = sidecar[name]
+        if cached is None:
+            return None, "sidecar-null"
+        if isinstance(cached, dict):
+            return cached, "sidecar-hit"
+        # Sidecar has a non-dict, non-None value — corruption. Fall through
+        # to fetch as a defensive fallback rather than passing garbage to
+        # Haiku.
+        logger.warning(
+            "Sidecar entry for %s is not dict|None (got %s); falling back to fetch.",
+            name, type(cached).__name__,
+        )
+
+    last_snapshot = record.get("wayback_last_snapshot")
+    if not last_snapshot:
+        return None, "no-snapshot"
+
+    try:
+        excerpt = fetch_excerpt(name, last_snapshot)
+    except Exception as exc:
+        logger.warning(
+            "Wayback excerpt fetch failed for %s: %s — proceeding without grounding",
+            name, exc,
+        )
+        return None, "fetch-error"
+    return excerpt, "fetch"
+
+
 # --- Top-level orchestration ------------------------------------------------
 
 
@@ -412,32 +513,24 @@ def generate_archive(
 
     content_dir.mkdir(parents=True, exist_ok=True)
 
+    # Sidecar-first excerpt resolution (Phase 4, 2026-05-20): pipeline's
+    # Stage 4b populates src/data/wayback_excerpts.json so this loop hits
+    # the sidecar instead of archive.org for every classified domain.
+    # Per-domain fetch_excerpt is still the fallback for entries the
+    # classifier didn't see (e.g., backfilled carryover from before Phase
+    # 4 wire-in, or a day where Stage 4b's sidecar write failed).
+    sidecar_excerpts = _load_sidecar_excerpts()
+
     new_entries: list[dict] = []
     consecutive_failures = 0
     for record in qualifying:
         name = record["name"]
 
-        # Wayback excerpt fetch for "Historical use" grounding (2026-05-18).
-        # Skipped when wayback_last_snapshot is null (the pipeline's wayback
-        # breaker tripped during enrichment for this candidate). Failures
-        # downgrade silently to excerpt=None — Haiku will OMIT the
-        # Historical use subsection rather than hallucinate. The 1s sleep
-        # paces us under archive.org's organic-traffic ceiling; with
-        # 30-50 archive-eligible domains per day that's 30-50 seconds of
-        # extra wall-clock, well within the systemd unit's tolerance.
-        excerpt = None
-        if record.get("wayback_last_snapshot"):
-            try:
-                excerpt = fetch_excerpt(
-                    record["name"],
-                    record["wayback_last_snapshot"],
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Wayback excerpt fetch failed for %s: %s — proceeding without grounding",
-                    record["name"], exc,
-                )
-                excerpt = None
+        excerpt, source = _resolve_excerpt(record, sidecar_excerpts)
+        # Only pause AFTER a real archive.org hit (not after a sidecar
+        # lookup). On full-sidecar-coverage days the archive run drops
+        # from ~50s/run of pacing waits to ~0s.
+        if source in ("fetch", "fetch-error"):
             time.sleep(1.0)
 
         enriched_record = {**record, "wayback_excerpt": excerpt}
@@ -523,33 +616,24 @@ def generate_archive(
 def _render_one_page(
     record: dict,
     *,
+    excerpt: dict | None,
     client: HaikuClient,
     output_dir: Path,
     today_iso: str,
 ) -> tuple[bool, str | None]:
-    """Per-domain work: Wayback excerpt → Haiku call → write .md.
+    """Per-domain work: Haiku call → write .md. Excerpt is provided by the
+    caller (so this helper doesn't decide whether to fetch vs read sidecar
+    vs use None).
 
     Returns (success, reason). reason is None on success, a short string
-    on failure ('excerpt-error', 'haiku-error', 'haiku-malformed').
-    Caller decides whether a failure aborts the run or just logs.
+    on failure ('haiku-error', 'haiku-malformed'). Caller decides whether
+    a failure aborts the run or just logs.
 
-    Pulled out of generate_archive's per-domain loop so the dry-run
-    helper can reuse it without inheriting the circuit-breaker
-    bookkeeping (which is meaningful only when processing dozens of
-    domains in one go, not for 1-2 review samples)."""
+    Phase 4 (2026-05-20): excerpt-fetching responsibility moved out to
+    the callers (`generate_archive` and `generate_for_domains`) so the
+    sidecar-first lookup pattern works uniformly for both production and
+    dry-run paths."""
     name = record["name"]
-
-    excerpt = None
-    if record.get("wayback_last_snapshot"):
-        try:
-            excerpt = fetch_excerpt(name, record["wayback_last_snapshot"])
-        except Exception as exc:
-            logger.warning(
-                "Wayback excerpt fetch failed for %s: %s — proceeding without grounding",
-                name, exc,
-            )
-            excerpt = None
-        time.sleep(1.0)
 
     enriched_record = {**record, "wayback_excerpt": excerpt}
 
@@ -635,11 +719,24 @@ def generate_for_domains(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Sidecar-first excerpt resolution, same as generate_archive (Phase 4).
+    # Dry-run path benefits more from sidecar hits than the production
+    # path (typical dry-run targets are 1-2 specific named domains that
+    # were classified earlier today / yesterday).
+    sidecar_excerpts = _load_sidecar_excerpts()
+
     rendered: list[str] = []
     failed: list[str] = []
     for record in eligible:
+        excerpt, source = _resolve_excerpt(record, sidecar_excerpts)
+        if source in ("fetch", "fetch-error"):
+            time.sleep(1.0)
         ok, _reason = _render_one_page(
-            record, client=client, output_dir=output_dir, today_iso=today_iso,
+            record,
+            excerpt=excerpt,
+            client=client,
+            output_dir=output_dir,
+            today_iso=today_iso,
         )
         if ok:
             rendered.append(record["name"])

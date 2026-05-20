@@ -591,3 +591,129 @@ def test_wayback_unknown_false_serializes_as_null():
     cand = _cand("normal.com", 80, wayback_snapshots=42)
     payload = output.build_payload([cand], CONFIG)
     assert payload["domains"][0]["wayback_unknown"] is None
+
+
+# --- snapshot_category verdict integration (Phase 4, 2026-05-20) -----------
+
+
+def test_verdict_parked_forces_caution_even_at_clean_score():
+    """Parked snapshot category overrides a high score. The domain may have
+    great Wayback / OPR / CC numbers, but if today's snapshot is a parking
+    page, we don't want a buyer mistaking it for an active site."""
+    cand = _cand(
+        "parked.com", 90,
+        wayback_snapshots=5000, open_page_rank=8.0, cc_source_domain_count=2000,
+    )
+    cand["snapshot_category"] = "parked"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_empty_forces_caution():
+    """Same as parked — empty/blank snapshots downgrade to Caution."""
+    cand = _cand(
+        "empty.com", 85,
+        wayback_snapshots=3000, open_page_rank=2.5, cc_source_domain_count=500,
+    )
+    cand["snapshot_category"] = "empty"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_legitimate_passes_to_normal_scoring():
+    """`legitimate` category does NOT short-circuit verdict — normal score
+    rules apply. A 90-scoring legitimate-snapshot entry is still Clean."""
+    cand = _cand(
+        "real.com", 90,
+        wayback_snapshots=5000, open_page_rank=4.0, cc_source_domain_count=1000,
+    )
+    cand["snapshot_category"] = "legitimate"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Clean"
+
+
+def test_verdict_unknown_passes_to_normal_scoring():
+    """`unknown` category does NOT short-circuit — it means we don't know,
+    not we know it's bad. Treat as if the classifier didn't run."""
+    cand = _cand(
+        "huh.com", 75,
+        wayback_snapshots=2000, open_page_rank=3.0, cc_source_domain_count=200,
+    )
+    cand["snapshot_category"] = "unknown"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Clean"
+
+
+def test_verdict_soft_signal_short_circuits_before_snapshot_check():
+    """When both a soft_signal_keyword AND a parked snapshot are present,
+    the soft_signal check fires first (it's named in the rule order). Both
+    paths lead to Caution, so the outcome is the same — this test pins
+    the rule precedence so a future reorder doesn't silently change it."""
+    cand = _cand(
+        "datingsite.com", 85,
+        wayback_snapshots=5000, open_page_rank=8.0,
+    )
+    cand["snapshot_category"] = "parked"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Caution"
+
+
+def test_verdict_no_snapshot_category_falls_through_to_score():
+    """Pre-Phase-4 entries with no snapshot_category field at all must
+    behave identically to today's pre-Phase-4 logic — Clean if score>=70."""
+    cand = _cand(
+        "legacy.com", 75,
+        wayback_snapshots=2000, open_page_rank=3.0, cc_source_domain_count=200,
+    )
+    # explicitly no snapshot_category
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert _verdict_of(payload) == "Clean"
+
+
+# --- snapshot_category contract surface (Phase 4, 2026-05-20) --------------
+
+
+def test_contract_fields_includes_snapshot_category():
+    assert "snapshot_category" in output.CONTRACT_FIELDS
+
+
+def test_contract_fields_includes_snapshot_classifier_version():
+    assert "snapshot_classifier_version" in output.CONTRACT_FIELDS
+
+
+def test_contract_fields_excludes_wayback_excerpt():
+    """Sidecar architecture (design (h)): wayback_excerpt lives in
+    src/data/wayback_excerpts.json, NOT inline in daily-domains.json.
+    Pin this so a future refactor doesn't accidentally re-add it."""
+    assert "wayback_excerpt" not in output.CONTRACT_FIELDS
+
+
+def test_project_emits_snapshot_fields_when_present():
+    cand = _cand("x.com", 80, wayback_snapshots=2000)
+    cand["snapshot_category"] = "legitimate"
+    cand["snapshot_classifier_version"] = "v1"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    d = payload["domains"][0]
+    assert d["snapshot_category"] == "legitimate"
+    assert d["snapshot_classifier_version"] == "v1"
+
+
+def test_project_emits_none_for_missing_snapshot_fields():
+    """Legacy / sample entries without classifier-touched fields project
+    as None — JSON shape stays uniform across migration."""
+    cand = _cand("legacy.com", 80, wayback_snapshots=2000)
+    payload = output.build_payload([cand], VERDICT_CFG)
+    d = payload["domains"][0]
+    assert d["snapshot_category"] is None
+    assert d["snapshot_classifier_version"] is None
+
+
+def test_project_does_not_leak_inline_wayback_excerpt():
+    """Even if a candidate dict has wayback_excerpt set (e.g., the pipeline
+    forgot to strip it before write), _project must not emit it — sidecar
+    is the only canonical location."""
+    cand = _cand("x.com", 80, wayback_snapshots=2000)
+    cand["wayback_excerpt"] = {"title": "Should not appear in JSON"}
+    cand["snapshot_category"] = "legitimate"
+    payload = output.build_payload([cand], VERDICT_CFG)
+    assert "wayback_excerpt" not in payload["domains"][0]

@@ -112,6 +112,16 @@ CONTRACT_FIELDS = (
     # attempted for this candidate — both safe.
     "wayback_unknown",
     "wayback_unknown_attempts",
+    # Snapshot content classifier outputs (added 2026-05-20, Stage 4b
+    # in pipeline.py). Five categories: legitimate / parked / toxic /
+    # empty / unknown. `toxic` is rejected by filter.keep_post_enrichment
+    # before we get here; `parked` / `empty` force Caution in
+    # _compute_verdict. The wayback_excerpt itself is NOT in this
+    # contract — it lives in the sidecar src/data/wayback_excerpts.json,
+    # keyed by name, so the per-day daily-domains.json stays small for
+    # the frontend's first-paint budget.
+    "snapshot_category",
+    "snapshot_classifier_version",
 )
 
 # Enrichment fields used to compute completeness ratio. A candidate's
@@ -150,10 +160,16 @@ def _compute_verdict(candidate: dict, config: dict) -> str:
     """Server-side verdict assignment. Tightened 2026-05-17 — see
     config.verdict_thresholds._doc.
 
-    Rules:
+    Rules (evaluated top-to-bottom; first match wins):
       - Soft-signal keyword in name (dating, snake-oil, get-rich, crypto)
-        → "Caution" regardless of score. The forced-Caution short-circuits
-        before the Clean check so a high-score scammy name still warns.
+        → "Caution" regardless of score.
+      - snapshot_category in (parked, empty) → "Caution" regardless of
+        score. Added 2026-05-20 with the classifier wire-in: a parking
+        page or default-server placeholder has no historical-authority
+        value to a buyer, even if the apex was previously well-archived.
+        `toxic` is not handled here because filter.keep_post_enrichment
+        rejects it upstream; `legitimate` / `unknown` pass through to
+        normal scoring.
       - score >= clean_min_score (default 70) → "Clean".
       - score >= promising_min_score (default 40) AND wayback >=
         promising_min_wayback_snapshots (default 1000) AND (OPR >=
@@ -167,6 +183,9 @@ def _compute_verdict(candidate: dict, config: dict) -> str:
     """
     name = candidate.get("name", "")
     if filter_mod.has_soft_signal(name, config):
+        return "Caution"
+
+    if candidate.get("snapshot_category") in ("parked", "empty"):
         return "Caution"
 
     thresholds = config.get("verdict_thresholds", {}) or {}
@@ -226,6 +245,10 @@ def _project(candidate: dict, registrars_config: list[dict], config: dict) -> di
             if candidate.get("wayback_unknown_attempts") not in (None, 0)
             else None
         ),
+        # Pre-Phase-4 entries (sample data, legacy carryover) have neither
+        # field; project them as None so JSON shape stays uniform.
+        "snapshot_category": candidate.get("snapshot_category"),
+        "snapshot_classifier_version": candidate.get("snapshot_classifier_version"),
     }
 
 

@@ -1,10 +1,11 @@
 ---
-// Seven-stage walkthrough of the actual pipeline. Reading order
+// Eight-stage walkthrough of the actual pipeline. Reading order
 // (top-to-bottom, left-to-right at the 3-col breakpoint) matches
 // the pipeline data flow:
-//   1. catch    → 2. filter  → 3. verify
-//   4. enrich   → 5. backlinks → 6. score
-//   7. publish
+//   1. catch    → 2. filter   → 3. verify
+//   4. enrich   → 5. backlinks → 6. snapshot
+//   7. score    → 8. publish
+// Step 6 added 2026-05-20 with the snapshot content classifier wire-in.
 // Icons are inline SVGs (Lucide-style stroke geometry) so we don't
 // need a runtime icon library; matches the existing antenna/sift/check
 // treatment from the prior 3-card version.
@@ -33,6 +34,11 @@ const steps = [
     icon: 'link-2',
     title: 'Check backlinks',
     body: 'Each domain is checked against the Common Crawl domain webgraph (released monthly, covering a rolling 3-month window of the live web). The backlinks count shows how many distinct source domains linked to it during that window.',
+  },
+  {
+    icon: 'eye',
+    title: 'Review snapshot content',
+    body: 'We pull the most recent Wayback snapshot of each domain and read the page content. Toxic snapshots (adult, gambling spam, malware) are rejected. Parked or empty pages get a Caution verdict regardless of other signals.',
   },
   {
     icon: 'bar-chart',
@@ -102,6 +108,12 @@ const steps = [
                     <path d="M9 17H7A5 5 0 0 1 7 7h2" />
                     <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
                     <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                )}
+                {step.icon === 'eye' && (
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
                 )}
                 {step.icon === 'bar-chart' && (

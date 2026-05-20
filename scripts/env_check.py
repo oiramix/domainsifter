@@ -40,7 +40,25 @@ REQUIRED_ENV_VARS: tuple[str, ...] = (
     "R2_BUCKET_NAME",
 )
 
-OPTIONAL_ENV_VARS: tuple[str, ...] = ("OPENPAGERANK_KEY", "BUTTONDOWN_API_KEY")
+OPTIONAL_ENV_VARS: tuple[str, ...] = (
+    "OPENPAGERANK_KEY",
+    "BUTTONDOWN_API_KEY",
+    # Snapshot content classifier (Stage 4b, added 2026-05-20). Missing key
+    # is SOFT-FAIL: the classifier short-circuits to all-unknown, pipeline
+    # runs normally, daily list publishes. Catch-up via
+    # `python -m scripts.classify_carryover --only-unknown` once the key
+    # is back. Custom warning text in OPTIONAL_ENV_VAR_WARNINGS below.
+    "ANTHROPIC_API_KEY",
+)
+
+# Per-var override for the warning text. Falls back to the generic
+# "corresponding enrichment will be skipped" message when no entry here.
+OPTIONAL_ENV_VAR_WARNINGS: dict[str, str] = {
+    "ANTHROPIC_API_KEY": (
+        "ANTHROPIC_API_KEY not set — snapshot classification disabled, "
+        "all candidates will pass-through as 'unknown'"
+    ),
+}
 
 
 class MissingEnvVarsError(RuntimeError):
@@ -67,10 +85,14 @@ def validate_env(env: dict[str, str] | None = None) -> None:
 
     for name in OPTIONAL_ENV_VARS:
         if not source.get(name):
-            logger.warning(
-                "Optional env var %s not set; the corresponding enrichment will be skipped.",
-                name,
-            )
+            custom = OPTIONAL_ENV_VAR_WARNINGS.get(name)
+            if custom:
+                logger.warning(custom)
+            else:
+                logger.warning(
+                    "Optional env var %s not set; the corresponding enrichment will be skipped.",
+                    name,
+                )
         else:
             logger.info("Optional env var %s is set.", name)
 
