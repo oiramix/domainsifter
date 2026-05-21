@@ -4,10 +4,24 @@
 # workflow_dispatch; this service is the production daily runner as of
 # 2026-05-11.
 #
+# ExecStart invokes run-daily-with-guard.sh (the wrapper) instead of
+# run-daily.sh directly. The wrapper enforces a same-day guard: if a
+# pipeline invocation already completed today (UTC), it skips. This
+# closes the failure mode that surfaced on 2026-05-21 when a timer
+# restart triggered a Persistent=true catch-up after a successful
+# manual recovery, which would have re-corrupted R2 state if not
+# killed in flight. See scripts/run-daily-with-guard.sh and RECOVERY.md
+# for the full design.
+#
+# To force a same-day re-run (e.g., morning run published bad data and
+# operator wants to republish after a config fix), use the sibling
+# unit:  sudo systemctl start domainsifter-force.service
+#
 # INSTALL (server-side, run as root once):
 #   cp /home/domainsifter/domainsifter/systemd/domainsifter.service         /etc/systemd/system/
 #   cp /home/domainsifter/domainsifter/systemd/domainsifter.timer           /etc/systemd/system/
 #   cp /home/domainsifter/domainsifter/systemd/domainsifter-archive.service /etc/systemd/system/
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter-force.service   /etc/systemd/system/
 #   systemctl daemon-reload
 #   systemctl enable --now domainsifter.timer
 #   systemctl enable domainsifter-archive.service
@@ -34,7 +48,7 @@ User=domainsifter
 Group=domainsifter
 WorkingDirectory=/home/domainsifter/domainsifter
 EnvironmentFile=/home/domainsifter/domainsifter/.env
-ExecStart=/home/domainsifter/domainsifter/scripts/run-daily.sh
+ExecStart=/home/domainsifter/domainsifter/scripts/run-daily-with-guard.sh
 StandardOutput=journal
 StandardError=journal
 # Explicit memory accounting so `systemctl show -p MemoryPeak` reports a

@@ -1,0 +1,44 @@
+# DomainSifter force-run service — bypasses the same-day guard.
+#
+# Use when the daily timer has already fired (successfully) today but
+# you intentionally want a SECOND pipeline invocation in the same UTC
+# day. Common reason: today's morning run published bad data due to a
+# config bug; you've fixed config and want to republish from scratch.
+#
+# Same env, working dir, user, and OnSuccess= chain as domainsifter.service
+# — the only difference is DOMAINSIFTER_FORCE_RUN=1, which tells
+# run-daily-with-guard.sh to skip the same-day sentinel check.
+#
+# The sentinel is still written on success (a forced run is still a
+# "successful run today"); subsequent automatic timer fires the same
+# day stay blocked. To force AGAIN within the same UTC day, restart
+# this unit — the env var bypasses the guard every time.
+#
+# OnSuccess= still chains the archive: archive_generator dedupes via
+# archive-index.json so a same-day archive call finds 0 new qualifying
+# entries (one no-op API touch; no .md files; no git activity).
+#
+# Invocation: sudo systemctl start domainsifter-force.service
+# Logs:       journalctl -u domainsifter-force.service -f
+# Status:     systemctl status domainsifter-force.service
+#
+# See RECOVERY.md for the runbook covering when force-runs are safe vs
+# when they will compound R2 state inconsistency.
+
+[Unit]
+Description=DomainSifter daily pipeline (force — bypasses same-day guard)
+After=network-online.target
+Wants=network-online.target
+OnSuccess=domainsifter-archive.service
+
+[Service]
+Type=oneshot
+User=domainsifter
+Group=domainsifter
+WorkingDirectory=/home/domainsifter/domainsifter
+EnvironmentFile=/home/domainsifter/domainsifter/.env
+Environment=DOMAINSIFTER_FORCE_RUN=1
+ExecStart=/home/domainsifter/domainsifter/scripts/run-daily-with-guard.sh
+StandardOutput=journal
+StandardError=journal
+MemoryAccounting=yes
