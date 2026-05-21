@@ -1691,6 +1691,73 @@ In STATE.md (operational pending items above):
 - +48 from newsletter (tests/test_generate_newsletter.py)
 - End-of-day 2026-05-13: 452; end-of-day 2026-05-14: 514. Net +62 today.
 
+## 2026-05-21 — Daily-run architecture hardened after operational incident
+
+Three commits on main today addressing three distinct architectural failures surfaced during the morning incident. Validated end-to-end before EOD; tomorrow's 06:30 UTC cron is the first natural exercise of the hardened path.
+
+### Operational incident — three failure modes surfaced
+
+At 10:00 UTC Mario noticed today's 06:30 UTC cron didn't fire. Diagnosis surfaced three distinct architectural failures in sequence:
+
+1. **Timer stuck in `NEXT: -`** because yesterday's `174d455` (RemainAfterExit=yes) kept `domainsifter.service` permanently `active (exited)` after a successful run. systemd refuses to trigger an already-active unit. Architectural root cause: `Requires=domainsifter.service` on the archive unit forced the pipeline to stay alive indefinitely as a Requires= workaround, conflicting with the timer's expectation that the unit goes inactive between runs.
+
+2. **Push race during long pipeline runs.** Manual recovery started a pipeline at 10:12 UTC; pipeline finished at 11:13 UTC. During the 1-hour window, the OnSuccess= architectural fix (`623b947`) landed on origin/main. Pipeline's final `git push` was rejected (origin moved). Pipeline reported FAILED exit 1 with data computed locally but stranded.
+
+3. **Persistent=true timer catch-up.** After deploying the OnSuccess= fix at 11:35 UTC, attempting to restart the timer (Mario followed Claude's instruction `sudo systemctl start domainsifter.timer`) triggered Persistent=true catch-up logic: systemd saw the missed 06:30 UTC scheduled firing and immediately ran a second same-day pipeline invocation. Killed at 11:43 UTC after 6 TLDs had been re-processed (R2 baselines overwritten with 27-minute-newer same-day snapshots — functionally identical, no actual corruption per post-mortem in RECOVERY.md).
+
+### Three architectural fixes shipped today
+
+**Commit `623b947` — OnSuccess= replaces ExecStartPost+Requires chain**
+- `systemd/domainsifter.service`: removed `RemainAfterExit=yes`, removed `ExecStartPost=systemctl start`, added `OnSuccess=domainsifter-archive.service` in `[Unit]` section
+- `systemd/domainsifter-archive.service`: removed `Requires=`, kept `After=`
+- `systemd/domainsifter.timer`: removed redundant `Requires=`
+- `systemd/50-domainsifter.rules`: preserved (no longer load-bearing for cron, useful for operator manual recovery)
+- Replaces three workarounds (`174d455` RemainAfterExit + ExecStartPost chain + `74cfa8c` polkit grant) with one canonical systemd pattern. OnSuccess= is PID 1 internal, fires when unit transitions inactive with exit code 0, no permission boundary, no race conditions.
+
+**Commit `1c4783f` — today's daily refresh (recovery push)**
+- Today's data computed by the morning manual recovery pipeline run
+- Stranded locally after push rejection, recovered via git rebase + amend (included `src/data/wayback_excerpts.json` sidecar that the pipeline mutated but didn't auto-commit) + push to origin/main
+- 217 published domains, 3 fresh in newsletter draft
+- Phase 4 classifier ran in production for the first time: 1 legitimate, 0 parked, 1 toxic, 2 empty, 29 unknown
+- The 1 toxic was rejected by the post-enrichment filter (`snapshot_toxic` in rejections dict) — first production classifier rejection ever
+- 29/33 unknown rate inflated by Wayback circuit breaker opening during enrichment stage (transient Wayback infrastructure outage)
+
+**Commit `2b2ff1b` — same-day guard + force unit + RECOVERY.md**
+- `scripts/run-daily-with-guard.sh`: new wrapper around `run-daily.sh`, checks sentinel at `$XDG_STATE_HOME/domainsifter/last-success.date`, exits 0 if it equals today UTC. Writes today's date unconditionally after every invocation (any `pipeline.py` call potentially mutates R2 state, so block all automatic same-day retries).
+- `systemd/domainsifter-force.service`: new manual-only unit, sets `DOMAINSIFTER_FORCE_RUN=1` to bypass guard, same OnSuccess= chain as regular service. Invoked via `sudo systemctl start domainsifter-force.service`.
+- `systemd/domainsifter.service`: ExecStart= now points at wrapper instead of `run-daily.sh` directly.
+- `RECOVERY.md`: operational runbook documenting the mental model (R2 `_yesterday.txt` is historically-named, contains last-successful-baseline regardless of calendar position), scenarios (cron didn't fire, pipeline crashed mid-run, push race, accidental same-day re-trigger), and the no-recovery-needed analysis for today's incident.
+- Sidecar bug noted but not fixed: `pipeline.py` writes `wayback_excerpts.json` but `run-daily.sh`'s commit step only adds `daily-domains.json`. Today's recovery had to manually `git add` the sidecar. Fix deferred.
+
+### Validated end-to-end before EOD
+- Deploy via `deploy_systemd.sh` succeeded (2 systemd files updated, 3 unchanged)
+- Guard validated: synthetic sentinel set to today's date → `systemctl start domainsifter.service` → wrapper logged "Skipping" and exited `inactive (dead)` within 5 seconds, no pipeline execution
+- Timer correctly scheduled: `systemctl list-timers` shows `NEXT: Fri 2026-05-22 06:30:00 UTC`
+
+### Open items as of 2026-05-21 evening
+
+**Next session — Phase 4 production validation continues.** Tomorrow 2026-05-22 06:30 UTC: first natural cron run with hardened architecture (OnSuccess=, same-day guard, OnSuccess= archive chain trigger). Expected behavior: wrapper sees no sentinel → runs pipeline → pipeline writes `daily-domains.json` and sidecar → `run-daily.sh` commits and pushes → wrapper writes sentinel for 2026-05-22 → OnSuccess= fires `archive_generator` → archive commits and pushes if any Clean/Promising qualifying entries → email lands by ~09:00 UTC. If anything breaks, RECOVERY.md is the runbook.
+
+**Next major work — .com TLD rollout.** CZDS approval confirmed live (email 2026-05-09, valid until 2037). Pipeline-side: add `.com` to `scripts/config.json` TLD list + CZDS download list, manual force-trigger via `domainsifter-force.service` to validate first-day memory/timing/RDAP behavior. Expected impact: 5× current daily fresh pool, also 5× .com toxic content potential (now classifier-protected post-Phase 4). After tomorrow's natural cron validates Phase 4 end-to-end.
+
+**Deferred — sidecar commit bug in run-daily.sh.** `pipeline.py` writes `src/data/wayback_excerpts.json` but `run-daily.sh`'s commit step doesn't add it. Today required manual `git add` to recover. Should add sidecar to the commit list in `run-daily.sh`. Low priority but real bug.
+
+**Deferred — GMO Retry-After fix.** Documented in prior STATE.md sections, no change today.
+
+**Deferred — paid tier feature design.** Documented in prior STATE.md sections, no change today.
+
+### Architectural lessons learned today
+
+1. **Workarounds compound.** RemainAfterExit + ExecStartPost + polkit were three patches for using `Requires=` as a completion trigger. The canonical pattern (`OnSuccess=`) eliminates all three.
+
+2. **`Persistent=true` on timers is a footgun for manual operator recovery.** Re-enabling a timer after the scheduled window has passed will immediately fire a catch-up run. Must use the force-service path for any same-day re-run; never restart the timer mid-day.
+
+3. **Push race during pipeline runs is a real failure mode** separate from the startup-time push race that `5a4c4d6` (defensive sync) addresses. Long pipeline runs (1h+) create a window for origin to move. Fix would be: fetch + rebase + push at the END of `run-daily.sh`, not just at the start. Deferred.
+
+4. **Sentinel-based idempotency is the right pattern for daily-run guards.** Should have existed from day one. `pipeline.py` mutates R2 state mid-run, so any automatic same-day retry compounds inconsistency — must require explicit operator intent.
+
+---
+
 ## 2026-05-20 — Archive chain validated end-to-end, Phase 4 classifier wiring shipped
 
 ### Archive chain fired automatically for the first time (2026-05-20 06:30 UTC)
