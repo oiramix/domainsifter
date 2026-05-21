@@ -16,7 +16,10 @@
 [Unit]
 Description=DomainSifter archive page generator
 After=domainsifter.service
-Requires=domainsifter.service
+# No Requires=domainsifter.service — the archive doesn't need the pipeline
+# to be concurrently active, it just needs to run AFTER pipeline finishes.
+# Triggered by OnSuccess=domainsifter-archive.service on the pipeline unit.
+# After= is kept for ordering safety if both are ever queued together.
 
 [Service]
 Type=oneshot

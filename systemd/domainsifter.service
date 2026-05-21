@@ -20,24 +20,21 @@
 Description=DomainSifter daily pipeline
 After=network-online.target
 Wants=network-online.target
+# Chain the archive page generator on successful pipeline completion.
+# systemd queues the start job internally when this unit transitions to
+# inactive with exit code 0 — same trigger semantics as the prior
+# ExecStartPost=/bin/systemctl start pattern, but processed by PID 1
+# instead of user-space, so no RemainAfterExit hack and no polkit
+# round-trip needed. Available since systemd 249; Debian 12 has 252.
+OnSuccess=domainsifter-archive.service
 
 [Service]
 Type=oneshot
-# Stay "active (exited)" after ExecStart+ExecStartPost finish, so that
-# domainsifter-archive.service's Requires=domainsifter.service check still
-# passes when systemd processes the start job queued by ExecStartPost.
-# Without this, oneshot transitions to inactive (dead) immediately after
-# ExecStartPost returns — the archive service's start job then sees
-# domainsifter.service as inactive and fails with "Dependency failed".
-# This is why no /d/ pages were chain-generated between the 2026-05-17
-# chain install and 2026-05-18: the archive service never ran.
-RemainAfterExit=yes
 User=domainsifter
 Group=domainsifter
 WorkingDirectory=/home/domainsifter/domainsifter
 EnvironmentFile=/home/domainsifter/domainsifter/.env
 ExecStart=/home/domainsifter/domainsifter/scripts/run-daily.sh
-ExecStartPost=/bin/systemctl start --no-block domainsifter-archive.service
 StandardOutput=journal
 StandardError=journal
 # Explicit memory accounting so `systemctl show -p MemoryPeak` reports a

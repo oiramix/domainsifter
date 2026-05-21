@@ -15,7 +15,6 @@
 
 [Unit]
 Description=Run DomainSifter daily pipeline at 06:30 UTC
-Requires=domainsifter.service
 
 [Timer]
 OnCalendar=*-*-* 06:30:00 UTC
