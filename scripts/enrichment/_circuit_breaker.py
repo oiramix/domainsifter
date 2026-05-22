@@ -53,6 +53,7 @@ import random
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from typing import Callable
 
 logger = logging.getLogger(__name__)
@@ -223,6 +224,87 @@ GLOBAL_HOST_THROTTLE = HostThrottle()
 
 
 # ---------------------------------------------------------------------------
+# Per-host 429 cooldown
+# ---------------------------------------------------------------------------
+
+
+class HostCooldown:
+    """Per-host rate-limit cooldown tracker, thread-safe across the pool.
+
+    When a host returns HTTP 429, the 429 handler records a cooldown via
+    `start(host, seconds)`. While that window is active, `seconds_remaining`
+    returns a positive value and callers should skip the host entirely —
+    issuing a request would just 429 again and, for registries that escalate
+    (GMO Registry's /help page documents temporary IP blocking), actively
+    makes things worse.
+
+    Added 2026-05-22 — see config.json:rdap_429_backoff_floor_seconds and
+    STATE.md for the GMO incident that motivated it.
+
+    Per-process, in-memory. One module-level singleton (GLOBAL_HOST_COOLDOWN);
+    no persistence. Reset between tests via the enrichment conftest fixture.
+    """
+
+    def __init__(self) -> None:
+        self._cooling_until: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def start(
+        self,
+        host: str,
+        seconds: float,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        """Mark `host` as cooling down for `seconds` from now. Extends an
+        existing cooldown when the new window ends later; never shortens one
+        — two workers racing on the same 429 must not let the shorter win."""
+        if seconds <= 0:
+            return
+        with self._lock:
+            until = clock() + seconds
+            if until > self._cooling_until.get(host, 0.0):
+                self._cooling_until[host] = until
+
+    def seconds_remaining(
+        self,
+        host: str,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> float:
+        """Seconds left on `host`'s cooldown, or 0.0 if it is not cooling.
+        Expired entries are dropped on read so the dict cannot grow without
+        bound across a long run."""
+        with self._lock:
+            until = self._cooling_until.get(host)
+            if until is None:
+                return 0.0
+            remaining = until - clock()
+            if remaining <= 0.0:
+                del self._cooling_until[host]
+                return 0.0
+            return remaining
+
+    def is_cooling(
+        self,
+        host: str,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> bool:
+        return self.seconds_remaining(host, clock=clock) > 0.0
+
+    def reset(self) -> None:
+        """For tests — clear all cooldown state."""
+        with self._lock:
+            self._cooling_until.clear()
+
+
+# Module-level singleton — the RDAP availability check arms and reads this.
+# One per Python process; reset between tests via the conftest fixture.
+GLOBAL_HOST_COOLDOWN = HostCooldown()
+
+
+# ---------------------------------------------------------------------------
 # Combined helper: throttle → call → 429-backoff
 # ---------------------------------------------------------------------------
 
@@ -289,13 +371,77 @@ def retry_on_timeout(
     raise last_exc if last_exc else RuntimeError("retry_on_timeout fell through")  # pragma: no cover
 
 
+# Upper bound on how long a single worker will sleep out one 429, even when
+# the registry's Retry-After (or per-host floor) asks for longer. A registry
+# can send an explicit multi-hour ban (Identity Digital once sent 86397s, a
+# 24h ban); a worker must not hang the pipeline that long. When the requested
+# cooldown exceeds this cap, the per-host cooldown is still armed for the FULL
+# requested duration (subsequent domains correctly skip the host for the whole
+# ban) but the worker itself sleeps only the cap, does its one retry, and
+# moves on. 120s comfortably covers every documented per-host floor (GMO's
+# 60s being the largest) with headroom.
+MAX_429_SLEEP_SECONDS = 120.0
+
+
+def parse_retry_after(
+    value: str | None,
+    *,
+    now: datetime | None = None,
+) -> float | None:
+    """Parse an HTTP `Retry-After` header value (RFC 7231 section 7.1.3).
+
+    Two legal forms:
+      - delta-seconds: a non-negative integer count of seconds.
+      - HTTP-date:     an absolute timestamp; the wait is (date - now).
+
+    Returns the wait in seconds as a float >= 0.0, or None when `value` is
+    absent or parses as neither form. A delta-seconds of "0" returns 0.0
+    (NOT None) — "0" IS a valid value, just a useless one (GMO Registry sends
+    exactly this); applying a sensible floor is the caller's job.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    # delta-seconds: a bare non-negative integer.
+    if text.isdigit():
+        return float(int(text))
+    # HTTP-date.
+    try:
+        parsed = parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        return None
+    if parsed is None:  # defensive — older Pythons returned None, not raised
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    reference = now or datetime.now(timezone.utc)
+    return max(0.0, (parsed - reference).total_seconds())
+
+
+def _retry_after_header(resp: "object") -> str | None:
+    """Best-effort read of a response's Retry-After header. Returns the raw
+    string, or None when the response exposes no usable headers mapping."""
+    headers = getattr(resp, "headers", None)
+    if headers is None:
+        return None
+    getter = getattr(headers, "get", None)
+    if not callable(getter):
+        return None
+    value = getter("Retry-After")
+    return value if isinstance(value, str) else None
+
+
 def request_with_429_backoff(
     call_fn: Callable[[], "object"],
     *,
     host: str | None = None,
     min_interval: float = 0.0,
     delays: tuple[float, ...] = (1.0, 2.0),
+    retry_after_floor: float = 0.0,
     sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
 ):
     """Invoke `call_fn()` (which must return a `requests.Response`-like
     object exposing `status_code`).
@@ -304,18 +450,40 @@ def request_with_429_backoff(
     BEFORE the first call (and re-acquired before each retry, so retries
     don't punch through the rate limit).
 
-    On 429, sleep for delays[i] then retry. After exhausting `delays`,
-    the next 429 is returned to the caller as-is — the caller treats it as
-    a failure (records breaker failure, returns {}).
+    Two 429-handling modes:
 
-    With the default delays=(1.0, 2.0), the call sequence is:
-        throttle → attempt 1 → if 429, sleep 1s
-        throttle → attempt 2 → if 429, sleep 2s
-        throttle → attempt 3 → return whatever (3rd 429 = give up)
+    LEGACY MODE (retry_after_floor <= 0, the default):
+        On 429, sleep delays[i] then retry. After exhausting `delays`, the
+        next 429 is returned to the caller as-is. With the default
+        delays=(1.0, 2.0): up to 3 attempts, fixed 1s/2s backoff, the
+        Retry-After header ignored. Used by crt.sh / OPR / Safe Browsing /
+        rdap.enrich — endpoints where a fixed short backoff is fine.
 
-    Total worst-case wall time: 3 × HTTP latency + 3 seconds of sleeps
-    + up to 3 × min_interval of throttle waits.
+    RETRY-AFTER MODE (retry_after_floor > 0, requires `host`):
+        On 429, honor the response's Retry-After header (RFC 7231 7.1.3)
+        floored at `retry_after_floor` seconds, then make EXACTLY ONE retry.
+        A per-host cooldown is recorded on GLOBAL_HOST_COOLDOWN so concurrent
+        workers for the same host skip it during the wait. Used by
+        rdap.check_availability — see config.json:rdap_429_backoff_floor_seconds.
+
+        Why one retry, not three: at a 60s floor (GMO Registry) three retries
+        would burn 180s+ per rate-limited domain and exhaust the per-host
+        availability budget after a handful of domains. One retry honors the
+        registry's documented cooldown once; a still-429 hands back to the
+        caller as unknown.
     """
+    if retry_after_floor > 0:
+        if not host:
+            raise ValueError("retry_after_floor > 0 requires host to be set")
+        return _request_honoring_retry_after(
+            call_fn,
+            host=host,
+            min_interval=min_interval,
+            retry_after_floor=retry_after_floor,
+            sleep=sleep,
+            clock=clock,
+        )
+
     for delay in (*delays, None):
         if host and min_interval > 0:
             GLOBAL_HOST_THROTTLE.acquire(host, min_interval, sleep=sleep)
@@ -326,3 +494,70 @@ def request_with_429_backoff(
         sleep(delay)
     # Unreachable — the loop always returns or sleeps then returns on next iter.
     raise RuntimeError("request_with_429_backoff fell through")  # pragma: no cover
+
+
+def _request_honoring_retry_after(
+    call_fn: Callable[[], "object"],
+    *,
+    host: str,
+    min_interval: float,
+    retry_after_floor: float,
+    sleep: Callable[[float], None],
+    clock: Callable[[], float],
+):
+    """429 handler that honors Retry-After with a per-host floor + one retry.
+    See request_with_429_backoff's RETRY-AFTER MODE docstring for the public
+    contract.
+
+    Cooldown semantics — the cooldown is armed ONCE, on the first 429, for
+    `cooldown_seconds`. Its purpose is to shield *concurrent* workers for the
+    same host: while this worker sleeps out the registry's penalty window, a
+    sibling worker that checks GLOBAL_HOST_COOLDOWN sees the host is cooling
+    and skips, rather than firing a fresh request into that window.
+
+    The retry-429 deliberately does NOT re-arm the cooldown. Re-arming would
+    push cooling_until past the end of this worker's sleep; a sequential
+    single-worker bucket (every RDAP host runs one worker by default) would
+    then race through every remaining domain as instant cooldown-skips,
+    collapsing the whole bucket to `unknown` after a single double-429.
+    Instead each rate-limited domain pays its own one-time sleep, pacing a
+    single worker to one request per cooldown window — exactly the cadence
+    GMO's /help page asks for ("do not access ... for at least a minute").
+
+    Sleep cap — when a registry sends an explicit long Retry-After, the
+    cooldown is armed for the FULL value (subsequent domains correctly skip
+    the host for the whole ban) but this worker sleeps at most
+    MAX_429_SLEEP_SECONDS so it never hangs the pipeline. See that constant.
+    """
+    def _attempt():
+        if min_interval > 0:
+            GLOBAL_HOST_THROTTLE.acquire(host, min_interval, sleep=sleep)
+        return call_fn()
+
+    resp = _attempt()
+    if getattr(resp, "status_code", None) != 429:
+        return resp
+
+    raw = _retry_after_header(resp)
+    parsed = parse_retry_after(raw)
+    cooldown_seconds = max(parsed if parsed is not None else 0.0, retry_after_floor)
+    GLOBAL_HOST_COOLDOWN.start(host, cooldown_seconds, clock=clock)
+
+    sleep_seconds = min(cooldown_seconds, MAX_429_SLEEP_SECONDS)
+    logger.warning(
+        "429 from %s — honoring %.0fs cooldown (Retry-After header=%r, "
+        "per-host floor=%.0fs); sleeping %.0fs then one retry",
+        host, cooldown_seconds, raw, retry_after_floor, sleep_seconds,
+    )
+    sleep(sleep_seconds)
+
+    resp = _attempt()
+    if getattr(resp, "status_code", None) == 429:
+        logger.warning(
+            "429 from %s on retry — domain treated as unknown; host cooldown "
+            "has %.0fs of its %.0fs window left",
+            host,
+            GLOBAL_HOST_COOLDOWN.seconds_remaining(host, clock=clock),
+            cooldown_seconds,
+        )
+    return resp

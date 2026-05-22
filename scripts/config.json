@@ -173,5 +173,12 @@
       "rdap.radix.host": 1.0
     }
   },
+  "rdap_429_backoff_floor_seconds": {
+    "_doc": "Minimum seconds to wait after an RDAP 429 before the single retry, AND the per-host cooldown window during which further requests to that host are skipped without an HTTP call. Added 2026-05-22 after the GMO bucket logged a 47.6% unknown rate (257 unknown / 540 candidates) driven by a retry-during-cooldown cascade: the prior 1s+2s backoff retried entirely inside GMO's documented 60s cooldown, and GMO escalates non-compliance to temporary IP blocking. On a 429, scripts/enrichment/_circuit_breaker.py honors max(parsed Retry-After header, floor); GMO sends a useless literal 'Retry-After: 0' so the floor is what binds. Lookup: per_host[host] -> default. The gmoregistry value 60 is authoritative — verbatim from rdap.gmoregistry.net/help ('do not access any more for at least a minute to avoid temporary blocking of your address'). default 5 is a conservative small floor for hosts with no documented cooldown. This knob is ORTHOGONAL to api_min_interval_seconds (steady-state pacing): the 5.0s GMO steady-state throttle is unchanged — a 1 req/sec probe on 2026-05-22 confirmed GMO does not rate-limit at steady state, so the cascade was never a steady-state-rate problem.",
+    "default": 5,
+    "per_host": {
+      "rdap.gmoregistry.net": 60
+    }
+  },
   "output_path": "src/data/daily-domains.json"
 }

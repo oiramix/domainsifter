@@ -38,7 +38,11 @@ from typing import Any
 
 import requests
 
-from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+from scripts.enrichment._circuit_breaker import (
+    CircuitBreaker,
+    GLOBAL_HOST_COOLDOWN,
+    request_with_429_backoff,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +241,22 @@ def _empty_unknown() -> dict:
     }
 
 
+def _retry_after_floor_seconds(rdap_host: str, config: dict) -> float:
+    """Minimum cooldown to honor after a 429 from `rdap_host`, in seconds.
+
+    Lookup order: rdap_429_backoff_floor_seconds.per_host[host]
+    → rdap_429_backoff_floor_seconds.default → 5.0.
+
+    GMO Registry (rdap.gmoregistry.net) is configured at 60 — its /help page
+    documents "do not access any more for at least a minute" after a 429 and
+    threatens temporary IP blocking otherwise. GMO's own Retry-After header
+    is a useless "0", so this floor is what actually binds. See config.json.
+    """
+    block = config.get("rdap_429_backoff_floor_seconds", {}) or {}
+    per_host = block.get("per_host", {}) or {}
+    return float(per_host.get(rdap_host, block.get("default", 5.0)))
+
+
 def resolve_rdap_host(domain: str, config: dict) -> str | None:
     """Return the RDAP server hostname that would be queried for `domain`.
 
@@ -316,6 +336,21 @@ def check_availability(domain: str, config: dict) -> dict:
     url = f"{base}/domain/{domain}"
     from urllib.parse import urlparse
     rdap_host = urlparse(base).hostname or "rdap"
+
+    # Per-host 429 cooldown (added 2026-05-22). If this host returned a 429
+    # within its cooldown window, skip the HTTP call entirely — re-querying
+    # would just 429 again, and registries that escalate (GMO Registry's
+    # /help page documents temporary IP blocking) treat continued access
+    # during the window as grounds to extend the block. INFO not WARNING:
+    # this is the backoff design working as intended, not an error.
+    cooldown_remaining = GLOBAL_HOST_COOLDOWN.seconds_remaining(rdap_host)
+    if cooldown_remaining > 0:
+        logger.info(
+            "RDAP host %s in 429 cooldown (%.0fs left); skipping %s without a request",
+            rdap_host, cooldown_remaining, domain,
+        )
+        return _empty_unknown()
+
     # Per-host override falls through to the global `rdap` interval when the
     # host isn't listed. Added 2026-05-01 because GMO Registry
     # (rdap.gmoregistry.net, serving .shop + 46 other TLDs) rate-limits much
@@ -331,6 +366,7 @@ def check_availability(domain: str, config: dict) -> dict:
             lambda: requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout),
             host=rdap_host,
             min_interval=min_interval,
+            retry_after_floor=_retry_after_floor_seconds(rdap_host, config),
         )
     except requests.RequestException as exc:
         logger.warning("RDAP availability check for %s failed: %s", domain, exc)
@@ -349,13 +385,12 @@ def check_availability(domain: str, config: dict) -> dict:
         }
 
     if response.status_code == 429:
-        # Surface the registry's Retry-After header (if any) so future
-        # diagnostics don't need a manual probe to discover it.
-        retry_after = response.headers.get("Retry-After") if hasattr(response, "headers") else None
-        logger.warning(
-            "RDAP persistent 429 for %s (Retry-After: %s)",
-            domain, retry_after if retry_after is not None else "absent",
-        )
+        # request_with_429_backoff (RETRY-AFTER MODE) already honored the
+        # per-host cooldown, logged the Retry-After detail at WARNING, and
+        # armed GLOBAL_HOST_COOLDOWN so the next domains for this host skip
+        # without a request. No extra warning here — cutting 429 log noise
+        # is the whole point of this change. Record the breaker failure and
+        # treat the domain as unknown.
         _BREAKER.record_failure()
         return {**_empty_unknown(), "rdap_http": 429}
 
