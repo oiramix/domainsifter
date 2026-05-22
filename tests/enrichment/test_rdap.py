@@ -6,6 +6,7 @@ import pytest
 import responses
 
 from scripts.enrichment import rdap
+from scripts.enrichment._circuit_breaker import GLOBAL_HOST_COOLDOWN
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +28,21 @@ def _config():
         "api_endpoints": {"rdap_bootstrap": "https://data.iana.org/rdap/dns.json"},
         "request_timeout_seconds": 5,
     }
+
+
+@pytest.fixture
+def _no_sleep_backoff(monkeypatch):
+    """Run the REAL request_with_429_backoff — real 429 handling, real
+    Retry-After honoring, real GLOBAL_HOST_COOLDOWN arming — but with the
+    backoff sleep no-op'd, so a 429 test doesn't actually wait out a 60s
+    floor. Tests that exercise check_availability's live 429 path use this."""
+    real = rdap.request_with_429_backoff
+
+    def fast(call_fn, **kwargs):
+        kwargs.setdefault("sleep", lambda *_a, **_k: None)
+        return real(call_fn, **kwargs)
+
+    monkeypatch.setattr(rdap, "request_with_429_backoff", fast)
 
 
 @responses.activate
@@ -286,12 +302,15 @@ def test_check_availability_5xx_returns_unknown():
 
 
 @responses.activate
-def test_check_availability_persistent_429_returns_unknown():
+def test_check_availability_persistent_429_returns_unknown(_no_sleep_backoff):
     responses.add(
         responses.GET, "https://data.iana.org/rdap/dns.json", json=BOOTSTRAP, status=200
     )
-    # Three back-to-back 429s — request_with_429_backoff returns the last one.
-    for _ in range(3):
+    # RETRY-AFTER MODE makes exactly two attempts (initial + one retry);
+    # both 429 → request_with_429_backoff returns the last 429. _config()
+    # carries no rdap_429_backoff_floor_seconds block, so the 5s default
+    # floor applies — _no_sleep_backoff no-ops the wait.
+    for _ in range(2):
         responses.add(
             responses.GET,
             "https://rdap.verisign.example/com/v1/domain/limited.com",
@@ -434,3 +453,136 @@ def test_check_availability_breaker_open_returns_unknown_immediately(monkeypatch
     # No HTTP mock registered — if a request escapes, this test will explode.
     result = rdap.check_availability("anything.com", _config())
     assert result["is_available"] is None
+
+
+# --- per-host 429 cooldown (added 2026-05-22) --------------------------------
+
+COOLDOWN_BOOTSTRAP = {
+    "services": [
+        [["shop"], ["https://rdap.gmoregistry.net/rdap/"]],
+        [["com"], ["https://rdap.verisign.example/com/v1/"]],
+    ]
+}
+
+
+def _cooldown_config():
+    """Config with an explicit rdap_429_backoff_floor_seconds block (60s for
+    GMO, mirroring production config.json) and the steady-state RDAP throttle
+    zeroed so tests don't incur throttle waits."""
+    return {
+        "api_endpoints": {"rdap_bootstrap": "https://data.iana.org/rdap/dns.json"},
+        "request_timeout_seconds": 5,
+        "api_min_interval_seconds": {"rdap": 0},
+        "rdap_429_backoff_floor_seconds": {
+            "default": 5,
+            "per_host": {"rdap.gmoregistry.net": 60},
+        },
+    }
+
+
+def test_retry_after_floor_seconds_lookup():
+    """The per-host floor lookup chain: per_host[host] → default → 5.0."""
+    cfg = _cooldown_config()
+    assert rdap._retry_after_floor_seconds("rdap.gmoregistry.net", cfg) == 60.0
+    assert rdap._retry_after_floor_seconds("rdap.verisign.example", cfg) == 5.0
+    # No config block at all → hard default 5.0.
+    assert rdap._retry_after_floor_seconds("anything", {}) == 5.0
+
+
+@responses.activate
+def test_check_availability_cooldown_skips_subsequent_same_host(_no_sleep_backoff):
+    """After a host 429s, the next domain on that host is skipped WITHOUT an
+    HTTP call (returns unknown, rdap_http=None)."""
+    responses.add(
+        responses.GET, "https://data.iana.org/rdap/dns.json",
+        json=COOLDOWN_BOOTSTRAP, status=200,
+    )
+    # first.shop: two 429s arm the gmoregistry 60s cooldown.
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/first.shop", status=429,
+    )
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/first.shop", status=429,
+    )
+    # second.shop is deliberately NOT registered — if the cooldown skip fails
+    # and a request escapes, `responses` raises ConnectionError and the test
+    # fails loudly.
+
+    cfg = _cooldown_config()
+    r1 = rdap.check_availability("first.shop", cfg)
+    assert r1["is_available"] is None
+    assert r1["rdap_http"] == 429  # 429 path: exhausted the one retry
+
+    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
+
+    r2 = rdap.check_availability("second.shop", cfg)
+    assert r2["is_available"] is None
+    assert r2["rdap_http"] is None  # skipped — no HTTP attempt was made
+
+    domain_calls = [c for c in responses.calls if "/domain/" in c.request.url]
+    assert len(domain_calls) == 2
+    assert all("first.shop" in c.request.url for c in domain_calls)
+
+
+@responses.activate
+def test_check_availability_cooldown_does_not_block_other_host(_no_sleep_backoff):
+    """A cooldown on one RDAP host must not affect a different host."""
+    responses.add(
+        responses.GET, "https://data.iana.org/rdap/dns.json",
+        json=COOLDOWN_BOOTSTRAP, status=200,
+    )
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/limited.shop", status=429,
+    )
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/limited.shop", status=429,
+    )
+    # A .com domain on the OTHER host — must still be queried normally.
+    responses.add(
+        responses.GET, "https://rdap.verisign.example/com/v1/domain/free.com", status=404,
+    )
+
+    cfg = _cooldown_config()
+    rdap.check_availability("limited.shop", cfg)  # arms the gmoregistry cooldown
+
+    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
+    assert not GLOBAL_HOST_COOLDOWN.is_cooling("rdap.verisign.example")
+
+    r = rdap.check_availability("free.com", cfg)
+    assert r["is_available"] is True   # verisign host queried, got its 404
+    assert r["rdap_http"] == 404
+
+
+@responses.activate
+def test_check_availability_resumes_after_cooldown_clears(_no_sleep_backoff):
+    """Once the cooldown window elapses, the host is queried again normally."""
+    responses.add(
+        responses.GET, "https://data.iana.org/rdap/dns.json",
+        json=COOLDOWN_BOOTSTRAP, status=200,
+    )
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/one.shop", status=429,
+    )
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/one.shop", status=429,
+    )
+    # Queried only after the cooldown is cleared.
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/three.shop", status=404,
+    )
+
+    cfg = _cooldown_config()
+    rdap.check_availability("one.shop", cfg)            # arms the cooldown
+    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
+
+    r2 = rdap.check_availability("two.shop", cfg)        # skipped while cooling
+    assert r2["rdap_http"] is None
+
+    # Simulate the cooldown window elapsing (HostCooldown's clock-based
+    # expiry is covered deterministically in test_circuit_breaker.py).
+    GLOBAL_HOST_COOLDOWN.reset()
+    assert not GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
+
+    r3 = rdap.check_availability("three.shop", cfg)      # resumes — real query
+    assert r3["is_available"] is True
+    assert r3["rdap_http"] == 404

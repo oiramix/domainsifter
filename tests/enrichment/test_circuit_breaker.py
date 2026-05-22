@@ -13,7 +13,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from scripts.enrichment._circuit_breaker import CircuitBreaker, request_with_429_backoff
+from scripts.enrichment._circuit_breaker import (
+    CircuitBreaker,
+    GLOBAL_HOST_COOLDOWN,
+    HostCooldown,
+    MAX_429_SLEEP_SECONDS,
+    parse_retry_after,
+    request_with_429_backoff,
+)
 
 
 # --- helpers -----------------------------------------------------------------
@@ -461,3 +468,267 @@ def test_retry_on_timeout_custom_delays():
             call_fn, label="x", delays=(1.0, 2.0, 3.0), sleep=sleeps.append,
         )
     assert sleeps == [1.0, 2.0, 3.0]  # 4 attempts, 3 backoffs
+
+
+# --- parse_retry_after (RFC 7231 §7.1.3) -------------------------------------
+
+
+def test_parse_retry_after_positive_int():
+    """delta-seconds form — a sane positive integer."""
+    assert parse_retry_after("120") == 120.0
+
+
+def test_parse_retry_after_zero_is_zero_not_none():
+    """'0' IS a valid delta-seconds value (GMO Registry sends exactly this).
+    It must parse to 0.0, NOT None — the caller distinguishes 'header said 0'
+    from 'no header' and applies the floor to both, but parse stays faithful."""
+    assert parse_retry_after("0") == 0.0
+
+
+def test_parse_retry_after_http_date():
+    """HTTP-date form — wait is (date - now)."""
+    now = datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc)
+    assert parse_retry_after("Fri, 22 May 2026 12:02:00 GMT", now=now) == 120.0
+
+
+def test_parse_retry_after_http_date_in_past_clamps_to_zero():
+    now = datetime(2026, 5, 22, 12, 0, 0, tzinfo=timezone.utc)
+    assert parse_retry_after("Fri, 22 May 2026 11:00:00 GMT", now=now) == 0.0
+
+
+def test_parse_retry_after_absent_is_none():
+    assert parse_retry_after(None) is None
+
+
+def test_parse_retry_after_empty_or_blank_is_none():
+    assert parse_retry_after("") is None
+    assert parse_retry_after("   ") is None
+
+
+def test_parse_retry_after_garbage_is_none():
+    """Unparseable values → None. Caller floors None the same as it floors 0."""
+    assert parse_retry_after("soon") is None
+    assert parse_retry_after("-5") is None        # negative — not delta-seconds
+    assert parse_retry_after("12.5") is None      # fractional — not an integer
+    assert parse_retry_after("Notaday, 99 Zzz 2026") is None  # not an HTTP-date
+
+
+# --- HostCooldown ------------------------------------------------------------
+
+
+class _FloatClock:
+    """Mutable monotonic-style clock for HostCooldown tests."""
+
+    def __init__(self, start: float = 1000.0) -> None:
+        self.t = start
+
+    def __call__(self) -> float:
+        return self.t
+
+    def advance(self, dt: float) -> None:
+        self.t += dt
+
+
+def test_cooldown_start_then_cooling():
+    clk = _FloatClock()
+    cd = HostCooldown()
+    cd.start("h.example", 60, clock=clk)
+    assert cd.is_cooling("h.example", clock=clk)
+    assert abs(cd.seconds_remaining("h.example", clock=clk) - 60.0) < 0.001
+
+
+def test_cooldown_unknown_host_not_cooling():
+    cd = HostCooldown()
+    assert not cd.is_cooling("never-seen.example")
+    assert cd.seconds_remaining("never-seen.example") == 0.0
+
+
+def test_cooldown_expires_and_traffic_resumes():
+    """The window elapses → seconds_remaining returns 0 and is_cooling flips
+    False, so callers resume issuing requests."""
+    clk = _FloatClock()
+    cd = HostCooldown()
+    cd.start("h.example", 60, clock=clk)
+    assert cd.is_cooling("h.example", clock=clk)
+
+    clk.advance(59)
+    assert cd.is_cooling("h.example", clock=clk), "still inside the 60s window"
+
+    clk.advance(2)
+    assert not cd.is_cooling("h.example", clock=clk), "window elapsed"
+    assert cd.seconds_remaining("h.example", clock=clk) == 0.0
+
+
+def test_cooldown_other_host_unaffected():
+    clk = _FloatClock()
+    cd = HostCooldown()
+    cd.start("host-a.example", 60, clock=clk)
+    assert cd.is_cooling("host-a.example", clock=clk)
+    assert not cd.is_cooling("host-b.example", clock=clk)
+
+
+def test_cooldown_extends_never_shortens():
+    """Two workers racing on the same 429 must not let a shorter window win."""
+    clk = _FloatClock()
+    cd = HostCooldown()
+    cd.start("h.example", 60, clock=clk)
+    cd.start("h.example", 10, clock=clk)  # shorter — ignored
+    assert abs(cd.seconds_remaining("h.example", clock=clk) - 60.0) < 0.001
+    cd.start("h.example", 120, clock=clk)  # longer — extends
+    assert abs(cd.seconds_remaining("h.example", clock=clk) - 120.0) < 0.001
+
+
+def test_cooldown_zero_or_negative_seconds_is_noop():
+    cd = HostCooldown()
+    cd.start("h.example", 0)
+    cd.start("h.example", -5)
+    assert not cd.is_cooling("h.example")
+
+
+def test_cooldown_reset_clears_state():
+    cd = HostCooldown()
+    cd.start("h.example", 60)
+    assert cd.is_cooling("h.example")
+    cd.reset()
+    assert not cd.is_cooling("h.example")
+
+
+# --- request_with_429_backoff: RETRY-AFTER MODE ------------------------------
+
+
+def _resp429(retry_after=None):
+    """A 429 response mock with a real (case-sensitive) headers dict so the
+    Retry-After read path behaves like a requests.Response."""
+    r = MagicMock()
+    r.status_code = 429
+    r.headers = {} if retry_after is None else {"Retry-After": retry_after}
+    return r
+
+
+def test_retry_after_mode_one_retry_then_success():
+    """First 429 → wait the floored cooldown → ONE retry → success."""
+    sleeps: list[float] = []
+    calls = [_resp429("0"), _resp(200)]
+    resp = request_with_429_backoff(
+        lambda: calls.pop(0),
+        host="gmo.example", min_interval=0.0,
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert resp.status_code == 200
+    assert sleeps == [60.0]   # Retry-After:0 floored up to 60
+    assert calls == []        # exactly 2 attempts consumed (initial + 1 retry)
+
+
+def test_retry_after_mode_floor_applied_when_header_zero():
+    sleeps: list[float] = []
+    calls = [_resp429("0"), _resp(200)]
+    request_with_429_backoff(
+        lambda: calls.pop(0), host="h.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert sleeps == [60.0]
+
+
+def test_retry_after_mode_floor_applied_when_header_absent():
+    sleeps: list[float] = []
+    calls = [_resp429(None), _resp(200)]
+    request_with_429_backoff(
+        lambda: calls.pop(0), host="h.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert sleeps == [60.0]
+
+
+def test_retry_after_mode_floor_applied_when_header_garbage():
+    sleeps: list[float] = []
+    calls = [_resp429("soon"), _resp(200)]
+    request_with_429_backoff(
+        lambda: calls.pop(0), host="h.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert sleeps == [60.0]
+
+
+def test_retry_after_mode_honors_header_when_larger_than_floor():
+    """A sane Retry-After larger than the floor is honored as-is."""
+    sleeps: list[float] = []
+    calls = [_resp429("90"), _resp(200)]
+    request_with_429_backoff(
+        lambda: calls.pop(0), host="h.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert sleeps == [90.0]
+
+
+def test_retry_after_mode_exactly_one_retry_on_repeated_429():
+    """Both attempts 429 → return the last 429 to the caller. EXACTLY two
+    attempts (not three) — one sleep, one retry."""
+    sleeps: list[float] = []
+    calls = [_resp429("0"), _resp429("0"), _resp(200)]
+    resp = request_with_429_backoff(
+        lambda: calls.pop(0), host="h.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert resp.status_code == 429
+    assert sleeps == [60.0]          # one sleep only
+    assert len(calls) == 1           # third response never consumed
+
+
+def test_retry_after_mode_arms_host_cooldown():
+    GLOBAL_HOST_COOLDOWN.reset()
+    calls = [_resp429("0"), _resp429("0")]
+    request_with_429_backoff(
+        lambda: calls.pop(0), host="cooldown.example",
+        retry_after_floor=60.0, sleep=lambda *_: None,
+    )
+    assert GLOBAL_HOST_COOLDOWN.is_cooling("cooldown.example")
+    assert GLOBAL_HOST_COOLDOWN.seconds_remaining("cooldown.example") > 50.0
+
+
+def test_retry_after_mode_success_first_attempt_no_sleep_no_cooldown():
+    """No 429 at all → no sleep, no cooldown armed."""
+    GLOBAL_HOST_COOLDOWN.reset()
+    sleeps: list[float] = []
+    resp = request_with_429_backoff(
+        lambda: _resp(200), host="clean.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert resp.status_code == 200
+    assert sleeps == []
+    assert not GLOBAL_HOST_COOLDOWN.is_cooling("clean.example")
+
+
+def test_retry_after_mode_sleep_capped_for_huge_retry_after():
+    """An explicit multi-hour ban (Identity Digital once sent 86397s): the
+    worker sleeps at most MAX_429_SLEEP_SECONDS, but the per-host cooldown is
+    armed for the FULL ban so subsequent domains skip the host all run."""
+    GLOBAL_HOST_COOLDOWN.reset()
+    sleeps: list[float] = []
+    calls = [_resp429("86397"), _resp429("86397")]
+    request_with_429_backoff(
+        lambda: calls.pop(0), host="banned.example",
+        retry_after_floor=60.0, sleep=sleeps.append,
+    )
+    assert sleeps == [MAX_429_SLEEP_SECONDS]  # worker sleep is capped
+    # ...but the cooldown reflects the registry's full 24h ban.
+    assert GLOBAL_HOST_COOLDOWN.seconds_remaining("banned.example") > 80000.0
+
+
+def test_retry_after_mode_requires_host():
+    """retry_after_floor > 0 needs a host (the cooldown + throttle are
+    host-keyed) — misuse is a programming error, raised eagerly."""
+    with pytest.raises(ValueError):
+        request_with_429_backoff(
+            lambda: _resp(200), retry_after_floor=60.0, sleep=lambda *_: None,
+        )
+
+
+def test_legacy_mode_unaffected_by_new_param_default():
+    """retry_after_floor defaults to 0.0 → legacy 3-attempt 1s/2s path,
+    Retry-After ignored. Guards every other request_with_429_backoff caller
+    (crt.sh / OPR / Safe Browsing / rdap.enrich)."""
+    sleeps: list[float] = []
+    calls = [_resp429("999"), _resp429("999"), _resp(200)]
+    resp = request_with_429_backoff(lambda: calls.pop(0), sleep=sleeps.append)
+    assert resp.status_code == 200
+    assert sleeps == [1.0, 2.0]  # fixed legacy delays, header value ignored

@@ -28,15 +28,20 @@ _BREAKER_MODULES = (
 
 @pytest.fixture(autouse=True)
 def _reset_breakers():
-    # Reset all per-source breakers AND the global host throttle so
-    # one test's simulated rate-limit waits don't leak into the next.
-    from scripts.enrichment._circuit_breaker import GLOBAL_HOST_THROTTLE
+    # Reset all per-source breakers, the global host throttle, AND the
+    # global per-host 429 cooldown so one test's simulated rate-limit
+    # state doesn't leak into the next.
+    from scripts.enrichment._circuit_breaker import (
+        GLOBAL_HOST_COOLDOWN,
+        GLOBAL_HOST_THROTTLE,
+    )
     for path in _BREAKER_MODULES:
         mod = importlib.import_module(path)
         breaker = getattr(mod, "_BREAKER", None)
         if breaker is not None:
             breaker.reset()
     GLOBAL_HOST_THROTTLE.reset()
+    GLOBAL_HOST_COOLDOWN.reset()
     yield
     for path in _BREAKER_MODULES:
         mod = importlib.import_module(path)
@@ -44,3 +49,4 @@ def _reset_breakers():
         if breaker is not None:
             breaker.reset()
     GLOBAL_HOST_THROTTLE.reset()
+    GLOBAL_HOST_COOLDOWN.reset()
