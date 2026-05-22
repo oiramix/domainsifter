@@ -6,6 +6,16 @@ This document captures the current snapshot of the project. Update it whenever a
 
 ---
 
+## Deferred bugs
+
+Known bugs intentionally not fixed yet. Each entry names the trigger condition that would justify prioritizing it.
+
+### Global RDAP breaker is host-blind (noted 2026-05-22)
+
+`_BREAKER` in `scripts/enrichment/rdap.py` is a single `CircuitBreaker` instance shared across all RDAP hosts. Other hosts' successes reset `_consecutive_failures`, masking any single host's failures — a host can fail every request without ever tripping the breaker as long as other hosts are healthy and concurrent (buckets run in parallel). The per-host 429 cooldown (`feat/rdap-429-honor-retry-after`, 2026-05-22) sidesteps this for the rate-limit case, but a host-level failure accumulation from a different cause (e.g. transport errors, persistent 5xx) still wouldn't trip the breaker for the affected host. Refactor to per-host breakers if/when another host exhibits the pattern.
+
+---
+
 ## What is built and live
 
 ### Domain and DNS
