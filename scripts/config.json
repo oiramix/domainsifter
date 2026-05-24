@@ -34,7 +34,7 @@
     "domain_length": 0.1,
     "cc_source_domain_count": 0.3
   },
-  "_keyword_lists_doc": "Token-aware keyword blocklist, expanded 2026-05-17 after adult/piracy/gambling domains (african-sex.net, xtubecinema.xyz, hentai2.org, tinbongda360.net) reached the published list with Promising verdicts under the old substring matcher. Matching uses split-on-dots/hyphens/digit-letter-boundaries tokenization (see scripts/filter.py:_tokenize). rejected_keywords are exact-match. rejected_keyword_prefixes is a curated subset that ALSO does startswith() against coarse tokens for digit/letter-suffix bypasses (xtubecinema, porn99) — entries here MUST be unambiguous (no common-English-word prefix conflicts; 'cam'/'tube'/'sex'/'slot'/'poker'/'pirate' are intentionally NOT here). soft_signal_keywords do NOT reject — output.py reads them to force a 'Caution' verdict on dating/snake-oil/get-rich-quick/crypto-speculative names.",
+  "_keyword_lists_doc": "Keyword blocklist with three REJECT categories plus one SOFT-SIGNAL category. (1) rejected_keywords: exact-match against tokens split on dots/hyphens/digit-letter boundaries. (2) rejected_keyword_prefixes: startswith() against coarse tokens (curated subset of unambiguous abuse stems — 'cam'/'tube'/'sex'/'slot'/'poker'/'pirate' are intentionally NOT here because their English-word overlap was the 2026-05-17 migration's whole motivation). (3) rejected_keyword_substrings (added 2026-05-24, Round 1): substring match on the apex label, for scam-vertical stems where real-world spam concatenates the keyword into a longer compound name with no separator and no digit boundary (richmendating, miraclepills, onlinepharmacy) — none of those reach the token matchers. Curation rule for this list: entries MUST be ≥5 chars and compound-specific enough that incidental English-word overlap is rare. Known minor FPs: 'dating' catches 'updating', 'pills' catches 'pillsbury' — accepted because such names rarely drop. (4) soft_signal_keywords: do NOT reject — output.py reads them to force a 'Caution' verdict on dating/snake-oil/get-rich-quick/crypto-speculative names; 'dating' and 'hookup' are dead entries here as of 2026-05-24 (the substring reject fires first) but kept to avoid scope creep.",
   "rejected_keywords": [
     "sex", "sexy", "sexo", "sexe", "porn", "porno", "nude", "naked",
     "dildo", "fetish", "hentai", "milf", "tube", "webcam", "camgirl",
@@ -60,6 +60,10 @@
     "sbobet", "pkv", "tinbongda", "bolaonline",
     "repelis", "putlocker", "fmovies", "soap2day", "couchtuner",
     "solarmovie", "streameast", "cuevana", "gnula", "pelisplus", "pelispedia"
+  ],
+  "rejected_keyword_substrings": [
+    "dating", "forex", "hookup", "payday", "pharmacy", "pills",
+    "replica", "weightloss"
   ],
   "soft_signal_keywords": [
     "dating", "hookup", "singles", "tinder", "romance",

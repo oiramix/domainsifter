@@ -17,6 +17,10 @@ CONFIG = {
     "rejected_keyword_prefixes": [
         "porn", "hentai", "xtube", "tinbongda", "soap2day", "xxx",
     ],
+    "rejected_keyword_substrings": [
+        "dating", "forex", "hookup", "payday", "pharmacy", "pills",
+        "replica", "weightloss",
+    ],
     "soft_signal_keywords": [
         "dating", "singles", "pump", "moonshot",
     ],
@@ -193,9 +197,11 @@ def test_keep_accepts_mastermining_no_false_positive():
 def test_soft_signal_does_not_reject_in_filter():
     """Soft-signal matches do NOT reject. The verdict computation in
     output.py reads has_soft_signal() to force a Caution verdict, but
-    the candidate survives filter rejection."""
+    the candidate survives filter rejection. Demo uses 'singles' here —
+    'dating' moved to rejected_keyword_substrings 2026-05-24 and so
+    would hard-reject through `keep`."""
     keep, reason = filter_mod.keep(
-        _ok(name="singlesdatingsingles.net"), CONFIG,
+        _ok(name="urbansinglesgroup.net"), CONFIG,
     )
     assert keep is True
     assert reason is None
@@ -219,6 +225,99 @@ def test_has_soft_signal_tolerates_missing_config_key():
     returns False — never raises."""
     cfg = {"filter_thresholds": {}, "rejected_keywords": []}
     assert filter_mod.has_soft_signal("anything.com", cfg) is False
+
+
+# --- Substring rejection (Round 1, added 2026-05-24) -----------------------
+#
+# Eight scam-vertical keywords that production saw slip through the token
+# matchers because spam concatenates them into compound names (richmendating,
+# miraclepills, onlinepharmacy). Substring matching catches all of them.
+
+
+def test_substring_reject_dating_in_compound_apex():
+    """The production miss: richmendating.net — token model yields
+    {'richmendating', 'net'}; neither equals 'dating' and 'richmendating'
+    does not start with 'dating'. Substring catches it."""
+    keep, reason = filter_mod.keep(_ok(name="richmendating.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:dating"
+
+
+def test_substring_reject_hookup_in_compound_apex():
+    keep, reason = filter_mod.keep(_ok(name="casualhookup.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:hookup"
+
+
+def test_substring_reject_payday_in_middle_of_apex():
+    """'payday' sits in the middle of 'fastpaydaynow' — neither prefix
+    nor exact would catch it. Substring does."""
+    keep, reason = filter_mod.keep(_ok(name="fastpaydaynow.org"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:payday"
+
+
+def test_substring_reject_forex_at_start_of_apex():
+    keep, reason = filter_mod.keep(_ok(name="forextrading101.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:forex"
+
+
+def test_substring_reject_pills_in_compound_apex():
+    keep, reason = filter_mod.keep(_ok(name="miraclepills.shop"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:pills"
+
+
+def test_substring_reject_weightloss_in_compound_apex():
+    keep, reason = filter_mod.keep(_ok(name="fastweightloss.info"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:weightloss"
+
+
+def test_substring_reject_replica_at_start_of_apex():
+    keep, reason = filter_mod.keep(_ok(name="replicawatches.store"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:replica"
+
+
+def test_substring_reject_pharmacy_in_compound_apex():
+    keep, reason = filter_mod.keep(_ok(name="onlinepharmacy.org"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:pharmacy"
+
+
+def test_substring_reject_is_case_insensitive():
+    keep, reason = filter_mod.keep(_ok(name="ReplicaWatches.STORE"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:replica"
+
+
+def test_substring_reject_ignores_tld_label():
+    """The substring matcher looks at the apex only — .pharmacy is a real
+    TLD, and a clean 'siteshop' apex on it must not be flagged just
+    because the TLD characters happen to contain the keyword."""
+    cand = _ok(name="siteshop.pharmacy")
+    keep, reason = filter_mod.keep(cand, CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_substring_reject_does_not_match_clean_compound():
+    """marketglow.com (apex 'marketglow') contains none of the Round 1
+    substrings — must pass cleanly."""
+    keep, reason = filter_mod.keep(_ok(name="marketglow.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_substring_reject_tolerates_missing_config_key():
+    """When the config has no rejected_keyword_substrings key, the
+    structural filter falls through cleanly (empty default, no reject)."""
+    cfg = {k: v for k, v in CONFIG.items() if k != "rejected_keyword_substrings"}
+    keep, reason = filter_mod.keep(_ok(name="richmendating.net"), cfg)
+    assert keep is True
+    assert reason is None
 
 
 def test_tokenize_produces_expected_token_sets():

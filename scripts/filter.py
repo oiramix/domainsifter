@@ -22,10 +22,18 @@ Reject rules (any one triggers rejection):
     R2  single-character apex    — labels[0] length < min_domain_length
     R3  too long                 — labels[0] length > max_domain_length
     R4  all-numeric apex         — labels[0] is digits only
-    R5  rejected keyword         — token-aware match against
-                                   rejected_keywords (exact) OR
-                                   rejected_keyword_prefixes (startswith).
-                                   See `_matched_hard_keyword`.
+    R5  rejected keyword         — three match modes against the apex:
+                                   rejected_keywords (token-exact),
+                                   rejected_keyword_prefixes (token-
+                                   startswith, curated subset of
+                                   unambiguous abuse stems), and
+                                   rejected_keyword_substrings (substring
+                                   anywhere in the apex label — added
+                                   2026-05-24 for scam-vertical stems
+                                   that spam concatenates into compound
+                                   names with no separator). See
+                                   `_matched_hard_keyword` and
+                                   `_matched_substring_keyword`.
     R6  spam_flagged             — Safe Browsing match
     R7  surbl_listed             — SURBL match (only on `is True`)
     R8  spamhaus_listed          — Spamhaus DBL match (only on `is True`)
@@ -67,11 +75,24 @@ that false-positived 'essex' on 'sex', 'camera' on 'cam'):
                    suffix bypasses like xtubecinema, porn99, hentai77x
                    without false-positiving 'essex' on 'sex' (essex
                    doesn't start with 'sex').
+      substring  — keyword appears anywhere in the apex label. Applied
+                   to `rejected_keyword_substrings` only (added
+                   2026-05-24). The token matchers above cannot catch a
+                   keyword that real-world spam concatenates into a
+                   compound name with no separator and no digit boundary
+                   (richmendating, miraclepills, onlinepharmacy). Entries
+                   in this list MUST be (a) ≥5 chars and (b) compound-
+                   specific enough that English-word overlap is rare.
+                   Known minor FPs accepted: 'dating' catches 'updating',
+                   'pills' catches 'pillsbury' — such names rarely drop.
+                   See `_matched_substring_keyword`.
 
-    Soft signals (dating, snake-oil, get-rich-quick, crypto-speculative,
-    listed in `soft_signal_keywords`) use exact match only. They do NOT
-    reject the candidate at the filter — they're a flag the verdict
-    computation reads to force "Caution" (see output.py:_verdict).
+    Soft signals (snake-oil, get-rich-quick, crypto-speculative, listed
+    in `soft_signal_keywords`) use substring match too but do NOT reject —
+    they're a flag the verdict computation reads to force "Caution" (see
+    output.py:_compute_verdict). 'dating' / 'hookup' formerly lived only
+    here; as of 2026-05-24 they're hard-reject via the substring list
+    above and their soft-signal entries are dead but harmless.
 
 DNSBL three-state semantics (R7, R8): `surbl_listed` and `spamhaus_listed`
 can be True / False / None / missing. Only `is True` rejects; `None`
@@ -154,6 +175,41 @@ def _matched_hard_keyword(
     return None
 
 
+def _matched_substring_keyword(
+    name: str,
+    substring_keywords: list[str],
+) -> str | None:
+    """Return the substring-keyword that matches anywhere in the apex
+    label (case-insensitive), or None.
+
+    Distinct from `_matched_hard_keyword` (token-based exact + prefix) —
+    this is a third match mode for stems that real-world spam concatenates
+    INSIDE a longer word without separators (richmendating → 'dating',
+    miraclepills → 'pills', onlinepharmacy → 'pharmacy'). The token model
+    cannot catch these because there is no dot, no hyphen, and no
+    digit/letter boundary to split on.
+
+    Substring matching is dangerous for short generic words — the
+    2026-05-17 token migration existed precisely to fix 'essex'/'sex' and
+    'camera'/'cam' false positives. Entries in
+    `config.rejected_keyword_substrings` MUST be (a) ≥5 chars and
+    (b) compound-specific enough that incidental English-word overlap is
+    rare. See config.json `_keyword_lists_doc` for the curation rule.
+
+    Compares against the APEX label only (the part before the first dot);
+    same scope as `_matched_soft_signal`. The TLD label is intentionally
+    ignored so that e.g. `siteshop.pharmacy` (.pharmacy is a real TLD)
+    is not falsely flagged.
+    """
+    if not name or not substring_keywords:
+        return None
+    apex_lower = name.split(".", 1)[0].lower()
+    for kw in substring_keywords:
+        if kw and kw.lower() in apex_lower:
+            return kw.lower()
+    return None
+
+
 def _matched_soft_signal(name: str, soft_signal_keywords: list[str]) -> str | None:
     """Return the soft-signal keyword that matches (substring), or None.
 
@@ -215,6 +271,15 @@ def keep_structural(candidate: dict, config: dict) -> tuple[bool, str | None]:
     )
     if matched:
         return False, f"keyword:{matched}"
+
+    # Substring match — catches scam-vertical stems that compound names
+    # bury without separators (richmendating, miraclepills, onlinepharmacy).
+    # Uses the SAME `keyword:` reason prefix as exact/prefix so log
+    # aggregation in `_apply` groups them together.
+    substring_keywords = config.get("rejected_keyword_substrings", []) or []
+    matched_sub = _matched_substring_keyword(apex_label, substring_keywords)
+    if matched_sub:
+        return False, f"keyword:{matched_sub}"
 
     return True, None
 
