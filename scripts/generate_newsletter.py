@@ -429,6 +429,38 @@ def _pick_top_n(domains: list[dict], n: int) -> list[dict]:
     )[: max(0, n)]
 
 
+def _apply_per_tld_cap(domains: list[dict], max_per_tld: int) -> list[dict]:
+    """Bucket by TLD, keep top `max_per_tld` per bucket by (score desc, name asc),
+    then flatten. Order returned is grouped by TLD; the caller is expected to
+    score-sort afterwards (via _pick_top_n) before truncating to panel size.
+
+    max_per_tld <= 0 or None → no-op (returns input order unchanged). The slack
+    rule is implicit: TLDs with fewer than `max_per_tld` entries contribute
+    everything they have; remaining panel slots get filled by other TLDs'
+    entries via the downstream score-sort. No padding, no reservation.
+
+    Mirrors applyPerTldCap() in src/components/DomainTable.astro by design —
+    same input/output contract, same tie-break. The duplication is intentional
+    (Python ↔ TS, no shared module) and tests guarantee the algorithm stays
+    aligned. See config.display_caps._doc for the why.
+    """
+    if not max_per_tld or max_per_tld <= 0:
+        return list(domains)
+
+    by_tld: dict[str, list[dict]] = {}
+    for d in domains:
+        by_tld.setdefault(d.get("tld", ""), []).append(d)
+
+    kept: list[dict] = []
+    for entries in by_tld.values():
+        entries_sorted = sorted(
+            entries,
+            key=lambda d: (-int(d.get("score", 0) or 0), d.get("name", "")),
+        )
+        kept.extend(entries_sorted[:max_per_tld])
+    return kept
+
+
 def _filter_to_fresh_today(domains: list[dict]) -> list[dict]:
     """Return only domains whose `days_listed == 0` — the pipeline's marker
     for "first appeared in today's run." Carryover entries (days_listed
@@ -491,7 +523,16 @@ def generate_newsletter(
         )
         return {"status": "skipped_no_fresh"}
 
-    top_domains = _pick_top_n(fresh_today, top_n)
+    # Per-TLD diversity cap (added 2026-05-25). Applied BEFORE top-N truncation
+    # so a single TLD can't crowd out the score-sort. With panel=20 and cap=8,
+    # at most 8 entries from any one TLD appear; the remaining 12 slots fill
+    # by score across other TLDs. Slack is implicit — TLDs with fewer than the
+    # cap just contribute what they have. max_per_tld <= 0 disables the cap.
+    display_caps = config.get("display_caps", {}) or {}
+    max_per_tld = int(display_caps.get("max_per_tld_in_top_panel", 0) or 0)
+    capped = _apply_per_tld_cap(fresh_today, max_per_tld)
+
+    top_domains = _pick_top_n(capped, top_n)
     if not top_domains:
         logger.warning("top_n=%d yielded zero domains; skipping newsletter.", top_n)
         return {"status": "skipped_empty"}

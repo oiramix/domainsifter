@@ -257,6 +257,116 @@ def test_pick_top_n_handles_negative_n_as_zero():
 
 
 # ---------------------------------------------------------------------------
+# Per-TLD diversity cap (added 2026-05-25)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_per_tld_cap_clips_over_represented_tld():
+    """One TLD with 17 entries + one with 1 entry + cap=8 → kept set has
+    8 from the big TLD and 1 from the small TLD. Matches Mario's expected
+    eyeball-test transformation of today=17.net+1.org → 8.net+1.org."""
+    cands = (
+        [_domain(f"n{i:02d}.net", 100 - i, tld="net") for i in range(17)]
+        + [_domain("solo.org", 50, tld="org")]
+    )
+    out = gn._apply_per_tld_cap(cands, max_per_tld=8)
+    by_tld = {}
+    for d in out:
+        by_tld.setdefault(d["tld"], []).append(d)
+    assert len(by_tld["net"]) == 8
+    assert len(by_tld["org"]) == 1
+    # Top 8 .net by score: scores 100..93. Last 9 (.net scores 92..84) dropped.
+    kept_net_scores = sorted((d["score"] for d in by_tld["net"]), reverse=True)
+    assert kept_net_scores == [100, 99, 98, 97, 96, 95, 94, 93]
+
+
+def test_apply_per_tld_cap_noop_when_no_tld_exceeds_cap():
+    """All TLDs already at or below the cap → input order preserved by
+    TLD bucket (caller score-sorts afterwards). Length equals input length."""
+    cands = [
+        _domain("a.net", 90, tld="net"),
+        _domain("b.net", 80, tld="net"),
+        _domain("c.org", 70, tld="org"),
+        _domain("d.xyz", 60, tld="xyz"),
+    ]
+    out = gn._apply_per_tld_cap(cands, max_per_tld=8)
+    assert len(out) == 4
+    assert {d["name"] for d in out} == {"a.net", "b.net", "c.org", "d.xyz"}
+
+
+def test_apply_per_tld_cap_slack_flows_when_small_tld_short_of_cap():
+    """A TLD with fewer than `max_per_tld` candidates contributes everything
+    it has. The function itself doesn't decide the panel slot allocation —
+    that's the downstream score-sort + slice — but the slack-flow behaviour
+    relies on this returning the full short-TLD bucket so the caller has
+    raw material to choose from."""
+    cands = (
+        [_domain(f"n{i}.net", 100 - i, tld="net") for i in range(20)]  # 20 .net
+        + [_domain("o1.org", 95, tld="org"), _domain("o2.org", 85, tld="org")]  # 2 .org
+        + [_domain("x1.xyz", 92, tld="xyz")]                                      # 1 .xyz
+    )
+    out = gn._apply_per_tld_cap(cands, max_per_tld=8)
+    by_tld = {}
+    for d in out:
+        by_tld.setdefault(d["tld"], []).append(d)
+    assert len(by_tld["net"]) == 8
+    assert len(by_tld["org"]) == 2     # full short bucket preserved
+    assert len(by_tld["xyz"]) == 1     # full short bucket preserved
+
+
+def test_apply_per_tld_cap_keeps_highest_scoring_per_tld():
+    """Within each TLD bucket, highest score wins the cap slots. Quality-first
+    within the cap is the binding rule from the spec."""
+    cands = [
+        _domain("low.net",  10, tld="net"),
+        _domain("mid.net",  50, tld="net"),
+        _domain("hi.net",   90, tld="net"),
+        _domain("tied1.net", 70, tld="net"),
+        _domain("tied2.net", 70, tld="net"),
+    ]
+    out = gn._apply_per_tld_cap(cands, max_per_tld=2)
+    kept_names = {d["name"] for d in out}
+    # Top 2 by (score desc, name asc): hi.net (90) then tied1.net (70, name asc).
+    assert kept_names == {"hi.net", "tied1.net"}
+
+
+def test_apply_per_tld_cap_ties_broken_by_name_ascending():
+    """Documented tie-break — keeps the algorithm reproducible across runs
+    even when scores tie. Mirrors _pick_top_n's tie-break behaviour."""
+    cands = [
+        _domain("zulu.org",  70, tld="org"),
+        _domain("alpha.org", 70, tld="org"),
+        _domain("mike.org",  70, tld="org"),
+    ]
+    out = gn._apply_per_tld_cap(cands, max_per_tld=2)
+    names = [d["name"] for d in out]
+    # alpha < mike < zulu alphabetically → alpha and mike kept.
+    assert set(names) == {"alpha.org", "mike.org"}
+
+
+def test_apply_per_tld_cap_zero_disables_cap():
+    """max_per_tld=0 → no-op. Same input set returned (order may be
+    reordered by TLD bucket but contents are identical)."""
+    cands = [_domain(f"n{i}.net", 100 - i, tld="net") for i in range(20)]
+    out = gn._apply_per_tld_cap(cands, max_per_tld=0)
+    assert len(out) == 20
+    assert {d["name"] for d in out} == {d["name"] for d in cands}
+
+
+def test_apply_per_tld_cap_negative_disables_cap():
+    """Defensive: negative max_per_tld behaves like 0 (disabled). Prevents
+    a typo or test-fixture mistake from silently dropping every entry."""
+    cands = [_domain(f"n{i}.net", 100 - i, tld="net") for i in range(5)]
+    out = gn._apply_per_tld_cap(cands, max_per_tld=-1)
+    assert len(out) == 5
+
+
+def test_apply_per_tld_cap_empty_input():
+    """Empty list → empty list. Trivial but documents the contract."""
+    assert gn._apply_per_tld_cap([], max_per_tld=8) == []
+
+
+# ---------------------------------------------------------------------------
 # Fresh-today filter (added 2026-05-17)
 # ---------------------------------------------------------------------------
 
@@ -700,6 +810,123 @@ def test_generate_newsletter_top20_cap_within_fresh_set():
     # No carryover ever appears even though it scored 99.
     for i in range(10):
         assert f"c{i}.com" not in captured["body"]
+
+
+def test_generate_newsletter_applies_per_tld_cap_when_configured():
+    """End-to-end: when config.display_caps.max_per_tld_in_top_panel=8 is set
+    AND fresh today is dominated by one TLD, the draft body contains at most
+    8 entries from any single TLD. Mirrors the production scenario as of
+    2026-05-25: ~17 .net + a sprinkling of other TLDs."""
+    fresh_net = [_domain(f"n{i:02d}.net", 100 - i, tld="net") for i in range(17)]
+    fresh_org = [_domain("solo.org", 75, tld="org")]
+    fresh_xyz = [_domain("x1.xyz", 65, tld="xyz"), _domain("x2.xyz", 60, tld="xyz")]
+    fresh = fresh_net + fresh_org + fresh_xyz
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        captured["subject"] = json["subject"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    cfg = _config()
+    cfg["display_caps"] = {"max_per_tld_in_top_panel": 8}
+
+    out = gn.generate_newsletter(
+        cfg, {"domains": fresh},
+        api_key="KEY", today=date(2026, 5, 25), session=session,
+    )
+    assert out["status"] == "created"
+    # Top 8 .net by score (scores 100..93) appear; the remaining 9 .net don't.
+    for i in range(8):
+        assert f"n{i:02d}.net" in captured["body"]
+    for i in range(8, 17):
+        assert f"n{i:02d}.net" not in captured["body"], (
+            f"per-TLD cap leaked: 'n{i:02d}.net' (score {100 - i}) shipped "
+            f"despite 8 higher-scoring .net entries above it"
+        )
+    # Smaller-TLD entries below the cap survive untouched and fill slack slots.
+    assert "solo.org" in captured["body"]
+    assert "x1.xyz" in captured["body"]
+    assert "x2.xyz" in captured["body"]
+
+
+def test_generate_newsletter_per_tld_cap_disabled_by_default():
+    """Backward-compat: a config without display_caps behaves exactly as
+    before — score-sort across the fresh set, take top_n. The 17 .net
+    entries here would crowd out everything else under the old behaviour,
+    which is the very gap this feature exists to close; this test pins the
+    pre-feature behaviour for any caller that omits the block."""
+    fresh = [_domain(f"n{i:02d}.net", 100 - i, tld="net") for i in range(17)]
+    fresh += [_domain("solo.org", 50, tld="org")]  # lowest score, fills 18th slot
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    # No display_caps key — old behaviour preserved.
+    out = gn.generate_newsletter(
+        _config(), {"domains": fresh},
+        api_key="KEY", today=date(2026, 5, 25), session=session,
+    )
+    assert out["status"] == "created"
+    # All 17 .net appear (top_n=20 is the only ceiling), plus solo.org.
+    for i in range(17):
+        assert f"n{i:02d}.net" in captured["body"]
+    assert "solo.org" in captured["body"]
+
+
+def test_generate_newsletter_per_tld_cap_no_effect_below_panel_size():
+    """When fresh-today is small enough that no TLD has more than cap
+    entries, the per-TLD cap doesn't bite. Body matches what you'd get
+    without the cap. Same backward-compat guarantee as the disabled case,
+    but at runtime instead of via config absence."""
+    fresh = [
+        _domain("a.net", 90, tld="net"),
+        _domain("b.net", 80, tld="net"),
+        _domain("c.org", 70, tld="org"),
+        _domain("d.xyz", 60, tld="xyz"),
+    ]
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    cfg = _config()
+    cfg["display_caps"] = {"max_per_tld_in_top_panel": 8}
+
+    out = gn.generate_newsletter(
+        cfg, {"domains": fresh},
+        api_key="KEY", today=date(2026, 5, 25), session=session,
+    )
+    assert out["status"] == "created"
+    for name in ("a.net", "b.net", "c.org", "d.xyz"):
+        assert name in captured["body"]
 
 
 def test_generate_newsletter_dry_run_returns_body_no_post():

@@ -1,5 +1,6 @@
 ---
 import samplePayload from '../data/sample-domains.json';
+import pipelineConfig from '../../scripts/config.json';
 
 // Pipeline output (locked schema — PLAN.md Principle 5).
 // Migrations applied:
@@ -80,21 +81,72 @@ const allDomains = payload.domains;
 // is a presentation gate, not a data gate, so future paid-tier surfaces can
 // read the JSON unmodified. If a card has fewer than N qualifying entries
 // (low-drop day, early-week carryover), the slice is a no-op.
+//
+// Per-TLD diversity cap (2026-05-25): on top of the panel size cap, each TLD
+// is limited to MAX_PER_TLD entries per panel — applied INDEPENDENTLY for
+// today and carryover. Mirrors scripts.generate_newsletter._apply_per_tld_cap.
+// max_per_tld <= 0 disables the cap (no-op).
 const PUBLIC_DOMAIN_CAP = 30;
+const MAX_PER_TLD =
+  Number(pipelineConfig?.display_caps?.max_per_tld_in_top_panel ?? 0) || 0;
+
 const byScoreDesc = (a: PipelineDomain, b: PipelineDomain): number =>
   (b.score ?? 0) - (a.score ?? 0);
-const todayDomains = allDomains
+const byScoreThenName = (a: PipelineDomain, b: PipelineDomain): number => {
+  const cmp = (b.score ?? 0) - (a.score ?? 0);
+  if (cmp !== 0) return cmp;
+  return (a.name ?? '').localeCompare(b.name ?? '');
+};
+
+// Bucket by TLD, keep top max_per_tld within each bucket (score desc, name asc),
+// flatten. Caller score-sorts and truncates to panel size next. Slack flows
+// implicitly via the downstream score-sort: TLDs short of the cap just
+// contribute what they have, freeing slots for other TLDs by score.
+const applyPerTldCap = (
+  domains: PipelineDomain[],
+  maxPerTld: number,
+): PipelineDomain[] => {
+  if (!maxPerTld || maxPerTld <= 0) return domains.slice();
+  const byTld = new Map<string, PipelineDomain[]>();
+  for (const d of domains) {
+    const tld = d.tld ?? '';
+    const bucket = byTld.get(tld);
+    if (bucket) bucket.push(d);
+    else byTld.set(tld, [d]);
+  }
+  const kept: PipelineDomain[] = [];
+  for (const bucket of byTld.values()) {
+    bucket.sort(byScoreThenName);
+    kept.push(...bucket.slice(0, maxPerTld));
+  }
+  return kept;
+};
+
+const todayUncapped = allDomains
   .filter((d) => (d.days_listed ?? 0) === 0)
-  .sort(byScoreDesc)
-  .slice(0, PUBLIC_DOMAIN_CAP);
-const carryoverDomains = allDomains
+  .sort(byScoreDesc);
+const carryoverUncapped = allDomains
   .filter((d) => (d.days_listed ?? 0) > 0)
-  .sort(byScoreDesc)
-  .slice(0, PUBLIC_DOMAIN_CAP);
-const todayCountUncapped = allDomains.filter((d) => (d.days_listed ?? 0) === 0).length;
-const carryoverCountUncapped = allDomains.filter((d) => (d.days_listed ?? 0) > 0).length;
-const todayIsCapped = todayCountUncapped > PUBLIC_DOMAIN_CAP;
-const carryoverIsCapped = carryoverCountUncapped > PUBLIC_DOMAIN_CAP;
+  .sort(byScoreDesc);
+
+const todayAfterTldCap = applyPerTldCap(todayUncapped, MAX_PER_TLD).sort(byScoreDesc);
+const carryoverAfterTldCap = applyPerTldCap(carryoverUncapped, MAX_PER_TLD).sort(byScoreDesc);
+
+const todayDomains = todayAfterTldCap.slice(0, PUBLIC_DOMAIN_CAP);
+const carryoverDomains = carryoverAfterTldCap.slice(0, PUBLIC_DOMAIN_CAP);
+
+const todayCountUncapped = todayUncapped.length;
+const carryoverCountUncapped = carryoverUncapped.length;
+
+// "Capped" now means EITHER the per-TLD cap dropped entries OR the panel size
+// dropped entries. Per-TLD cap fired when applyPerTldCap shrunk the set;
+// panel cap fired when the post-cap set still exceeded PUBLIC_DOMAIN_CAP.
+const todayIsCapped =
+  todayUncapped.length > todayAfterTldCap.length ||
+  todayAfterTldCap.length > PUBLIC_DOMAIN_CAP;
+const carryoverIsCapped =
+  carryoverUncapped.length > carryoverAfterTldCap.length ||
+  carryoverAfterTldCap.length > PUBLIC_DOMAIN_CAP;
 
 const lastUpdatedLabel = isPreview
   ? 'Preview data'
@@ -223,7 +275,16 @@ const carryoverSubheader = (n: number): string => {
       </p>
       {(todayIsCapped || carryoverIsCapped) && (
         <p class="mt-2 text-xs text-stone-500" data-cap-notice>
-          Showing top {PUBLIC_DOMAIN_CAP} by score per panel.
+          {MAX_PER_TLD > 0 ? (
+            <>
+              Diversified across TLDs (max {MAX_PER_TLD} per TLD).
+              <span class="text-stone-600"> See the </span>
+              <a href="/archive" class="text-accent hover:underline">archive</a>
+              <span class="text-stone-600"> for the full list.</span>
+            </>
+          ) : (
+            `Showing top ${PUBLIC_DOMAIN_CAP} by score per panel.`
+          )}
           <span class="text-stone-400"> · </span>
           <a href="#signup" class="text-accent hover:underline">Subscribe to the daily newsletter</a>
           <span class="text-stone-600"> for top 20 picks delivered each morning.</span>
