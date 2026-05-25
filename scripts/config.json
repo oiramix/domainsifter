@@ -112,6 +112,10 @@
   "max_candidates_for_publication": 300,
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,
+  "display_caps": {
+    "_doc": "Per-TLD ceiling applied at the DISPLAY layer only (homepage Today/Recent panels and the Buttondown newsletter top-N). Pipeline output daily-domains.json stays score-pure — this knob never touches the JSON contract. Rationale (2026-05-25): the published list is heavily .net-skewed because .net has Wayback content where other approved TLDs often don't. With ~232 entries across 14 TLDs and ~170 .net, a naive score-desc top-30 panel was rendering 25+ .net rows and creating an honesty gap against the 'curated across 15 TLDs' methodology copy. Algorithm: bucket by TLD, take top-N per TLD by score (slack flows naturally — TLDs with fewer than N just contribute what they have), flatten, score-sort, take panel size. Cap fires INDEPENDENTLY per surface: Today panel, Recent panel, newsletter top-N each see their own bucket. Tighten the cap (8→6) only if smaller TLDs still get crowded out; loosen (8→12) only if production data shows the cap is starving small-TLD slots without improving diversity. The newsletter and homepage may diverge later but share the same 8 for now (homepage panel=30, newsletter panel=20 from newsletter.top_n).",
+    "max_per_tld_in_top_panel": 8
+  },
   "verdict_thresholds": {
     "_doc": "Tightened 2026-05-17. Promising used to be earned by score >= 40 alone; the tag became meaningless when ~all published rows wore it (89/89 on 2026-05-16). New bar requires significant historical web presence (wayback >= 1000) AND at least one external authority signal (OPR >= 1.5 OR CC backlinks >= 10). Candidates clearing only the score threshold demote to Caution instead. Clean (the top tier) is unchanged — score >= 70 wins. Soft-signal keyword matches (dating, snake-oil, get-rich-quick, crypto-speculative) force Caution regardless of the above. Verdict is computed in scripts/output.py:_compute_verdict and serialized as a JSON field — frontend and newsletter read it instead of recomputing from score (single source of truth).",
     "clean_min_score": 70,
