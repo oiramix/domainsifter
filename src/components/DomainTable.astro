@@ -275,9 +275,16 @@ const carryoverSubheader = (n: number): string => {
       </p>
       {(todayIsCapped || carryoverIsCapped) && (
         <p class="mt-2 text-xs text-stone-500" data-cap-notice>
-          {MAX_PER_TLD > 0
-            ? `Showing top ${PUBLIC_DOMAIN_CAP} by score per panel, capped at ${MAX_PER_TLD} per TLD for diversity.`
-            : `Showing top ${PUBLIC_DOMAIN_CAP} by score per panel.`}
+          {MAX_PER_TLD > 0 ? (
+            <>
+              Diversified across TLDs (max {MAX_PER_TLD} per TLD).
+              <span class="text-stone-600"> See the </span>
+              <a href="/archive" class="text-accent hover:underline">archive</a>
+              <span class="text-stone-600"> for the full list.</span>
+            </>
+          ) : (
+            `Showing top ${PUBLIC_DOMAIN_CAP} by score per panel.`
+          )}
           <span class="text-stone-400"> · </span>
           <a href="#signup" class="text-accent hover:underline">Subscribe to the daily newsletter</a>
           <span class="text-stone-600"> for top 20 picks delivered each morning.</span>
