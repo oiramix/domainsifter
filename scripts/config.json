@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "tlds": {
-    "_doc": "memory architecture issue on GHA — .com 160M apex names exceeds 16 GB runner RAM during set-based parsing. Migration to OVH KS-6 dedicated server (128 GB RAM, 16-core AMD EPYC 7351p) ordered 2026-05-10 to address; .com will be re-enabled after migration validates.",
+    "_doc": ".com re-added to approved on 2026-05-26 after the OVH KS-6 migration (128 GB RAM, 16-core EPYC 7351p) validated 5 consecutive clean natural-cron runs 2026-05-22 → 2026-05-26 on the new architecture (Phase 4 snapshot classifier, RDAP 429 cooldown handling, keyword denylist Round 1, per-TLD display cap). Pre-.com memory_peak holds at 3.87 GB; .com parse is expected to push to 15-25 GB during set-build, still well within budget. Cold-start handled by scripts/diff.py — first .com run writes the R2 baseline only (0 drops reported); first real .com diff lands 2026-05-28. The original 2026-05-10 OOM that forced .com to pending happened on the 16 GB GHA runner; that hardware constraint is gone now that the pipeline runs on the dedicated OVH host.",
     "approved": [
       "app",
       "dev",
@@ -16,9 +16,10 @@
       "org",
       "shop",
       "biz",
-      "net"
+      "net",
+      "com"
     ],
-    "pending": ["com"]
+    "pending": []
   },
   "filter_thresholds": {
     "min_wayback_snapshots": 1,
