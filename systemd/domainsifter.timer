@@ -1,23 +1,23 @@
-# Timer for daily DomainSifter pipeline run — fires at 06:30 UTC daily.
+# Timer for daily DomainSifter pipeline run — fires at 09:00 UTC daily.
 # Was previously triggered by the Cloudflare Worker domainsifter-cron-trigger,
 # which dispatched the GHA workflow via the GitHub API. Migrated to OVH
 # systemd on 2026-05-11 because GHA's 16 GB RAM ceiling can't parse the
 # .com zone (~15.5 GB peak; see 2026-05-10 STATE.md entry).
 #
 # The Cloudflare Worker MUST be disabled at the Cloudflare dashboard before
-# 06:30 UTC tomorrow, or both schedulers will race and the second push
+# 09:00 UTC tomorrow, or both schedulers will race and the second push
 # will be rejected.
 #
-# Persistent=true means if the server was down at 06:30 UTC, the timer fires
+# Persistent=true means if the server was down at 09:00 UTC, the timer fires
 # immediately on next boot rather than waiting until the following day.
 #
 # INSTALL: see systemd/domainsifter.service for the install procedure.
 
 [Unit]
-Description=Run DomainSifter daily pipeline at 06:30 UTC
+Description=Run DomainSifter daily pipeline at 09:00 UTC
 
 [Timer]
-OnCalendar=*-*-* 06:30:00 UTC
+OnCalendar=*-*-* 09:00:00 UTC
 Persistent=true
 Unit=domainsifter.service
 
