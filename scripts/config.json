@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "tlds": {
-    "_doc": ".com re-added to approved on 2026-05-26 after the OVH KS-6 migration (128 GB RAM, 16-core EPYC 7351p) validated 5 consecutive clean natural-cron runs 2026-05-22 → 2026-05-26 on the new architecture (Phase 4 snapshot classifier, RDAP 429 cooldown handling, keyword denylist Round 1, per-TLD display cap). Pre-.com memory_peak holds at 3.87 GB; .com parse is expected to push to 15-25 GB during set-build, still well within budget. Cold-start handled by scripts/diff.py — first .com run writes the R2 baseline only (0 drops reported); first real .com diff lands 2026-05-28. The original 2026-05-10 OOM that forced .com to pending happened on the 16 GB GHA runner; that hardware constraint is gone now that the pipeline runs on the dedicated OVH host.",
+    "_doc": ".com re-added to approved on 2026-05-26 after the OVH KS-6 migration (128 GB RAM, 16-core EPYC 7351p) validated 5 consecutive clean natural-cron runs 2026-05-22 → 2026-05-26 on the new architecture (Phase 4 snapshot classifier, RDAP 429 cooldown handling, keyword denylist Round 1, per-TLD display cap). Pre-.com memory_peak holds at 3.87 GB; .com parse is expected to push to 15-25 GB during set-build, still well within budget. Cold-start handled by scripts/diff.py — first .com run writes the R2 baseline only (0 drops reported); first real .com diff lands 2026-05-28. The original 2026-05-10 OOM that forced .com to pending happened on the 16 GB GHA runner; that hardware constraint is gone now that the pipeline runs on the dedicated OVH host. .shop moved to pending on 2026-06-01: GMO RDAP IP-block (rdap.gmoregistry.net rejects our OVH IP at the Cloudflare edge with instant 429), whitelist request pending with info@gmoregistry.com since 2026-05-30. Today's run spent ~45 min (09:43–10:27) fighting GMO 429 cooldowns and produced 0 available / 23 not_available / 275 unknown from the bucket; temporary removal stops the daily time bleed. Re-add to approved when the whitelist is granted — verified via IANA RDAP bootstrap that .shop is the only currently-approved TLD routed through rdap.gmoregistry.net (the other 45 GMO-served TLDs are brand/geo TLDs we don't have CZDS access to). Carryover .shop entries already in daily-domains.json will age out naturally over the 14-day rolling window; no backfill needed.",
     "approved": [
       "app",
       "dev",
@@ -14,12 +14,11 @@
       "xyz",
       "info",
       "org",
-      "shop",
       "biz",
       "net",
       "com"
     ],
-    "pending": []
+    "pending": ["shop"]
   },
   "filter_thresholds": {
     "min_wayback_snapshots": 1,
