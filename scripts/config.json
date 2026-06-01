@@ -112,6 +112,19 @@
   "max_candidates_for_publication": 300,
   "publish_min_score": 30,
   "publish_min_enrichment_completeness": 0.50,
+  "phase2": {
+    "_doc": "LLM-based name-quality ranker (Haiku) inserted between the lexical filter and the RDAP availability check. Replaces the per-host random-shuffle trim with quality-ordered selection. Wires LIVE in tomorrow's production run (enabled=true on 2026-06-02). Fallback is wired to FAILURE ONLY — never to thin yield. Triggers: API error, cost-ceiling-hit-before-min-eligible, uncaught exception, missing ANTHROPIC_API_KEY. Per product policy 'smaller but cleaner is better', min_eligible defaults to 10 so a thin-but-valid day publishes a short quality list rather than reverting to a longer mechanical one. Budget enforcement is two-layer: (a) planned, via target_n = floor(daily_budget_usd / cost_per_1000_planning_usd * 1000); (b) runtime, a thread-safe cost meter halts further batches at 95% of daily_budget_usd. Pricing constants in scripts/phase2_ranker.py PRICE_*_PER_MTOK; cost_per_1000_planning_usd is the BUDGETED rate (with retry-pass + drift headroom over the diagnostic-measured ~$0.19/1k). Overflow (above-gate candidates that don't fit any RDAP bucket) is persisted to R2 at state/phase2_overflow.jsonl with first_seen_date, aged out at 14 days — same rolling window as carryover. NOT committed to the repo: this is the public domainsifter repo and overflow is private pick-pool data. Tunable: daily_budget_eur (cap), score_gate (eligibility threshold), min_eligible (fallback floor — keep low to honor thin-but-quality days), batch_size (smaller batches reduce Haiku JSON truncation; 15 is post-diagnostic calibration). Diagnostic that validated the prompt + cost + quality lives in scratch/haiku_ranker_diagnostic/ (untracked).",
+    "enabled": true,
+    "daily_budget_eur": 3.0,
+    "eur_to_usd": 1.08,
+    "cost_per_1000_planning_usd": 0.25,
+    "score_gate": 60,
+    "min_eligible": 10,
+    "model": "claude-haiku-4-5-20251001",
+    "batch_size": 15,
+    "concurrency": 6,
+    "max_retry_passes": 1
+  },
   "display_caps": {
     "_doc": "Per-TLD ceiling applied at the DISPLAY layer only (homepage Today/Recent panels and the Buttondown newsletter top-N). Pipeline output daily-domains.json stays score-pure — this knob never touches the JSON contract. Rationale (2026-05-25): the published list is heavily .net-skewed because .net has Wayback content where other approved TLDs often don't. With ~232 entries across 14 TLDs and ~170 .net, a naive score-desc top-30 panel was rendering 25+ .net rows and creating an honesty gap against the 'curated across 15 TLDs' methodology copy. Algorithm: bucket by TLD, take top-N per TLD by score (slack flows naturally — TLDs with fewer than N just contribute what they have), flatten, score-sort, take panel size. Cap fires INDEPENDENTLY per surface: Today panel, Recent panel, newsletter top-N each see their own bucket. Tighten the cap (8→6) only if smaller TLDs still get crowded out; loosen (8→12) only if production data shows the cap is starving small-TLD slots without improving diversity. The newsletter and homepage may diverge later but share the same 8 for now (homepage panel=30, newsletter panel=20 from newsletter.top_n).",
     "max_per_tld_in_top_panel": 8
