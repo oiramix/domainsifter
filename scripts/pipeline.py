@@ -80,6 +80,7 @@ from scripts import (
     filter as filter_mod,
     lexical_filter,
     output,
+    phase2_ranker,
     score,
     snapshot_classifier,
     zone_parser,
@@ -685,14 +686,36 @@ def _bucket_and_cap_for_availability(
         workers = _resolve_host_workers(host, config)
         before = len(group)
         if before > cap:
-            rng = random.Random(seed)
-            rng.shuffle(group)
-            group = group[:cap]
-            logger.warning(
-                "RDAP host bucket [%s]: %d candidates exceed cap %d (throttle=%.2fs, workers=%d); "
-                "random-shuffle trim",
-                host, before, cap, throttle, workers,
-            )
+            # Phase 2 ranker (2026-06-02): if any candidate in this bucket
+            # carries a `phase2_score`, sort by score desc and take the top
+            # `cap` slots — quality-driven selection. Otherwise (no scores,
+            # ranker disabled / fallback / cost-ceiling-below-min-eligible)
+            # use the existing random-shuffle path bit-for-bit. This keeps
+            # the mechanical-selection fallback parity guaranteed.
+            scored_present = any("phase2_score" in c for c in group)
+            if scored_present:
+                group.sort(
+                    key=lambda c: (
+                        -int(c.get("phase2_score", 0)),
+                        c.get("name", ""),
+                    )
+                )
+                group = group[:cap]
+                logger.warning(
+                    "RDAP host bucket [%s]: %d candidates exceed cap %d "
+                    "(throttle=%.2fs, workers=%d); phase2 score-desc trim "
+                    "kept top %d",
+                    host, before, cap, throttle, workers, len(group),
+                )
+            else:
+                rng = random.Random(seed)
+                rng.shuffle(group)
+                group = group[:cap]
+                logger.warning(
+                    "RDAP host bucket [%s]: %d candidates exceed cap %d (throttle=%.2fs, workers=%d); "
+                    "random-shuffle trim",
+                    host, before, cap, throttle, workers,
+                )
         final.extend(group)
         stats[host] = {
             "before": before,
@@ -919,6 +942,29 @@ def main(argv: list[str] | None = None) -> int:
         structural_kept, config, rejections_out=lexical_rejections,
     )
 
+    # Stage 2b: Phase 2 LLM name-quality ranker (2026-06-02). Pre-narrows
+    # to what the daily budget can rank, sends to Haiku for 0-100 scoring,
+    # gates at score_gate (default 60), and returns the above-gate set
+    # sorted by score desc with `phase2_score` + `phase2_reason` fields
+    # attached. _bucket_and_cap_for_availability detects the score field
+    # presence and sorts each over-cap RDAP bucket by score desc instead
+    # of random-shuffle — quality-driven RDAP selection.
+    #
+    # Fallback is wired to FAILURE only (per product policy "smaller but
+    # cleaner is better"): API error, cost-ceiling-below-min-eligible,
+    # uncaught exception, or missing API key trigger fallback. Thin yield
+    # (above-gate count < publish floor) does NOT trigger fallback as long
+    # as it clears phase2.min_eligible (default 10) — the ranker drives a
+    # short quality list rather than reverting to a longer mechanical one.
+    #
+    # When status mode is 'disabled' or 'fallback', the returned list is
+    # `lexical_kept` unchanged (no phase2_score field), so the bucket-and-cap
+    # below runs its existing random-shuffle path bit-for-bit. Test #16
+    # in tests/test_phase2_ranker.py is the regression guard for that parity.
+    candidates_for_bucketing, phase2_status = phase2_ranker.rank_and_select(
+        lexical_kept, config, today=today,
+    )
+
     # Bucket lexical survivors by RDAP host and apply per-host caps derived
     # from the configured runtime budget (availability_check.max_runtime_per_host_seconds).
     # global_cap overflow (when lexical survivors > 15k) is trimmed by
@@ -926,7 +972,18 @@ def main(argv: list[str] | None = None) -> int:
     # ~3-7k candidates discarded on overflow days should be the lowest-
     # quality by the available pre-enrichment signals.
     candidates_to_evaluate, per_host_stats = _bucket_and_cap_for_availability(
-        lexical_kept, config, today=today,
+        candidates_for_bucketing, config, today=today,
+    )
+
+    # Phase 2 overflow: above-gate candidates that didn't fit any RDAP bucket
+    # get persisted to R2 (state/phase2_overflow.jsonl, aged out at 14 days)
+    # for a future second RDAP pass or paid-tier consumer. No-op when status
+    # is 'disabled' or 'fallback'. Side-effect only; R2 errors are logged
+    # and swallowed — never block the daily run on this step.
+    phase2_ranker.record_overflow(
+        above_gate=candidates_for_bucketing,
+        selected_for_rdap=candidates_to_evaluate,
+        config=config, today=today, status=phase2_status,
     )
     total_evaluated = len(candidates_to_evaluate)
     logger.info(
