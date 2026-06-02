@@ -78,6 +78,112 @@ def test_count_tld_failures_matches_pipeline_log_lines():
     assert send_report._count_tld_failures(log) == 2
 
 
+# --- RDAP 429 strikes / stops / 403 alarms ----------------------------------
+
+_STRIKE_LINE_1 = (
+    "429 from rdap.verisign.com — strike 1/3: honored 5s cooldown "
+    "(Retry-After header='0'), resuming this host at its normal pace."
+)
+_STRIKE_LINE_3 = (
+    "429 from rdap.verisign.com — strike 3/3: STRIKE LIMIT reached, STOPPING "
+    "this host for the rest of the run (no resume). Honored 5s cooldown "
+    "(Retry-After header='0'). Other RDAP hosts continue normally."
+)
+_STOP_LINE = (
+    "RDAP host [rdap.verisign.com] STOPPED (429) after 312.5s into its bucket "
+    "— 412/1350 candidates checked before the stop, 938 left UNCHECKED "
+    "(never queried). Other hosts unaffected."
+)
+_403_STOP_LINE = (
+    "RDAP host [rdap.gmoregistry.net] STOPPED (403) after 5.0s into its bucket "
+    "— 1/40 candidates checked before the stop, 39 left UNCHECKED "
+    "(never queried). Other hosts unaffected."
+)
+_403_LINE = (
+    "RDAP 403 FORBIDDEN from rdap.verisign.com on blocked.com — CATASTROPHIC "
+    "IP-BLOCK signal (NOT a rate limit). Stopping this host for the run. "
+    "INVESTIGATE IMMEDIATELY: the registry has likely blocked our egress IP."
+)
+
+
+def test_rdap_429_strikes_counts_every_strike():
+    log = _STRIKE_LINE_1 + "\n" + _STRIKE_LINE_3 + "\nunrelated line\n"
+    assert send_report._rdap_429_strikes(log) == 2
+
+
+def test_rdap_429_strikes_zero_on_clean_run():
+    assert send_report._rdap_429_strikes("clean\nno strikes\n") == 0
+
+
+def test_rdap_429_stops_matches_only_429_stop_lines():
+    """The stop scanner counts hosts that hit the 429 strike limit — a 403
+    hard-stop line (STOPPED (403)) is NOT a 429 stop and must be excluded."""
+    log = (
+        _STOP_LINE + "\n"
+        + _403_STOP_LINE + "\n"
+        "RDAP host bucket [rdap.org.example] done in 900.0s: 12 available\n"  # not a stop
+    )
+    stops = send_report._rdap_429_stops(log)
+    assert len(stops) == 1  # only the (429) line
+    assert "rdap.verisign.com" in stops[0] and "938 left UNCHECKED" in stops[0]
+
+
+def test_rdap_429_stops_empty_on_clean_run():
+    assert send_report._rdap_429_stops("a clean log\nno stops here\n") == []
+
+
+def test_rdap_429_stops_empty_when_only_strikes_no_stop():
+    """A 'recovered' day (strikes but no host hit the limit) shows 0 stops."""
+    assert send_report._rdap_429_stops(_STRIKE_LINE_1 + "\n") == []
+
+
+def test_rdap_403_alarms_matches_critical_lines():
+    log = "some line\n" + _403_LINE + "\nanother line\n"
+    alarms = send_report._rdap_403_alarms(log)
+    assert len(alarms) == 1
+    assert "rdap.verisign.com" in alarms[0]
+
+
+def test_rdap_403_alarms_empty_when_only_429s():
+    """A 429 strike/stop must NOT be mistaken for a 403 block."""
+    assert send_report._rdap_403_alarms(_STOP_LINE + "\n" + _STRIKE_LINE_3 + "\n") == []
+
+
+def test_build_email_403_escalates_subject_and_header(required_env):
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_403_LINE + "\n", duration_sec=42.0,
+    )
+    assert "🚨 RDAP 403 BLOCK" in msg["Subject"]
+    body = msg.get_content()
+    assert "RDAP 403 blocks  : 1" in body
+    assert "CATASTROPHIC IP-BLOCK DETECTED" in body
+
+
+def test_build_email_recovered_day_shows_strikes_no_stop_no_alarm(required_env):
+    """1 strike, recovered: header shows the strike, zero stops, no subject alarm."""
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_STRIKE_LINE_1 + "\n", duration_sec=42.0,
+    )
+    assert "🚨" not in msg["Subject"]
+    body = msg.get_content()
+    assert "RDAP 429 strikes : 1" in body
+    assert "RDAP 429 stops   : 0" in body
+
+
+def test_build_email_strike_limit_day_shows_stop_no_subject_alarm(required_env):
+    """Host hit the limit: strikes counted, 1 stop shown, but only 403 escalates
+    the subject — a 429 stop does not."""
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_STRIKE_LINE_1 + "\n" + _STRIKE_LINE_3 + "\n" + _STOP_LINE + "\n",
+        duration_sec=42.0,
+    )
+    assert "🚨" not in msg["Subject"]
+    body = msg.get_content()
+    assert "RDAP 429 strikes : 2" in body
+    assert "RDAP 429 stops   : 1" in body
+    assert "938 left UNCHECKED" in body
+
+
 # --- truncation ------------------------------------------------------------
 
 

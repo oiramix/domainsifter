@@ -16,8 +16,11 @@ import pytest
 from scripts.enrichment._circuit_breaker import (
     CircuitBreaker,
     GLOBAL_HOST_COOLDOWN,
+    GLOBAL_HOST_STOP,
+    GLOBAL_HOST_STRIKES,
     HostCooldown,
-    MAX_429_SLEEP_SECONDS,
+    HostStop,
+    HostStrikes,
     parse_retry_after,
     request_with_429_backoff,
 )
@@ -593,6 +596,108 @@ def test_cooldown_reset_clears_state():
     assert not cd.is_cooling("h.example")
 
 
+# --- HostStop (run-scoped 429/403 kill-switch) -------------------------------
+
+
+def test_stop_unknown_host_not_stopped():
+    hs = HostStop()
+    assert not hs.is_stopped("never-seen.example")
+
+
+def test_stop_marks_host_stopped():
+    hs = HostStop()
+    hs.stop("h.example", reason="429")
+    assert hs.is_stopped("h.example")
+
+
+def test_stop_does_not_expire_unlike_cooldown():
+    """Unlike HostCooldown, a stop has no time window — once set it stays set
+    for the life of the instance (the run). is_stopped is not time-based."""
+    clk = _FloatClock()
+    hs = HostStop()
+    hs.stop("h.example", reason="429", clock=clk)
+    clk.advance(100_000.0)
+    assert hs.is_stopped("h.example")
+
+
+def test_stop_other_host_unaffected():
+    hs = HostStop()
+    hs.stop("a.example", reason="429")
+    assert hs.is_stopped("a.example")
+    assert not hs.is_stopped("b.example")
+
+
+def test_stop_first_reason_wins():
+    """A later 403 must not overwrite the original 429's recorded reason/time
+    (or vice versa) — the first trip is the diagnostic of record."""
+    clk = _FloatClock()
+    hs = HostStop()
+    clk.advance(5.0)
+    hs.stop("h.example", reason="429", clock=clk)
+    first = hs.stopped_hosts()["h.example"]
+    clk.advance(100.0)
+    hs.stop("h.example", reason="403", clock=clk)
+    assert hs.stopped_hosts()["h.example"] == first
+    assert hs.stopped_hosts()["h.example"][1] == "429"
+
+
+def test_stop_records_reason_and_time():
+    clk = _FloatClock(start=42.0)
+    hs = HostStop()
+    hs.stop("h.example", reason="403", clock=clk)
+    mono, reason = hs.stopped_hosts()["h.example"]
+    assert reason == "403"
+    assert abs(mono - 42.0) < 1e-9
+
+
+def test_stop_reset_clears_state():
+    hs = HostStop()
+    hs.stop("h.example", reason="429")
+    assert hs.is_stopped("h.example")
+    hs.reset()
+    assert not hs.is_stopped("h.example")
+
+
+# --- HostStrikes (cumulative per-host 429 counter) ---------------------------
+
+
+def test_strikes_unknown_host_is_zero():
+    assert HostStrikes().count("never-seen.example") == 0
+
+
+def test_strikes_record_increments_and_returns_total():
+    hs = HostStrikes()
+    assert hs.record("h.example") == 1
+    assert hs.record("h.example") == 2
+    assert hs.record("h.example") == 3
+    assert hs.count("h.example") == 3
+
+
+def test_strikes_are_per_host():
+    hs = HostStrikes()
+    hs.record("a.example")
+    hs.record("a.example")
+    hs.record("b.example")
+    assert hs.count("a.example") == 2
+    assert hs.count("b.example") == 1
+
+
+def test_strikes_total_sums_across_hosts():
+    hs = HostStrikes()
+    hs.record("a.example")
+    hs.record("a.example")
+    hs.record("b.example")
+    assert hs.total() == 3
+
+
+def test_strikes_reset_clears_state():
+    hs = HostStrikes()
+    hs.record("h.example")
+    assert hs.count("h.example") == 1
+    hs.reset()
+    assert hs.count("h.example") == 0
+
+
 # --- request_with_429_backoff: RETRY-AFTER MODE ------------------------------
 
 
@@ -605,8 +710,11 @@ def _resp429(retry_after=None):
     return r
 
 
-def test_retry_after_mode_one_retry_then_success():
-    """First 429 → wait the floored cooldown → ONE retry → success."""
+def test_retry_after_mode_first_429_strikes_does_not_stop():
+    """First 429 → one strike, host NOT stopped (3-strike rule). Cooldown is
+    armed, the 429 is returned, no sleep, no same-domain retry."""
+    GLOBAL_HOST_STRIKES.reset()
+    GLOBAL_HOST_STOP.reset()
     sleeps: list[float] = []
     calls = [_resp429("0"), _resp(200)]
     resp = request_with_429_backoff(
@@ -614,80 +722,110 @@ def test_retry_after_mode_one_retry_then_success():
         host="gmo.example", min_interval=0.0,
         retry_after_floor=60.0, sleep=sleeps.append,
     )
-    assert resp.status_code == 200
-    assert sleeps == [60.0]   # Retry-After:0 floored up to 60
-    assert calls == []        # exactly 2 attempts consumed (initial + 1 retry)
+    assert resp.status_code == 429   # the 429 is handed straight back
+    assert sleeps == []              # no sleep — cooldown skip handles pacing
+    assert len(calls) == 1           # exactly ONE attempt; 200 never consumed
+    assert GLOBAL_HOST_STRIKES.count("gmo.example") == 1
+    assert not GLOBAL_HOST_STOP.is_stopped("gmo.example")  # survives a blip
 
 
-def test_retry_after_mode_floor_applied_when_header_zero():
+def test_retry_after_mode_third_strike_stops_host():
+    """Default strike_limit=3: the host stops only on the 3rd cumulative 429.
+    Three separate handler calls (the cooldown skip lives in
+    check_availability, not here) → strikes 1,2,3 → stop on the 3rd."""
+    GLOBAL_HOST_STRIKES.reset()
+    GLOBAL_HOST_STOP.reset()
+    for expected in (1, 2, 3):
+        request_with_429_backoff(
+            lambda: _resp429("0"), host="strikes.example",
+            retry_after_floor=60.0, sleep=lambda *_: None,
+        )
+        assert GLOBAL_HOST_STRIKES.count("strikes.example") == expected
+        if expected < 3:
+            assert not GLOBAL_HOST_STOP.is_stopped("strikes.example")
+    assert GLOBAL_HOST_STOP.is_stopped("strikes.example")  # stopped on strike 3
+
+
+def test_retry_after_mode_strike_limit_one_restores_hard_stop():
+    """strike_limit=1 reproduces the old hard-stop-on-first behavior."""
+    GLOBAL_HOST_STRIKES.reset()
+    GLOBAL_HOST_STOP.reset()
+    request_with_429_backoff(
+        lambda: _resp429("0"), host="hard.example",
+        retry_after_floor=60.0, strike_limit=1, sleep=lambda *_: None,
+    )
+    assert GLOBAL_HOST_STOP.is_stopped("hard.example")
+
+
+def test_retry_after_mode_floor_armed_as_cooldown_when_header_zero():
+    """No sleep happens, but the per-host cooldown is armed at the floor
+    (honoring Retry-After) — Retry-After:0 floors up to 60s — and the host is
+    NOT stopped on the first strike."""
     sleeps: list[float] = []
     calls = [_resp429("0"), _resp(200)]
     request_with_429_backoff(
         lambda: calls.pop(0), host="h.example",
         retry_after_floor=60.0, sleep=sleeps.append,
     )
-    assert sleeps == [60.0]
+    assert sleeps == []
+    assert abs(GLOBAL_HOST_COOLDOWN.seconds_remaining("h.example") - 60.0) < 1.0
+    assert not GLOBAL_HOST_STOP.is_stopped("h.example")
 
 
-def test_retry_after_mode_floor_applied_when_header_absent():
+def test_retry_after_mode_floor_armed_when_header_absent():
     sleeps: list[float] = []
     calls = [_resp429(None), _resp(200)]
     request_with_429_backoff(
         lambda: calls.pop(0), host="h.example",
         retry_after_floor=60.0, sleep=sleeps.append,
     )
-    assert sleeps == [60.0]
+    assert sleeps == []
+    assert abs(GLOBAL_HOST_COOLDOWN.seconds_remaining("h.example") - 60.0) < 1.0
 
 
-def test_retry_after_mode_floor_applied_when_header_garbage():
+def test_retry_after_mode_floor_armed_when_header_garbage():
     sleeps: list[float] = []
     calls = [_resp429("soon"), _resp(200)]
     request_with_429_backoff(
         lambda: calls.pop(0), host="h.example",
         retry_after_floor=60.0, sleep=sleeps.append,
     )
-    assert sleeps == [60.0]
+    assert sleeps == []
+    assert abs(GLOBAL_HOST_COOLDOWN.seconds_remaining("h.example") - 60.0) < 1.0
 
 
 def test_retry_after_mode_honors_header_when_larger_than_floor():
-    """A sane Retry-After larger than the floor is honored as-is."""
+    """A sane Retry-After larger than the floor is honored as the cooldown
+    value (still no sleep)."""
     sleeps: list[float] = []
     calls = [_resp429("90"), _resp(200)]
     request_with_429_backoff(
         lambda: calls.pop(0), host="h.example",
         retry_after_floor=60.0, sleep=sleeps.append,
     )
-    assert sleeps == [90.0]
+    assert sleeps == []
+    assert abs(GLOBAL_HOST_COOLDOWN.seconds_remaining("h.example") - 90.0) < 1.0
 
 
-def test_retry_after_mode_exactly_one_retry_on_repeated_429():
-    """Both attempts 429 → return the last 429 to the caller. EXACTLY two
-    attempts (not three) — one sleep, one retry."""
-    sleeps: list[float] = []
-    calls = [_resp429("0"), _resp429("0"), _resp(200)]
-    resp = request_with_429_backoff(
-        lambda: calls.pop(0), host="h.example",
-        retry_after_floor=60.0, sleep=sleeps.append,
-    )
-    assert resp.status_code == 429
-    assert sleeps == [60.0]          # one sleep only
-    assert len(calls) == 1           # third response never consumed
-
-
-def test_retry_after_mode_arms_host_cooldown():
+def test_retry_after_mode_arms_cooldown_and_strike_no_stop_on_first():
     GLOBAL_HOST_COOLDOWN.reset()
-    calls = [_resp429("0"), _resp429("0")]
+    GLOBAL_HOST_STOP.reset()
+    GLOBAL_HOST_STRIKES.reset()
     request_with_429_backoff(
-        lambda: calls.pop(0), host="cooldown.example",
+        lambda: _resp429("0"), host="cooldown.example",
         retry_after_floor=60.0, sleep=lambda *_: None,
     )
     assert GLOBAL_HOST_COOLDOWN.is_cooling("cooldown.example")
     assert GLOBAL_HOST_COOLDOWN.seconds_remaining("cooldown.example") > 50.0
+    assert GLOBAL_HOST_STRIKES.count("cooldown.example") == 1
+    assert not GLOBAL_HOST_STOP.is_stopped("cooldown.example")
 
 
-def test_retry_after_mode_success_first_attempt_no_sleep_no_cooldown():
-    """No 429 at all → no sleep, no cooldown armed."""
+def test_retry_after_mode_success_no_strike_no_cooldown_no_stop():
+    """No 429 at all → no strike, no sleep, no cooldown, no stop."""
     GLOBAL_HOST_COOLDOWN.reset()
+    GLOBAL_HOST_STOP.reset()
+    GLOBAL_HOST_STRIKES.reset()
     sleeps: list[float] = []
     resp = request_with_429_backoff(
         lambda: _resp(200), host="clean.example",
@@ -695,23 +833,29 @@ def test_retry_after_mode_success_first_attempt_no_sleep_no_cooldown():
     )
     assert resp.status_code == 200
     assert sleeps == []
+    assert GLOBAL_HOST_STRIKES.count("clean.example") == 0
     assert not GLOBAL_HOST_COOLDOWN.is_cooling("clean.example")
+    assert not GLOBAL_HOST_STOP.is_stopped("clean.example")
 
 
-def test_retry_after_mode_sleep_capped_for_huge_retry_after():
-    """An explicit multi-hour ban (Identity Digital once sent 86397s): the
-    worker sleeps at most MAX_429_SLEEP_SECONDS, but the per-host cooldown is
-    armed for the FULL ban so subsequent domains skip the host all run."""
+def test_retry_after_mode_huge_retry_after_arms_full_cooldown_no_sleep():
+    """An explicit multi-hour ban (Identity Digital once sent 86397s): we do
+    NOT sleep (the cooldown skip paces us), the per-host cooldown reflects the
+    full ban, and a single strike does NOT stop the host."""
     GLOBAL_HOST_COOLDOWN.reset()
+    GLOBAL_HOST_STOP.reset()
+    GLOBAL_HOST_STRIKES.reset()
     sleeps: list[float] = []
     calls = [_resp429("86397"), _resp429("86397")]
     request_with_429_backoff(
         lambda: calls.pop(0), host="banned.example",
         retry_after_floor=60.0, sleep=sleeps.append,
     )
-    assert sleeps == [MAX_429_SLEEP_SECONDS]  # worker sleep is capped
-    # ...but the cooldown reflects the registry's full 24h ban.
+    assert sleeps == []  # no worker sleep
     assert GLOBAL_HOST_COOLDOWN.seconds_remaining("banned.example") > 80000.0
+    assert GLOBAL_HOST_STRIKES.count("banned.example") == 1
+    assert not GLOBAL_HOST_STOP.is_stopped("banned.example")
+    assert len(calls) == 1  # second 429 never consumed
 
 
 def test_retry_after_mode_requires_host():

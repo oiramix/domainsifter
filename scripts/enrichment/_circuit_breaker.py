@@ -305,6 +305,137 @@ GLOBAL_HOST_COOLDOWN = HostCooldown()
 
 
 # ---------------------------------------------------------------------------
+# Per-host run-scoped STOP (the 429 safety kill-switch)
+# ---------------------------------------------------------------------------
+
+
+class HostStop:
+    """Per-host kill-switch for the remainder of a pipeline run.
+
+    Once an RDAP host returns a 429 (rate limit) or a 403 (block), it is
+    STOPPED for the rest of THIS run: no further requests are issued to it,
+    no retry, no resume after any cooldown window expires. Callers check
+    `is_stopped(host)` before every request and skip stopped hosts entirely.
+
+    Why a permanent run-stop, not just the time-bounded HostCooldown:
+    stopping the host is the *maximum* possible rate-decrease, which is
+    exactly what RFC 7480 §5.5 asks a client to do on a 429 ("SHOULD decrease
+    its query rate"). It is also the surest defense against escalating a
+    survivable 429 into a catastrophic 403 IP-block — the GMO outcome where
+    continued access during a penalty window got our egress IP blocked at the
+    registry's edge. A 429 means "you found the rate edge on THIS host — back
+    off this host for today," NOT "abort the whole run": other hosts run in
+    their own buckets and are completely unaffected.
+
+    Trade-off (intentional): a single transient 429 retires that host's whole
+    remaining bucket for the day. The candidates left unchecked are logged
+    loudly (pipeline._check_availability_concurrent) so the operator sees
+    exactly what was left on the table. Under-checking is the safe failure —
+    an unchecked candidate is rejected, never wrongly published.
+
+    Per-process, in-memory, thread-safe. One module-level singleton
+    (GLOBAL_HOST_STOP); reset between tests via the enrichment conftest.
+    Records (monotonic time, reason) of the first stop for diagnostics.
+    """
+
+    def __init__(self) -> None:
+        self._stopped: dict[str, tuple[float, str]] = {}
+        self._lock = threading.Lock()
+
+    def stop(
+        self,
+        host: str,
+        *,
+        reason: str = "429",
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        """Mark `host` stopped for the rest of the run. First stop wins —
+        the recorded (time, reason) reflects what first tripped the host, so
+        a later 403 doesn't overwrite the original 429 timestamp (and vice
+        versa)."""
+        with self._lock:
+            if host not in self._stopped:
+                self._stopped[host] = (clock(), reason)
+
+    def is_stopped(self, host: str) -> bool:
+        with self._lock:
+            return host in self._stopped
+
+    def stopped_hosts(self) -> dict[str, tuple[float, str]]:
+        """Snapshot of stopped hosts → (monotonic_stop_time, reason)."""
+        with self._lock:
+            return dict(self._stopped)
+
+    def reset(self) -> None:
+        """For tests — clear all stop state."""
+        with self._lock:
+            self._stopped.clear()
+
+
+# Module-level singleton — the RDAP availability check arms (on 429/403) and
+# reads this. One per Python process; reset between tests via the conftest.
+GLOBAL_HOST_STOP = HostStop()
+
+
+# ---------------------------------------------------------------------------
+# Per-host cumulative 429 strike counter
+# ---------------------------------------------------------------------------
+
+
+class HostStrikes:
+    """Per-host cumulative 429 strike counter for a pipeline run.
+
+    Each 429 from a host is one strike. `record(host)` increments and returns
+    the new total. Strikes accumulate CUMULATIVELY across the whole bucket —
+    a successful (non-429) query does NOT reset the counter — so a host that
+    429s intermittently still trends toward its strike cap and cannot evade it
+    by spacing the 429s out. The RDAP 429 handler stops the host (GLOBAL_HOST_
+    STOP) once the count reaches the configured strike limit; below that it
+    honors Retry-After and resumes. See config.json:rdap_429_strike_limit and
+    request_with_429_backoff's RETRY-AFTER MODE.
+
+    Why cumulative, not strictly-consecutive: a registry under load may answer
+    A→429, B→200, C→429, D→200, E→429. Those are three real rate-limit signals
+    spread across successes; a consecutive-only counter would reset on each 200
+    and never trip. Cumulative counting treats the run's total pushback as the
+    signal, which is what "the registry means it" actually looks like.
+
+    Per-process, in-memory, thread-safe. One module-level singleton
+    (GLOBAL_HOST_STRIKES); reset between tests via the enrichment conftest.
+    """
+
+    def __init__(self) -> None:
+        self._strikes: dict[str, int] = {}
+        self._lock = threading.Lock()
+
+    def record(self, host: str) -> int:
+        """Add one strike to `host` and return its new cumulative total."""
+        with self._lock:
+            total = self._strikes.get(host, 0) + 1
+            self._strikes[host] = total
+            return total
+
+    def count(self, host: str) -> int:
+        with self._lock:
+            return self._strikes.get(host, 0)
+
+    def total(self) -> int:
+        """Sum of strikes across all hosts this run (for the daily report)."""
+        with self._lock:
+            return sum(self._strikes.values())
+
+    def reset(self) -> None:
+        """For tests — clear all strike state."""
+        with self._lock:
+            self._strikes.clear()
+
+
+# Module-level singleton — the RDAP 429 handler records strikes here and stops
+# the host at the configured limit. One per process; reset between tests.
+GLOBAL_HOST_STRIKES = HostStrikes()
+
+
+# ---------------------------------------------------------------------------
 # Combined helper: throttle → call → 429-backoff
 # ---------------------------------------------------------------------------
 
@@ -371,18 +502,6 @@ def retry_on_timeout(
     raise last_exc if last_exc else RuntimeError("retry_on_timeout fell through")  # pragma: no cover
 
 
-# Upper bound on how long a single worker will sleep out one 429, even when
-# the registry's Retry-After (or per-host floor) asks for longer. A registry
-# can send an explicit multi-hour ban (Identity Digital once sent 86397s, a
-# 24h ban); a worker must not hang the pipeline that long. When the requested
-# cooldown exceeds this cap, the per-host cooldown is still armed for the FULL
-# requested duration (subsequent domains correctly skip the host for the whole
-# ban) but the worker itself sleeps only the cap, does its one retry, and
-# moves on. 120s comfortably covers every documented per-host floor (GMO's
-# 60s being the largest) with headroom.
-MAX_429_SLEEP_SECONDS = 120.0
-
-
 def parse_retry_after(
     value: str | None,
     *,
@@ -440,6 +559,7 @@ def request_with_429_backoff(
     min_interval: float = 0.0,
     delays: tuple[float, ...] = (1.0, 2.0),
     retry_after_floor: float = 0.0,
+    strike_limit: int = 3,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ):
@@ -460,17 +580,24 @@ def request_with_429_backoff(
         rdap.enrich — endpoints where a fixed short backoff is fine.
 
     RETRY-AFTER MODE (retry_after_floor > 0, requires `host`):
-        On 429, honor the response's Retry-After header (RFC 7231 7.1.3)
-        floored at `retry_after_floor` seconds, then make EXACTLY ONE retry.
-        A per-host cooldown is recorded on GLOBAL_HOST_COOLDOWN so concurrent
-        workers for the same host skip it during the wait. Used by
-        rdap.check_availability — see config.json:rdap_429_backoff_floor_seconds.
+        On 429, honor the Retry-After header (RFC 7231 7.1.3, floored at
+        `retry_after_floor`) by arming a per-host cooldown on
+        GLOBAL_HOST_COOLDOWN (so subsequent same-host domains skip during the
+        window, then the host RESUMES at its normal pace), record one strike
+        on GLOBAL_HOST_STRIKES, and return the 429 to the caller as unknown.
+        No sleep, no same-domain retry. Once a host accumulates `strike_limit`
+        cumulative strikes (default 3), it is STOPPED for the rest of the run
+        on GLOBAL_HOST_STOP. Used by rdap.check_availability — see
+        config.json:rdap_429_strike_limit / rdap_429_backoff_floor_seconds and
+        the HostStrikes / HostStop docstrings.
 
-        Why one retry, not three: at a 60s floor (GMO Registry) three retries
-        would burn 180s+ per rate-limited domain and exhaust the per-host
-        availability budget after a handful of domains. One retry honors the
-        registry's documented cooldown once; a still-429 hands back to the
-        caller as unknown.
+        Why a 3-strike rule, not stop-on-first (changed 2026-06-02): per RFC
+        7480 §5.5 a 429 is the survivable "decrease your rate" signal, not the
+        catastrophic one. A single transient 429 must not retire a host's whole
+        bucket for the day; sustained pushback (3 cumulative strikes) is the
+        heuristic for "the registry means it." 403 remains an immediate hard
+        stop (handled in rdap.check_availability) — it is the catastrophic
+        block and one is enough. Other hosts are unaffected.
     """
     if retry_after_floor > 0:
         if not host:
@@ -480,6 +607,7 @@ def request_with_429_backoff(
             host=host,
             min_interval=min_interval,
             retry_after_floor=retry_after_floor,
+            strike_limit=strike_limit,
             sleep=sleep,
             clock=clock,
         )
@@ -502,39 +630,32 @@ def _request_honoring_retry_after(
     host: str,
     min_interval: float,
     retry_after_floor: float,
+    strike_limit: int,
     sleep: Callable[[float], None],
     clock: Callable[[], float],
 ):
-    """429 handler that honors Retry-After with a per-host floor + one retry.
-    See request_with_429_backoff's RETRY-AFTER MODE docstring for the public
-    contract.
+    """429 handler implementing the per-host 3-strike rule. See
+    request_with_429_backoff's RETRY-AFTER MODE docstring for the public
+    contract and the 2026-06-02 rationale.
 
-    Cooldown semantics — the cooldown is armed ONCE, on the first 429, for
-    `cooldown_seconds`. Its purpose is to shield *concurrent* workers for the
-    same host: while this worker sleeps out the registry's penalty window, a
-    sibling worker that checks GLOBAL_HOST_COOLDOWN sees the host is cooling
-    and skips, rather than firing a fresh request into that window.
+    On 429 we do three non-blocking things before returning the 429:
+      1. Parse the Retry-After header (floored at `retry_after_floor`) and arm
+         GLOBAL_HOST_COOLDOWN for that duration — honors the registry's stated
+         wait, so subsequent same-host domains skip during the window and the
+         host then RESUMES at its normal throttled pace.
+      2. Record one cumulative strike on GLOBAL_HOST_STRIKES.
+      3. Only if the strike count has reached `strike_limit` do we arm
+         GLOBAL_HOST_STOP — a permanent run-stop for that host. Below the
+         limit the host keeps going.
 
-    The retry-429 deliberately does NOT re-arm the cooldown. Re-arming would
-    push cooling_until past the end of this worker's sleep; a sequential
-    single-worker bucket (every RDAP host runs one worker by default) would
-    then race through every remaining domain as instant cooldown-skips,
-    collapsing the whole bucket to `unknown` after a single double-429.
-    Instead each rate-limited domain pays its own one-time sleep, pacing a
-    single worker to one request per cooldown window — exactly the cadence
-    GMO's /help page asks for ("do not access ... for at least a minute").
-
-    Sleep cap — when a registry sends an explicit long Retry-After, the
-    cooldown is armed for the FULL value (subsequent domains correctly skip
-    the host for the whole ban) but this worker sleeps at most
-    MAX_429_SLEEP_SECONDS so it never hangs the pipeline. See that constant.
+    The request is throttle-paced (GLOBAL_HOST_THROTTLE) so the steady-state
+    per-host rate is unchanged. We never retry the SAME domain — the 429'd
+    domain is returned as unknown and the worker moves on; pacing/recovery is
+    handled by the cooldown skip, not a re-query.
     """
-    def _attempt():
-        if min_interval > 0:
-            GLOBAL_HOST_THROTTLE.acquire(host, min_interval, sleep=sleep)
-        return call_fn()
-
-    resp = _attempt()
+    if min_interval > 0:
+        GLOBAL_HOST_THROTTLE.acquire(host, min_interval, sleep=sleep)
+    resp = call_fn()
     if getattr(resp, "status_code", None) != 429:
         return resp
 
@@ -542,22 +663,20 @@ def _request_honoring_retry_after(
     parsed = parse_retry_after(raw)
     cooldown_seconds = max(parsed if parsed is not None else 0.0, retry_after_floor)
     GLOBAL_HOST_COOLDOWN.start(host, cooldown_seconds, clock=clock)
+    strikes = GLOBAL_HOST_STRIKES.record(host)
 
-    sleep_seconds = min(cooldown_seconds, MAX_429_SLEEP_SECONDS)
-    logger.warning(
-        "429 from %s — honoring %.0fs cooldown (Retry-After header=%r, "
-        "per-host floor=%.0fs); sleeping %.0fs then one retry",
-        host, cooldown_seconds, raw, retry_after_floor, sleep_seconds,
-    )
-    sleep(sleep_seconds)
-
-    resp = _attempt()
-    if getattr(resp, "status_code", None) == 429:
+    if strikes >= strike_limit:
+        GLOBAL_HOST_STOP.stop(host, reason="429", clock=clock)
         logger.warning(
-            "429 from %s on retry — domain treated as unknown; host cooldown "
-            "has %.0fs of its %.0fs window left",
-            host,
-            GLOBAL_HOST_COOLDOWN.seconds_remaining(host, clock=clock),
-            cooldown_seconds,
+            "429 from %s — strike %d/%d: STRIKE LIMIT reached, STOPPING this "
+            "host for the rest of the run (no resume). Honored %.0fs cooldown "
+            "(Retry-After header=%r). Other RDAP hosts continue normally.",
+            host, strikes, strike_limit, cooldown_seconds, raw,
+        )
+    else:
+        logger.warning(
+            "429 from %s — strike %d/%d: honored %.0fs cooldown (Retry-After "
+            "header=%r), resuming this host at its normal pace.",
+            host, strikes, strike_limit, cooldown_seconds, raw,
         )
     return resp
