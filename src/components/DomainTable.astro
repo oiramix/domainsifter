@@ -76,16 +76,19 @@ const allDomains = payload.domains;
 // Split into the two card buckets. days_listed === 0 → today; > 0 → carryover.
 // Missing / undefined days_listed (sample data, migration) → treated as today.
 //
-// Public-tier cap (2026-05-17): each card shows the top N by score, where
-// N = PUBLIC_DOMAIN_CAP. The full list stays in daily-domains.json — the cap
-// is a presentation gate, not a data gate, so future paid-tier surfaces can
-// read the JSON unmodified. If a card has fewer than N qualifying entries
-// (low-drop day, early-week carryover), the slice is a no-op.
+// Public-tier cap (2026-05-17, scope-corrected 2026-06-02): the Today (NEW
+// drops) panel shows the top N by score, where N = PUBLIC_DOMAIN_CAP — a
+// flood-day guard so a burst of fresh drops doesn't bury the page. The
+// Recent (carryover) panel is intentionally UNCAPPED so its rendered rows
+// match the header count (the full 14-day rolling list). The complete list
+// stays in daily-domains.json regardless — the cap is a presentation gate
+// on the Today panel, not a data gate. If the Today panel has fewer than N
+// qualifying entries (low-drop day), the slice is a no-op.
 //
-// Per-TLD diversity cap (2026-05-25): on top of the panel size cap, each TLD
-// is limited to MAX_PER_TLD entries per panel — applied INDEPENDENTLY for
-// today and carryover. Mirrors scripts.generate_newsletter._apply_per_tld_cap.
-// max_per_tld <= 0 disables the cap (no-op).
+// Per-TLD diversity cap (2026-05-25): on top of the Today panel size cap,
+// each TLD is limited to MAX_PER_TLD entries — Today panel ONLY. Mirrors
+// scripts.generate_newsletter._apply_per_tld_cap. max_per_tld <= 0 disables
+// the cap (no-op).
 const PUBLIC_DOMAIN_CAP = 30;
 const MAX_PER_TLD =
   Number(pipelineConfig?.display_caps?.max_per_tld_in_top_panel ?? 0) || 0;
@@ -129,24 +132,24 @@ const carryoverUncapped = allDomains
   .filter((d) => (d.days_listed ?? 0) > 0)
   .sort(byScoreDesc);
 
+// Today (NEW drops) panel: per-TLD diversity cap THEN panel size cap.
 const todayAfterTldCap = applyPerTldCap(todayUncapped, MAX_PER_TLD).sort(byScoreDesc);
-const carryoverAfterTldCap = applyPerTldCap(carryoverUncapped, MAX_PER_TLD).sort(byScoreDesc);
-
 const todayDomains = todayAfterTldCap.slice(0, PUBLIC_DOMAIN_CAP);
-const carryoverDomains = carryoverAfterTldCap.slice(0, PUBLIC_DOMAIN_CAP);
+
+// Recent (carryover) panel: UNCAPPED — every surviving domain renders, so
+// the row count matches the header count. Neither the per-TLD cap nor
+// PUBLIC_DOMAIN_CAP applies here; both are Today-panel-only guards.
+const carryoverDomains = carryoverUncapped;
 
 const todayCountUncapped = todayUncapped.length;
 const carryoverCountUncapped = carryoverUncapped.length;
 
-// "Capped" now means EITHER the per-TLD cap dropped entries OR the panel size
-// dropped entries. Per-TLD cap fired when applyPerTldCap shrunk the set;
-// panel cap fired when the post-cap set still exceeded PUBLIC_DOMAIN_CAP.
+// "Capped" means EITHER the per-TLD cap dropped entries OR the panel size cap
+// did. Only the Today panel can be capped; carryover always renders in full.
 const todayIsCapped =
   todayUncapped.length > todayAfterTldCap.length ||
   todayAfterTldCap.length > PUBLIC_DOMAIN_CAP;
-const carryoverIsCapped =
-  carryoverUncapped.length > carryoverAfterTldCap.length ||
-  carryoverAfterTldCap.length > PUBLIC_DOMAIN_CAP;
+const carryoverIsCapped = false;
 
 const lastUpdatedLabel = isPreview
   ? 'Preview data'
