@@ -139,6 +139,17 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] generating newsletter draft"
 .venv/bin/python -m scripts.generate_newsletter --config scripts/config.json \
   || echo "WARNING: newsletter generation failed (non-fatal; continuing)" >&2
 
+# Step 3c: append the run's FULL confirmed-available set to the permanent
+# domain-lifecycle archive in private R2 (state/domain_archive/YYYY-MM.jsonl).
+# Reads the available-set handoff the pipeline just emitted (scripts/state/,
+# gitignored); read-only w.r.t. the pipeline. Separate exit code, non-fatal:
+# a failure here is logged and the daily publish continues unaffected (same
+# idiom as the newsletter above). This archive is APPEND-ONLY and NEVER aged
+# out — distinct from the 14-day-aging state/phase2_overflow.jsonl work queue.
+echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] appending available-set to domain archive (R2)"
+.venv/bin/python -m scripts.domain_archive \
+  || echo "WARNING: domain archive append failed (non-fatal; continuing)" >&2
+
 # Step 4: replicate the GHA workflow's "Commit refreshed daily output" step.
 # `git config` writes to .git/config (local, not credentials — just author
 # identity). Idempotent on every run.

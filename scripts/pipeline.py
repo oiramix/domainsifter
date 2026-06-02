@@ -1103,6 +1103,28 @@ def main(argv: list[str] | None = None) -> int:
         len(retained_carryover), len(final_list), publication_cap,
     )
 
+    # Side-effect (non-fatal): emit the FULL RDAP-confirmed-available set —
+    # every domain the run confirmed free to register, regardless of score or
+    # publication, INCLUDING the low-scoring tail that the post-enrichment
+    # filter / publish floor dropped — to a private local handoff file
+    # (scripts/state/*, gitignored) for the permanent domain-lifecycle archive.
+    # The archive itself is a SEPARATE post-process (scripts/domain_archive.py)
+    # chained after this run in run-daily.sh; this step only persists the set
+    # so that read-only process can append it to private R2. Wrapped so any
+    # failure here can NEVER break or delay the daily publish.
+    try:
+        from scripts import domain_archive
+
+        published_payload = json.loads(written_path.read_text(encoding="utf-8"))
+        published_names = {
+            d.get("name", "") for d in published_payload.get("domains", [])
+        }
+        domain_archive.emit_available_set(
+            enriched, published_names, config, today,
+        )
+    except Exception as exc:  # never let the archive emit abort a published run
+        logger.warning("Available-set archive emit failed (non-fatal): %s", exc)
+
     # Optional intermediate-list dumps for manual quality audits. Strictly
     # gated on --debug-export; production runs that don't pass the flag never
     # collect the lists or call into debug_export.
