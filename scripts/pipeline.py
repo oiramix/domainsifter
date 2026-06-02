@@ -404,6 +404,7 @@ def _check_availability_concurrent(
     from datetime import datetime, timezone
 
     from scripts.enrichment import rdap
+    from scripts.enrichment._circuit_breaker import GLOBAL_HOST_STOP
 
     cc = config.get("rdap_concurrency", {}) or {}
     default_workers = max(1, int(cc.get("default_workers_per_host", 1) or 1))
@@ -417,7 +418,13 @@ def _check_availability_concurrent(
         host = rdap.resolve_rdap_host(cand.get("name", ""), config) or "_unknown"
         buckets.setdefault(host, []).append(cand)
 
-    counts = {"available": 0, "not_available": 0, "unknown": 0, "skipped_budget": 0}
+    counts = {
+        "available": 0,
+        "not_available": 0,
+        "unknown": 0,
+        "skipped_budget": 0,
+        "stopped_unchecked": 0,
+    }
     counts_lock = threading.Lock()
 
     def _process_one(cand: dict) -> None:
@@ -431,6 +438,14 @@ def _check_availability_concurrent(
             return
         result = rdap.check_availability(cand.get("name", ""), config)
         cand.update(result)
+        # Host stopped after a prior 429/403 → this candidate was skipped
+        # WITHOUT an RDAP request. Count it separately and do NOT stamp
+        # availability_verified_at: we never actually verified it.
+        if result.get("rdap_skipped_reason") == "host_stopped":
+            cand["is_available"] = None
+            with counts_lock:
+                counts["stopped_unchecked"] += 1
+            return
         cand["availability_verified_at"] = datetime.now(timezone.utc).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
@@ -472,6 +487,7 @@ def _check_availability_concurrent(
 
     # Drain. Each pool is independent — earlier pools may finish while we
     # still wait on later ones; no head-of-line blocking across hosts.
+    stopped_hosts = GLOBAL_HOST_STOP.stopped_hosts()
     for host, pool, futures, host_start, group in pools_meta:
         for f in futures:
             try:
@@ -487,6 +503,24 @@ def _check_availability_concurrent(
             "RDAP host bucket [%s] done in %.1fs: %d available, %d not_available, %d unknown",
             host, elapsed, host_avail, host_unavail, host_unknown,
         )
+        # If this host backed off (429/403), log LOUDLY what was left on the
+        # table: which host, when (elapsed into the bucket), and how many
+        # candidates we never queried. The 403 path already fired a critical;
+        # this is the per-host accounting line the operator reads in the
+        # report to see exactly what a stop cost us.
+        if host in stopped_hosts:
+            stop_mono, reason = stopped_hosts[host]
+            left_unchecked = sum(
+                1 for c in group if c.get("rdap_skipped_reason") == "host_stopped"
+            )
+            checked = len(group) - left_unchecked
+            logger.warning(
+                "RDAP host [%s] STOPPED (%s) after %.1fs into its bucket — "
+                "%d/%d candidates checked before the stop, %d left UNCHECKED "
+                "(never queried). Other hosts unaffected.",
+                host, reason, max(0.0, stop_mono - host_start),
+                checked, len(group), left_unchecked,
+            )
 
     return counts
 
@@ -545,11 +579,14 @@ def validate_availability(
     kept = [c for c in candidates if c.get("is_available") is True]
 
     logger.info(
-        "Availability check: %d available, %d not available, %d unknown, %d skipped (budget) — kept %d / %d",
+        "Availability check: %d available, %d not available, %d unknown, "
+        "%d skipped (budget), %d left unchecked (host stopped after 429/403) "
+        "— kept %d / %d",
         counts["available"],
         counts["not_available"],
         counts["unknown"],
         counts["skipped_budget"],
+        counts["stopped_unchecked"],
         len(kept),
         len(candidates),
     )

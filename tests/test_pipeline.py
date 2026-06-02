@@ -783,6 +783,45 @@ def test_check_availability_concurrent_unknown_host_bucket(monkeypatch, cfg):
     assert sorted(seen_domains) == ["d0.unknown", "d1.unknown", "d2.unknown"]
 
 
+def test_check_availability_stopped_unchecked_not_verified(monkeypatch, cfg):
+    """Candidates whose host was stopped (429/403) are returned with
+    rdap_skipped_reason='host_stopped': they are rejected, NOT stamped with
+    availability_verified_at (we never verified them), and counted under the
+    stopped_unchecked tally rather than as a genuine 'unknown'."""
+    from scripts.enrichment import rdap as rdap_mod
+
+    cfg = {
+        **cfg,
+        "rdap_concurrency": {"default_workers_per_host": 1, "per_host": {}},
+    }
+
+    def fake_check(domain, _c):
+        # one.com is checked (404, available); the rest were skipped because
+        # the host stopped after one.com's (simulated) 429.
+        if domain == "one.com":
+            return {"is_available": True, "rdap_http": 404, "rdap_status": [],
+                    "rdap_expiration": None, "previous_registrar": None}
+        return {**rdap_mod._empty_unknown(), "rdap_skipped_reason": "host_stopped"}
+
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+    monkeypatch.setattr(rdap_mod, "resolve_rdap_host", lambda *_a, **_k: "rdap.com.example")
+
+    cands = [
+        {"name": "one.com", "score": 50},
+        {"name": "two.com", "score": 50},
+        {"name": "three.com", "score": 50},
+    ]
+    kept = pipeline.validate_availability(cands, cfg)
+    assert [c["name"] for c in kept] == ["one.com"]
+    # Skipped candidates: rejected, no verification stamp.
+    skipped = [c for c in cands if c["name"] != "one.com"]
+    assert all(c.get("is_available") is None for c in skipped)
+    assert all("availability_verified_at" not in c for c in skipped)
+    # The checked one IS stamped.
+    one = next(c for c in cands if c["name"] == "one.com")
+    assert "availability_verified_at" in one
+
+
 def test_main_persists_carryover_across_runs(monkeypatch, cfg, tmp_path):
     """End-to-end: existing daily-domains.json contains an entry from 3 days
     ago with full enrichment. Today's run finds NO new drops but the

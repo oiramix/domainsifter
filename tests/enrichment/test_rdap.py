@@ -6,7 +6,7 @@ import pytest
 import responses
 
 from scripts.enrichment import rdap
-from scripts.enrichment._circuit_breaker import GLOBAL_HOST_COOLDOWN
+from scripts.enrichment._circuit_breaker import GLOBAL_HOST_COOLDOWN, GLOBAL_HOST_STOP
 
 
 @pytest.fixture(autouse=True)
@@ -302,23 +302,26 @@ def test_check_availability_5xx_returns_unknown():
 
 
 @responses.activate
-def test_check_availability_persistent_429_returns_unknown(_no_sleep_backoff):
+def test_check_availability_single_429_strikes_does_not_stop(_no_sleep_backoff):
+    """A single 429 → unknown for this domain AND one strike, but the host is
+    NOT stopped (3-strike rule — a transient blip is survivable). The cooldown
+    is armed so the host briefly pauses, then resumes. Exactly ONE request
+    fires (no retry)."""
     responses.add(
         responses.GET, "https://data.iana.org/rdap/dns.json", json=BOOTSTRAP, status=200
     )
-    # RETRY-AFTER MODE makes exactly two attempts (initial + one retry);
-    # both 429 → request_with_429_backoff returns the last 429. _config()
-    # carries no rdap_429_backoff_floor_seconds block, so the 5s default
-    # floor applies — _no_sleep_backoff no-ops the wait.
-    for _ in range(2):
-        responses.add(
-            responses.GET,
-            "https://rdap.verisign.example/com/v1/domain/limited.com",
-            status=429,
-        )
+    responses.add(
+        responses.GET,
+        "https://rdap.verisign.example/com/v1/domain/limited.com",
+        status=429,
+    )
     result = rdap.check_availability("limited.com", _config())
     assert result["is_available"] is None
     assert result["rdap_http"] == 429
+    from scripts.enrichment._circuit_breaker import GLOBAL_HOST_STRIKES
+    assert GLOBAL_HOST_STRIKES.count("rdap.verisign.example") == 1
+    assert not GLOBAL_HOST_STOP.is_stopped("rdap.verisign.example")
+    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.verisign.example")
 
 
 def test_check_availability_connection_error_returns_unknown(monkeypatch):
@@ -490,99 +493,161 @@ def test_retry_after_floor_seconds_lookup():
 
 
 @responses.activate
-def test_check_availability_cooldown_skips_subsequent_same_host(_no_sleep_backoff):
-    """After a host 429s, the next domain on that host is skipped WITHOUT an
-    HTTP call (returns unknown, rdap_http=None)."""
+def test_check_availability_cooldown_skips_during_window_then_strike_not_stop(_no_sleep_backoff):
+    """After ONE 429 the host is NOT stopped (strike 1/3). Its cooldown is
+    armed, so the very next same-host domain is skipped during the window
+    (cooldown-skip, NOT a stop-skip — no rdap_skipped_reason)."""
     responses.add(
         responses.GET, "https://data.iana.org/rdap/dns.json",
         json=COOLDOWN_BOOTSTRAP, status=200,
     )
-    # first.shop: two 429s arm the gmoregistry 60s cooldown.
     responses.add(
         responses.GET, "https://rdap.gmoregistry.net/rdap/domain/first.shop", status=429,
     )
-    responses.add(
-        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/first.shop", status=429,
-    )
-    # second.shop is deliberately NOT registered — if the cooldown skip fails
-    # and a request escapes, `responses` raises ConnectionError and the test
-    # fails loudly.
+    # second.shop NOT registered — must be skipped via the cooldown window.
 
     cfg = _cooldown_config()
     r1 = rdap.check_availability("first.shop", cfg)
-    assert r1["is_available"] is None
-    assert r1["rdap_http"] == 429  # 429 path: exhausted the one retry
-
+    assert r1["rdap_http"] == 429
+    assert not GLOBAL_HOST_STOP.is_stopped("rdap.gmoregistry.net")  # 1 strike only
     assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
 
     r2 = rdap.check_availability("second.shop", cfg)
-    assert r2["is_available"] is None
-    assert r2["rdap_http"] is None  # skipped — no HTTP attempt was made
+    assert r2["rdap_http"] is None              # skipped (cooldown), no request
+    assert r2.get("rdap_skipped_reason") is None  # NOT a stop — just cooling
 
     domain_calls = [c for c in responses.calls if "/domain/" in c.request.url]
-    assert len(domain_calls) == 2
+    assert len(domain_calls) == 1
     assert all("first.shop" in c.request.url for c in domain_calls)
 
 
+def _drive_three_strikes(host_domains, cfg):
+    """Fire three real 429s against one host (resetting the time-based cooldown
+    between each so the next query proceeds), driving it to the 3-strike stop.
+    `host_domains` is three distinct domains on the same RDAP host."""
+    for i, name in enumerate(host_domains, start=1):
+        GLOBAL_HOST_COOLDOWN.reset()  # simulate the cooldown window elapsing
+        r = rdap.check_availability(name, cfg)
+        assert r["rdap_http"] == 429
+        yield i, r
+
+
 @responses.activate
-def test_check_availability_cooldown_does_not_block_other_host(_no_sleep_backoff):
-    """A cooldown on one RDAP host must not affect a different host."""
+def test_check_availability_three_strikes_stops_host(_no_sleep_backoff):
+    """The 3rd cumulative 429 on a host stops it for the run; the 4th domain is
+    then skipped via the run-stop (rdap_skipped_reason='host_stopped')."""
+    from scripts.enrichment._circuit_breaker import GLOBAL_HOST_STRIKES
+
     responses.add(
         responses.GET, "https://data.iana.org/rdap/dns.json",
         json=COOLDOWN_BOOTSTRAP, status=200,
     )
+    for name in ("s1.shop", "s2.shop", "s3.shop"):
+        responses.add(
+            responses.GET, f"https://rdap.gmoregistry.net/rdap/domain/{name}", status=429,
+        )
+    # s4.shop NOT registered — must be skipped via the run-stop.
+
+    cfg = _cooldown_config()
+    for i, _r in _drive_three_strikes(["s1.shop", "s2.shop", "s3.shop"], cfg):
+        if i < 3:
+            assert not GLOBAL_HOST_STOP.is_stopped("rdap.gmoregistry.net")
+    assert GLOBAL_HOST_STRIKES.count("rdap.gmoregistry.net") == 3
+    assert GLOBAL_HOST_STOP.is_stopped("rdap.gmoregistry.net")
+
+    GLOBAL_HOST_COOLDOWN.reset()
+    r4 = rdap.check_availability("s4.shop", cfg)
+    assert r4["rdap_http"] is None
+    assert r4["rdap_skipped_reason"] == "host_stopped"
+
+    domain_calls = [c for c in responses.calls if "/domain/" in c.request.url]
+    assert len(domain_calls) == 3  # only s1/s2/s3 ever hit the network
+
+
+@responses.activate
+def test_check_availability_strikes_do_not_block_other_host(_no_sleep_backoff):
+    """Three strikes stop one host; a different host is completely unaffected
+    (its own independent strike counter is still 0)."""
+    from scripts.enrichment._circuit_breaker import GLOBAL_HOST_STRIKES
+
     responses.add(
-        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/limited.shop", status=429,
+        responses.GET, "https://data.iana.org/rdap/dns.json",
+        json=COOLDOWN_BOOTSTRAP, status=200,
     )
-    responses.add(
-        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/limited.shop", status=429,
-    )
-    # A .com domain on the OTHER host — must still be queried normally.
+    for name in ("a.shop", "b.shop", "c.shop"):
+        responses.add(
+            responses.GET, f"https://rdap.gmoregistry.net/rdap/domain/{name}", status=429,
+        )
     responses.add(
         responses.GET, "https://rdap.verisign.example/com/v1/domain/free.com", status=404,
     )
 
     cfg = _cooldown_config()
-    rdap.check_availability("limited.shop", cfg)  # arms the gmoregistry cooldown
+    list(_drive_three_strikes(["a.shop", "b.shop", "c.shop"], cfg))
+    assert GLOBAL_HOST_STOP.is_stopped("rdap.gmoregistry.net")
+    assert not GLOBAL_HOST_STOP.is_stopped("rdap.verisign.example")
+    assert GLOBAL_HOST_STRIKES.count("rdap.verisign.example") == 0
 
-    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
-    assert not GLOBAL_HOST_COOLDOWN.is_cooling("rdap.verisign.example")
-
+    GLOBAL_HOST_COOLDOWN.reset()
     r = rdap.check_availability("free.com", cfg)
-    assert r["is_available"] is True   # verisign host queried, got its 404
+    assert r["is_available"] is True
     assert r["rdap_http"] == 404
 
 
 @responses.activate
-def test_check_availability_resumes_after_cooldown_clears(_no_sleep_backoff):
-    """Once the cooldown window elapses, the host is queried again normally."""
+def test_check_availability_does_not_resume_after_strike_stop(_no_sleep_backoff):
+    """Once a host hits the strike limit and stops, clearing the time-based
+    cooldown does NOT let it resume — the run-stop is permanent."""
+    responses.add(
+        responses.GET, "https://data.iana.org/rdap/dns.json",
+        json=COOLDOWN_BOOTSTRAP, status=200,
+    )
+    for name in ("o1.shop", "o2.shop", "o3.shop"):
+        responses.add(
+            responses.GET, f"https://rdap.gmoregistry.net/rdap/domain/{name}", status=429,
+        )
+    # later.shop NOT registered — must stay skipped even after a cooldown reset.
+
+    cfg = _cooldown_config()
+    list(_drive_three_strikes(["o1.shop", "o2.shop", "o3.shop"], cfg))
+    assert GLOBAL_HOST_STOP.is_stopped("rdap.gmoregistry.net")
+
+    GLOBAL_HOST_COOLDOWN.reset()
+    assert not GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
+    assert GLOBAL_HOST_STOP.is_stopped("rdap.gmoregistry.net")  # stop still holds
+
+    r = rdap.check_availability("later.shop", cfg)
+    assert r["rdap_http"] is None
+    assert r["rdap_skipped_reason"] == "host_stopped"
+
+    domain_calls = [c for c in responses.calls if "/domain/" in c.request.url]
+    assert len(domain_calls) == 3  # only the three strike domains hit network
+
+
+@responses.activate
+def test_check_availability_403_alarms_and_stops_host(_no_sleep_backoff, caplog):
+    """A 403 is the catastrophic block: unknown for this domain, host stopped,
+    and a CRITICAL alarm logged. Subsequent domains on the host are skipped."""
+    import logging
+
     responses.add(
         responses.GET, "https://data.iana.org/rdap/dns.json",
         json=COOLDOWN_BOOTSTRAP, status=200,
     )
     responses.add(
-        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/one.shop", status=429,
+        responses.GET, "https://rdap.verisign.example/com/v1/domain/blocked.com", status=403,
     )
-    responses.add(
-        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/one.shop", status=429,
-    )
-    # Queried only after the cooldown is cleared.
-    responses.add(
-        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/three.shop", status=404,
-    )
+    # next.com NOT registered — must be skipped without a request.
 
     cfg = _cooldown_config()
-    rdap.check_availability("one.shop", cfg)            # arms the cooldown
-    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
+    with caplog.at_level(logging.CRITICAL, logger="scripts.enrichment.rdap"):
+        r1 = rdap.check_availability("blocked.com", cfg)
+    assert r1["is_available"] is None
+    assert r1["rdap_http"] == 403
+    assert GLOBAL_HOST_STOP.is_stopped("rdap.verisign.example")
+    assert any("403 FORBIDDEN" in rec.message and "CATASTROPHIC" in rec.message
+               for rec in caplog.records)
 
-    r2 = rdap.check_availability("two.shop", cfg)        # skipped while cooling
+    r2 = rdap.check_availability("next.com", cfg)
     assert r2["rdap_http"] is None
-
-    # Simulate the cooldown window elapsing (HostCooldown's clock-based
-    # expiry is covered deterministically in test_circuit_breaker.py).
-    GLOBAL_HOST_COOLDOWN.reset()
-    assert not GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")
-
-    r3 = rdap.check_availability("three.shop", cfg)      # resumes — real query
-    assert r3["is_available"] is True
-    assert r3["rdap_http"] == 404
+    assert r2["rdap_skipped_reason"] == "host_stopped"

@@ -41,6 +41,7 @@ import requests
 from scripts.enrichment._circuit_breaker import (
     CircuitBreaker,
     GLOBAL_HOST_COOLDOWN,
+    GLOBAL_HOST_STOP,
     request_with_429_backoff,
 )
 
@@ -337,6 +338,22 @@ def check_availability(domain: str, config: dict) -> dict:
     from urllib.parse import urlparse
     rdap_host = urlparse(base).hostname or "rdap"
 
+    # Run-scoped STOP (added 2026-06-02). If this host previously returned a
+    # 429 or a 403, it is stopped for the rest of the run — skip every
+    # subsequent domain WITHOUT a request. This is the maximum rate-decrease
+    # and the surest defense against escalating a 429 into a 403 IP-block.
+    # `rdap_skipped_reason` lets the orchestrator count what was left
+    # unchecked when a host backed off (it is NOT part of the JSON contract;
+    # output.py filters to CONTRACT_FIELDS). INFO not WARNING: this is the
+    # safety rule working as intended. See _circuit_breaker.HostStop.
+    if GLOBAL_HOST_STOP.is_stopped(rdap_host):
+        logger.info(
+            "RDAP host %s stopped for this run (prior 429/403); skipping %s "
+            "without a request",
+            rdap_host, domain,
+        )
+        return {**_empty_unknown(), "rdap_skipped_reason": "host_stopped"}
+
     # Per-host 429 cooldown (added 2026-05-22). If this host returned a 429
     # within its cooldown window, skip the HTTP call entirely — re-querying
     # would just 429 again, and registries that escalate (GMO Registry's
@@ -360,6 +377,10 @@ def check_availability(domain: str, config: dict) -> dict:
     min_interval = float(
         intervals.get("rdap_per_host", {}).get(rdap_host, intervals.get("rdap", 0.2))
     )
+    # Per-host cumulative 429 strike cap (default 3). Below the cap a 429
+    # honors Retry-After and the host resumes; at the cap the host stops for
+    # the run. See config.json:rdap_429_strike_limit.
+    strike_limit = int(config.get("rdap_429_strike_limit", 3))
 
     try:
         response = request_with_429_backoff(
@@ -367,6 +388,7 @@ def check_availability(domain: str, config: dict) -> dict:
             host=rdap_host,
             min_interval=min_interval,
             retry_after_floor=_retry_after_floor_seconds(rdap_host, config),
+            strike_limit=strike_limit,
         )
     except requests.RequestException as exc:
         logger.warning("RDAP availability check for %s failed: %s", domain, exc)
@@ -384,13 +406,30 @@ def check_availability(domain: str, config: dict) -> dict:
             "rdap_http": 404,
         }
 
+    if response.status_code == 403:
+        # 403 FORBIDDEN is the CATASTROPHIC signal — not a rate limit but an
+        # outright block (typically IP-level at the registry's edge, the GMO
+        # outcome). ALARM HARD (logging.critical surfaces in the daily report)
+        # and stop the host immediately: we are already blocked, so every
+        # further request can only deepen the block. This must never be
+        # silently swallowed.
+        GLOBAL_HOST_STOP.stop(rdap_host, reason="403")
+        logger.critical(
+            "RDAP 403 FORBIDDEN from %s on %s — CATASTROPHIC IP-BLOCK signal "
+            "(NOT a rate limit). Stopping this host for the run. INVESTIGATE "
+            "IMMEDIATELY: the registry has likely blocked our egress IP.",
+            rdap_host, domain,
+        )
+        _BREAKER.record_failure()
+        return {**_empty_unknown(), "rdap_http": 403}
+
     if response.status_code == 429:
         # request_with_429_backoff (RETRY-AFTER MODE) already honored the
-        # per-host cooldown, logged the Retry-After detail at WARNING, and
-        # armed GLOBAL_HOST_COOLDOWN so the next domains for this host skip
-        # without a request. No extra warning here — cutting 429 log noise
-        # is the whole point of this change. Record the breaker failure and
-        # treat the domain as unknown.
+        # per-host cooldown, recorded a strike, logged the strike N/limit at
+        # WARNING, and — only if the strike limit was reached — armed
+        # GLOBAL_HOST_STOP. Below the limit the host resumes after its
+        # cooldown window. No extra warning here. Record the breaker failure
+        # and treat this domain as unknown.
         _BREAKER.record_failure()
         return {**_empty_unknown(), "rdap_http": 429}
 

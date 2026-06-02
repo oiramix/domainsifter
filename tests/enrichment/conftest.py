@@ -33,6 +33,8 @@ def _reset_breakers():
     # state doesn't leak into the next.
     from scripts.enrichment._circuit_breaker import (
         GLOBAL_HOST_COOLDOWN,
+        GLOBAL_HOST_STOP,
+        GLOBAL_HOST_STRIKES,
         GLOBAL_HOST_THROTTLE,
     )
     for path in _BREAKER_MODULES:
@@ -42,6 +44,8 @@ def _reset_breakers():
             breaker.reset()
     GLOBAL_HOST_THROTTLE.reset()
     GLOBAL_HOST_COOLDOWN.reset()
+    GLOBAL_HOST_STOP.reset()
+    GLOBAL_HOST_STRIKES.reset()
     yield
     for path in _BREAKER_MODULES:
         mod = importlib.import_module(path)
@@ -50,3 +54,5 @@ def _reset_breakers():
             breaker.reset()
     GLOBAL_HOST_THROTTLE.reset()
     GLOBAL_HOST_COOLDOWN.reset()
+    GLOBAL_HOST_STOP.reset()
+    GLOBAL_HOST_STRIKES.reset()

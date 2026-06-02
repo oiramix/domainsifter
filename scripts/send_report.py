@@ -219,6 +219,48 @@ def _count_tld_failures(log: str) -> int:
     )
 
 
+def _rdap_429_strikes(log: str) -> int:
+    """Count individual RDAP 429 strikes across all hosts this run.
+
+    Matches the per-strike WARNING from _circuit_breaker._request_honoring_
+    retry_after ("429 from <host> — strike N/L: ..."). Lets the operator
+    distinguish a "1 strike, recovered" day from a "hit the limit, stopped"
+    day. Counts EVERY strike including the limit-reaching one."""
+    return sum(
+        1 for line in log.splitlines()
+        if "429 from " in line and "— strike " in line
+    )
+
+
+def _rdap_429_stops(log: str) -> list[str]:
+    """Return the per-host STOP accounting lines for hosts that hit the 429
+    strike limit (NOT 403 — those are surfaced by _rdap_403_alarms).
+
+    Matches the pipeline's "RDAP host [<host>] STOPPED (429) after ..." warning
+    emitted in _check_availability_concurrent — one line per host that reached
+    its strike cap, carrying which host, when, and how many candidates were
+    left unchecked. Surfaced verbatim in the report header. The "(429)" reason
+    filter excludes 403 hard-stops, which get their own catastrophic banner."""
+    return [
+        line.strip()
+        for line in log.splitlines()
+        if "STOPPED (429)" in line and "left UNCHECKED" in line
+    ]
+
+
+def _rdap_403_alarms(log: str) -> list[str]:
+    """Return RDAP 403 CATASTROPHIC-block lines from rdap.check_availability.
+
+    A 403 is an outright block (typically IP-level), categorically worse than
+    a 429 rate limit. These MUST be impossible to miss — they drive the alarm
+    banner and escalate the subject line."""
+    return [
+        line.strip()
+        for line in log.splitlines()
+        if "403 FORBIDDEN" in line and "CATASTROPHIC IP-BLOCK" in line
+    ]
+
+
 def _truncate(log: str, max_bytes: int = _MAX_LOG_BYTES) -> str:
     """If log exceeds max_bytes, keep head + tail and replace middle with a
     notice. Preserves the most-useful portions (start: config + first errors;
@@ -249,10 +291,19 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
     domain_count = _extract_domain_count(log)
     breaker_trips = _count_circuit_breaker_trips(log)
     tld_failures = _count_tld_failures(log)
+    rdap_strikes = _rdap_429_strikes(log)
+    rdap_stops = _rdap_429_stops(log)
+    rdap_403s = _rdap_403_alarms(log)
     mem_peak = _memory_peak_bytes()
 
     count_part = f"{domain_count} domains" if domain_count is not None else "domain count unknown"
-    subject = f"[DomainSifter] Daily run {date_str} UTC: {verdict_emoji} {verdict_word} — {count_part}"
+    # A 403 is the catastrophic IP-block case — escalate the subject so it is
+    # impossible to miss even at a glance in the inbox.
+    alarm_prefix = "🚨 RDAP 403 BLOCK — " if rdap_403s else ""
+    subject = (
+        f"[DomainSifter] {alarm_prefix}Daily run {date_str} UTC: "
+        f"{verdict_emoji} {verdict_word} — {count_part}"
+    )
 
     header = [
         f"Verdict          : {verdict_emoji} {verdict_word} (exit code {pipeline_exit})",
@@ -262,13 +313,38 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"Domains published: {domain_count if domain_count is not None else '(unknown — log parse miss)'}",
         f"Breakers tripped : {breaker_trips}",
         f"TLD failures     : {tld_failures}",
+        f"RDAP 429 strikes : {rdap_strikes}",
+        f"RDAP 429 stops   : {len(rdap_stops)} (host(s) hit the strike limit)",
+        f"RDAP 403 blocks  : {len(rdap_403s)}",
     ]
+
+    # Loud alarm/notice blocks above the log, built only when there is
+    # something to report so clean days stay clean.
+    alert_blocks = ""
+    if rdap_403s:
+        alert_blocks += (
+            "\n🚨🚨 RDAP 403 — CATASTROPHIC IP-BLOCK DETECTED 🚨🚨\n"
+            "-------------------------------------------------\n"
+            "A registry returned 403 FORBIDDEN (an outright block, NOT a rate\n"
+            "limit). Investigate immediately — the egress IP is likely blocked.\n"
+            + "\n".join(rdap_403s)
+            + "\n"
+        )
+    if rdap_stops:
+        alert_blocks += (
+            "\n⚠️  RDAP hosts that backed off this run (429/403 stop-on-edge):\n"
+            "-------------------------------------------------------------\n"
+            + "\n".join(rdap_stops)
+            + "\n"
+        )
 
     body = (
         "DomainSifter daily run report\n"
         "=============================\n"
         + "\n".join(header)
-        + "\n\n"
+        + "\n"
+        + alert_blocks
+        + "\n"
         + "Full run log (journalctl, this invocation only):\n"
         + "------------------------------------------------\n"
         + _truncate(log)
