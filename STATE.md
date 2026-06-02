@@ -2045,7 +2045,7 @@ Pipeline filtering, verdict logic, newsletter source, display cap, and a new SEO
 - `bc2c63e` — filter expansion (token-aware, prefix-stem) + verdict tightening; ~75 hard-reject keywords; soft-signal tier forces Caution
 - `128dcba` — one-shot `scripts/refilter_today.py` re-applies new filters to existing JSON (195 → 188 after refilter, 7 rejected)
 - `dd5dc96` — three-fix plumbing: DNS prefilter killed (was 0% rejection 3 days running, ~25min cost), score-based trim by `trigram_match_count` at global_cap (was random-shuffle), `wayback_unknown` flag distinguishes circuit-breaker-tripped from confirmed-no-history; carryover for 3 days then ages out
-- `07c5a07` — display cap to top 30 per panel (`PUBLIC_DOMAIN_CAP=30`); pipeline writes all to JSON, cap is frontend-only
+- `07c5a07` — display cap (`PUBLIC_DOMAIN_CAP=30`) + per-TLD top-8 diversity cap; pipeline writes all to JSON, caps are frontend-only. **Scope (corrected 2026-06-02): both caps apply to the Today/new-drops panel ONLY — a flood-day guard so fresh drops don't bury the page. The Recent/carryover panel renders the FULL list uncapped (no top-30 slice, no per-TLD cap), so its rows match the header count.** `07c5a07` originally sliced carryover to 30 as well; that was a latent bug, fixed in DomainTable.astro. Do NOT re-add either cap to the carryover path.
 - `bc32080` — IPv6 RDAP diagnostic script (parked; OVH only has /128, ticket pending for /64)
 - `b303a55` — newsletter source: fresh-today only (`days_listed == 0`); three skip states: `skipped_empty`, `skipped_no_fresh`, `skipped_duplicate`
 - `beb90ff` — honest cap disclosure copy + newsletter signup hook (removed "paid plan coming soon" vaporware promise)
