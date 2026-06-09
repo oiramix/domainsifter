@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-07T11:27:00Z",
+  "generated_at": "2026-06-09T11:49:53Z",
   "entries": [
     {
       "name": "usimin.net",
@@ -704,6 +704,28 @@
       "wayback_snapshots": 2879,
       "cc_source_domain_count": 1,
       "open_page_rank": 1.84
+    },
+    {
+      "name": "bluecanaryevents.com",
+      "tld": "com",
+      "verdict": "Promising",
+      "score": 58,
+      "dropped_date": "2026-06-09",
+      "archived_date": "2026-06-09",
+      "wayback_snapshots": 2733,
+      "cc_source_domain_count": 39,
+      "open_page_rank": 2.18
+    },
+    {
+      "name": "stitcherscloset.com",
+      "tld": "com",
+      "verdict": "Promising",
+      "score": 55,
+      "dropped_date": "2026-06-09",
+      "archived_date": "2026-06-09",
+      "wayback_snapshots": 219175,
+      "cc_source_domain_count": 14,
+      "open_page_rank": 1.94
     }
   ]
 }
