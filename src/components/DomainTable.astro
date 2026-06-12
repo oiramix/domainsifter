@@ -132,9 +132,15 @@ const carryoverUncapped = allDomains
   .filter((d) => (d.days_listed ?? 0) > 0)
   .sort(byScoreDesc);
 
-// Today (NEW drops) panel: per-TLD diversity cap THEN panel size cap.
-const todayAfterTldCap = applyPerTldCap(todayUncapped, MAX_PER_TLD).sort(byScoreDesc);
-const todayDomains = todayAfterTldCap.slice(0, PUBLIC_DOMAIN_CAP);
+// Today (NEW drops) panel: render ALL fresh drops, so the badge count always
+// equals the rows present. Visual size is bounded by the max-height scroll
+// container on the row list (see CARD 1 below), NOT by dropping rows —
+// "how many rows" (data, show all) is separated from "how tall the card is"
+// (layout, constrain + scroll). The per-TLD diversity cap + PUBLIC_DOMAIN_CAP
+// slice were removed from this card on 2026-06-12: they hid fresh drops that
+// the badge still counted (14 counted, 11 rendered). `todayUncapped` is
+// already score-desc sorted (above), so order is preserved.
+const todayDomains = todayUncapped;
 
 // Recent (carryover) panel: UNCAPPED — every surviving domain renders, so
 // the row count matches the header count. Neither the per-TLD cap nor
@@ -144,11 +150,12 @@ const carryoverDomains = carryoverUncapped;
 const todayCountUncapped = todayUncapped.length;
 const carryoverCountUncapped = carryoverUncapped.length;
 
-// "Capped" means EITHER the per-TLD cap dropped entries OR the panel size cap
-// did. Only the Today panel can be capped; carryover always renders in full.
-const todayIsCapped =
-  todayUncapped.length > todayAfterTldCap.length ||
-  todayAfterTldCap.length > PUBLIC_DOMAIN_CAP;
+// The Today card no longer drops rows (all fresh drops render; height is
+// controlled by the scroll container), so it is never "capped". Held as a
+// const = false so the cap-notice block below still compiles but never
+// renders — neutralizes the "Diversified across TLDs" notice without
+// deleting shared helpers. Carryover was, and remains, uncapped.
+const todayIsCapped = false;
 const carryoverIsCapped = false;
 
 const lastUpdatedLabel = isPreview
@@ -356,8 +363,10 @@ const carryoverSubheader = (n: number): string => {
 
     {todayDomains.length > 0 && (
       <>
-        <!-- Desktop table — max-height + scroll for >20 rows. -->
-        <div class="hidden md:block max-h-[60rem] overflow-y-auto rounded-b-lg">
+        <!-- Desktop table — fixed max-height (~11 rows) + internal scroll, so
+             the card footprint stays stable whether today has 11, 14, or 40
+             fresh drops. The list shows all rows; the box just scrolls. -->
+        <div class="hidden md:block max-h-[34rem] overflow-y-auto rounded-b-lg">
           {/*
             CSS Grid replaces the <table> markup. Each row is its own grid
             container with the SAME explicit grid-cols template, so columns
