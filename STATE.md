@@ -18,6 +18,14 @@ Known bugs intentionally not fixed yet. Each entry names the trigger condition t
 
 ---
 
+## Intentional divergences (not bugs)
+
+### Site shows ALL fresh drops; newsletter still caps 8-per-TLD (2026-06-12)
+
+The homepage "Today's drops" card now renders every `days_listed==0` domain (badge count always == rows; the per-TLD diversity cap + `PUBLIC_DOMAIN_CAP` slice were removed from the card, and card height is bounded by an internal max-height scroll container instead of by dropping rows). The Buttondown newsletter STILL applies the 8-per-TLD cap via `scripts.generate_newsletter._apply_per_tld_cap` (which reads `display_caps.max_per_tld_in_top_panel`) because email can't scroll. This site/newsletter divergence is intentional — do NOT "fix" the newsletter to match the site, and do NOT remove the `display_caps.max_per_tld_in_top_panel` config key (the newsletter still needs it).
+
+---
+
 ## What is built and live
 
 ### Domain and DNS
