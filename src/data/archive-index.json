@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T11:48:41Z",
+  "generated_at": "2026-07-07T12:19:04Z",
   "entries": [
     {
       "name": "usimin.net",
@@ -1067,6 +1067,28 @@
       "wayback_snapshots": 3133,
       "cc_source_domain_count": 11,
       "open_page_rank": 0.0
+    },
+    {
+      "name": "mentortravel.org",
+      "tld": "org",
+      "verdict": "Promising",
+      "score": 56,
+      "dropped_date": "2026-07-07",
+      "archived_date": "2026-07-07",
+      "wayback_snapshots": 1899,
+      "cc_source_domain_count": 5,
+      "open_page_rank": 2.59
+    },
+    {
+      "name": "route66lostandfound.com",
+      "tld": "com",
+      "verdict": "Promising",
+      "score": 43,
+      "dropped_date": "2026-07-07",
+      "archived_date": "2026-07-07",
+      "wayback_snapshots": 2716,
+      "cc_source_domain_count": 2,
+      "open_page_rank": 2.32
     }
   ]
 }
