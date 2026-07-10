@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-09T11:57:50Z",
+  "generated_at": "2026-07-10T11:58:51Z",
   "entries": [
     {
       "name": "usimin.net",
@@ -1133,6 +1133,28 @@
       "wayback_snapshots": 33210,
       "cc_source_domain_count": 35,
       "open_page_rank": 1.33
+    },
+    {
+      "name": "documentingme.net",
+      "tld": "net",
+      "verdict": "Promising",
+      "score": 54,
+      "dropped_date": "2026-07-10",
+      "archived_date": "2026-07-10",
+      "wayback_snapshots": 6462,
+      "cc_source_domain_count": 7,
+      "open_page_rank": 1.84
+    },
+    {
+      "name": "everyoneneedsabuddy.com",
+      "tld": "com",
+      "verdict": "Promising",
+      "score": 46,
+      "dropped_date": "2026-07-10",
+      "archived_date": "2026-07-10",
+      "wayback_snapshots": 3778,
+      "cc_source_domain_count": 13,
+      "open_page_rank": 1.99
     }
   ]
 }
