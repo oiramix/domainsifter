@@ -123,7 +123,26 @@
     "model": "claude-haiku-4-5-20251001",
     "batch_size": 15,
     "concurrency": 6,
-    "max_retry_passes": 1
+    "max_retry_passes": 1,
+    "_claude_code_doc": "Used only when llm.backend == 'claude_code'. Claude Code carries ~25k tokens of its own system prompt + tool defs on EVERY call, so the API path's batch_size=15 would be almost pure overhead; we chunk far larger instead. chunk_size 800 is set from a 2026-09-17 measurement on the OVH box: 29.4 output tokens per ranked name against a 32k output cap gives a hard ceiling near 1090 names/call, so 800 leaves margin for a verbose day. max_names_claude_code REPLACES the budget-derived target_n (daily_budget_eur / cost_per_1000_planning_usd), which is meaningless when inference is covered by the Max subscription rather than metered tokens; the runtime cost meter is likewise skipped on this backend. Both budget mechanisms stay fully active for llm.backend == 'api' so rollback is faithful.",
+    "chunk_size": 800,
+    "max_names_claude_code": 13000
+  },
+  "llm": {
+    "_doc": "Backend selection for every pipeline stage that needs model inference (phase2_ranker, snapshot_classifier, classify_carryover). 'api' is the historical metered Anthropic path; 'claude_code' shells out to the `claude` CLI authenticated with a subscription OAuth token, costing nothing per token. Switched to claude_code on 2026-09-18 because the API credit balance hit zero on 2026-07-23 and will not be refunded. ROLLBACK is this one value. Implementation and the two traps it guards (ANTHROPIC_API_KEY outranks the OAuth token; a conversational refusal must not be mistaken for an empty result) are documented in scripts/llm_backend.py.",
+    "backend": "claude_code",
+    "binary": "/usr/bin/claude",
+    "model": "haiku",
+    "timeout_seconds": 900,
+    "env_file": "/etc/domainsifter/claude.env",
+    "max_parallel": 3,
+    "api_model": "claude-haiku-4-5-20251001",
+    "api_max_tokens": 8192
+  },
+  "snapshot_classifier": {
+    "_doc": "Wayback-excerpt content classifier. Its 'toxic' verdict is the ONLY thing that trips the toxic gate in filter.keep_post_enrichment (scripts/filter.py). That gate has been open since 2026-07-23 because the classifier returned 'unknown' for every domain once API credits ran out. batch_size groups domains per model call (the old path made one call per domain, which is unusable against Claude Code's per-call overhead). shadow=true writes the verdict to snapshot_category_shadow and leaves snapshot_category='unknown', so nothing is evicted while we validate the new backend against the API-era verdicts; set false to arm it for real.",
+    "batch_size": 20,
+    "shadow": true
   },
   "display_caps": {
     "_doc": "Per-TLD ceiling applied at the DISPLAY layer only (homepage Today/Recent panels and the Buttondown newsletter top-N). Pipeline output daily-domains.json stays score-pure — this knob never touches the JSON contract. Rationale (2026-05-25): the published list is heavily .net-skewed because .net has Wayback content where other approved TLDs often don't. With ~232 entries across 14 TLDs and ~170 .net, a naive score-desc top-30 panel was rendering 25+ .net rows and creating an honesty gap against the 'curated across 15 TLDs' methodology copy. Algorithm: bucket by TLD, take top-N per TLD by score (slack flows naturally — TLDs with fewer than N just contribute what they have), flatten, score-sort, take panel size. Cap fires INDEPENDENTLY per surface: Today panel, Recent panel, newsletter top-N each see their own bucket. Tighten the cap (8→6) only if smaller TLDs still get crowded out; loosen (8→12) only if production data shows the cap is starving small-TLD slots without improving diversity. The newsletter and homepage may diverge later but share the same 8 for now (homepage panel=30, newsletter panel=20 from newsletter.top_n).",

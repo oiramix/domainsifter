@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from datetime import date
 from io import BytesIO
 from types import SimpleNamespace
@@ -664,3 +665,496 @@ def test_pipeline_integration_full_path_with_mocked_haiku(caplog):
     assert "score_distribution" in status
     assert status["above_gate_count"] == 2
     assert status["scored_count"] == 4
+
+
+# ---------------------------------------------------------------------------
+# 23+: claude_code backend path (2026-09-18 subscription switch)
+#
+# The Anthropic API balance has been zero since 2026-07-23, so the metered
+# path 400s every batch and the ranker has been falling back daily. These
+# tests cover the chunked, subscription-backed replacement. The backend is
+# always a fake — no subprocess, no live call.
+# ---------------------------------------------------------------------------
+
+
+class _FakeBackend:
+    """Stands in for llm_backend.ClaudeCodeBackend.
+
+    Scores every name it is handed, unless `fail_if`/`reply_if` say otherwise.
+    Both hooks key off the CHUNK CONTENTS rather than a call counter, so they
+    stay deterministic when chunks run in parallel.
+    """
+
+    name = "claude_code"
+
+    def __init__(
+        self,
+        *,
+        scores: dict[str, int] | None = None,
+        default_score: int = 80,
+        fail_if=None,
+        reply_if=None,
+    ) -> None:
+        self._scores = scores or {}
+        self._default = default_score
+        self._fail_if = fail_if
+        self._reply_if = reply_if
+        self.calls: list[dict] = []
+        self._lock = threading.Lock()
+
+    def complete(self, *, system: str, user: str, timeout_seconds=None) -> str:
+        names = [
+            line[2:].strip() for line in user.splitlines() if line.startswith("- ")
+        ]
+        with self._lock:
+            self.calls.append(
+                {"names": names, "system": system, "timeout": timeout_seconds}
+            )
+        if self._fail_if is not None and self._fail_if(names):
+            raise phase2_ranker.llm_backend.LLMBackendError("chunk exploded")
+        if self._reply_if is not None:
+            canned = self._reply_if(names)
+            if canned is not None:
+                return canned
+        return json.dumps(
+            [
+                {
+                    "domain": n,
+                    "score": self._scores.get(n, self._default),
+                    "reason": "invented test reason",
+                }
+                for n in names
+            ]
+        )
+
+    @property
+    def chunk_sizes(self) -> list[int]:
+        return sorted(len(c["names"]) for c in self.calls)
+
+    @property
+    def all_names(self) -> list[str]:
+        return [n for c in self.calls for n in c["names"]]
+
+
+def _cc_config(
+    *,
+    chunk_size: int = 800,
+    max_names_claude_code: int = 13000,
+    max_parallel: int = 1,
+    score_gate: int = 60,
+    min_eligible: int = 1,
+    enabled: bool = True,
+    daily_budget_eur: float = 3.0,
+    backend: str = "claude_code",
+) -> dict:
+    """A config on the claude_code backend."""
+    cfg = _config(
+        enabled=enabled,
+        score_gate=score_gate,
+        min_eligible=min_eligible,
+        daily_budget_eur=daily_budget_eur,
+    )
+    cfg["phase2"]["chunk_size"] = chunk_size
+    cfg["phase2"]["max_names_claude_code"] = max_names_claude_code
+    cfg["llm"] = {"backend": backend, "max_parallel": max_parallel}
+    return cfg
+
+
+def _use(monkeypatch, backend) -> None:
+    monkeypatch.setattr(
+        phase2_ranker.llm_backend, "get_backend", lambda config: backend
+    )
+
+
+# --- backend selection -----------------------------------------------------
+
+
+def test_backend_name_defaults_to_api_when_config_has_no_llm_section():
+    """ROLLBACK PARITY: a config written before the switch keeps the metered
+    path, so nothing changes until `llm` is added to scripts/config.json."""
+    assert phase2_ranker._backend_name({}) == "api"
+    assert phase2_ranker._backend_name({"phase2": {"enabled": True}}) == "api"
+
+
+def test_backend_name_reads_llm_backend_when_section_present():
+    assert phase2_ranker._backend_name({"llm": {"backend": "api"}}) == "api"
+    assert (
+        phase2_ranker._backend_name({"llm": {"backend": "CLAUDE_CODE "}})
+        == "claude_code"
+    )
+    # Section present but backend omitted -> llm_backend.DEFAULTS applies.
+    assert phase2_ranker._backend_name({"llm": {"model": "haiku"}}) == "claude_code"
+
+
+def test_rank_and_select_fallback_when_backend_name_is_unknown():
+    cands = [_cand(f"brandseed{i:02d}.org") for i in range(5)]
+    cfg = _cc_config(backend="does-not-exist")
+    out, status = phase2_ranker.rank_and_select(
+        cands, cfg, today=date(2026, 6, 2), client=None,
+    )
+    assert status["mode"] == "fallback"
+    assert status["reason"] == "no_api_client"
+    assert len(out) == 5
+    assert all("phase2_score" not in c for c in out)
+
+
+# --- chunking --------------------------------------------------------------
+
+
+def test_claude_code_chunks_at_chunk_size_boundaries(monkeypatch):
+    """1,700 names at chunk_size=800 -> 800 + 800 + 100, every name sent once."""
+    cands = [_cand(f"brandseed{i:04d}.org") for i in range(1700)]
+    backend = _FakeBackend()
+    _use(monkeypatch, backend)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=800), today=date(2026, 6, 2),
+    )
+    assert backend.chunk_sizes == [100, 800, 800]
+    assert len(backend.all_names) == 1700
+    assert len(set(backend.all_names)) == 1700
+    assert status["mode"] == "ranker"
+    assert status["scored_count"] == 1700
+    assert len(out) == 1700
+
+
+def test_claude_code_exact_multiple_of_chunk_size_makes_no_empty_chunk(monkeypatch):
+    cands = [_cand(f"brandseed{i:04d}.org") for i in range(1600)]
+    backend = _FakeBackend()
+    _use(monkeypatch, backend)
+
+    phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=800), today=date(2026, 6, 2),
+    )
+    assert backend.chunk_sizes == [800, 800]
+
+
+def test_claude_code_passes_the_full_ranker_system_prompt(monkeypatch):
+    """A paraphrase of RANKER_SYSTEM was refused outright as a trademark
+    question (2026-09-17). Every chunk must carry the verbatim prompt."""
+    cands = [_cand(f"brandseed{i:03d}.org") for i in range(20)]
+    backend = _FakeBackend()
+    _use(monkeypatch, backend)
+
+    phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=5), today=date(2026, 6, 2),
+    )
+    assert len(backend.calls) == 4
+    assert all(c["system"] == phase2_ranker.RANKER_SYSTEM for c in backend.calls)
+
+
+def test_claude_code_attaches_score_and_reason_to_each_candidate(monkeypatch):
+    """phase2_reason feeds the private R2 overflow queue - it must survive."""
+    cands = [_cand("coppernest.org"), _cand("tideblock.io")]
+    backend = _FakeBackend(scores={"coppernest.org": 91, "tideblock.io": 77})
+    _use(monkeypatch, backend)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=800), today=date(2026, 6, 2),
+    )
+    assert status["backend"] == "claude_code"
+    assert [c["name"] for c in out] == ["coppernest.org", "tideblock.io"]
+    assert [c["phase2_score"] for c in out] == [91, 77]
+    assert all(c["phase2_reason"] == "invented test reason" for c in out)
+
+
+# --- partial failure -------------------------------------------------------
+
+
+def _doomed_chunk(backend: "_FakeBackend") -> set[str]:
+    """Names of the single chunk that the `poisoned` marker landed in.
+
+    `pre_narrow` reorders candidates before chunking, so a test must not
+    assume WHICH names share a chunk — only that exactly one chunk was hit.
+    """
+    hit = [set(c["names"]) for c in backend.calls if "poisoned.org" in c["names"]]
+    assert len(hit) == 1
+    return hit[0]
+
+
+def test_claude_code_one_failed_chunk_leaves_other_chunks_scored(monkeypatch):
+    """One LLMBackendError must not cost the other chunks their scores; the
+    failed chunk's names land below-gate instead of vanishing."""
+    cands = [_cand("poisoned.org")] + [
+        _cand(f"brandseed{i:02d}.org") for i in range(9)
+    ]
+    backend = _FakeBackend(fail_if=lambda names: "poisoned.org" in names)
+    _use(monkeypatch, backend)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=5, max_parallel=2), today=date(2026, 6, 2),
+    )
+    doomed = _doomed_chunk(backend)
+    assert status["mode"] == "ranker_partial"
+    assert status["reason"] == "chunks_failed"
+    assert status["batches_failed"] == 1
+    assert status["batches_ok"] == 1
+    assert status["missing_count"] == len(doomed)
+    # The surviving chunk is fully scored; the failed one is entirely absent.
+    assert {c["name"] for c in out} == {c["name"] for c in cands} - doomed
+
+
+def test_claude_code_prose_refusal_chunk_is_treated_as_batch_failure(monkeypatch):
+    """Prose instead of JSON is a FAILED chunk, never 'no results'."""
+    cands = [_cand("poisoned.org")] + [
+        _cand(f"brandseed{i:02d}.org") for i in range(9)
+    ]
+    refusal = (
+        "I am not able to help with assessing trademark availability for "
+        "these domain names."
+    )
+    backend = _FakeBackend(
+        reply_if=lambda names: refusal if "poisoned.org" in names else None
+    )
+    _use(monkeypatch, backend)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=5, max_parallel=2), today=date(2026, 6, 2),
+    )
+    doomed = _doomed_chunk(backend)
+    assert status["mode"] == "ranker_partial"
+    assert status["reason"] == "chunks_failed"
+    assert status["batches_failed"] == 1
+    assert status["missing_count"] == len(doomed)
+    assert {c["name"] for c in out} == {c["name"] for c in cands} - doomed
+
+
+def test_claude_code_all_chunks_failed_falls_back_unchanged(monkeypatch):
+    """New fallback reason: a chunked run that yielded nothing usable."""
+    cands = [_cand(f"brandseed{i:02d}.org") for i in range(20)]
+    backend = _FakeBackend(fail_if=lambda names: True)
+    _use(monkeypatch, backend)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=5), today=date(2026, 6, 2),
+    )
+    assert status["mode"] == "fallback"
+    assert status["reason"] == "all_chunks_failed"
+    assert status["chunks_failed"] == 4
+    # Fallback parity: lexical_kept back unchanged, no score field, so
+    # _bucket_and_cap_for_availability runs its random-shuffle path.
+    assert len(out) == 20
+    assert all("phase2_score" not in c for c in out)
+
+
+def test_claude_code_too_few_eligible_still_falls_back(monkeypatch):
+    cands = [_cand(f"brandseed{i:02d}.org") for i in range(10)]
+    backend = _FakeBackend(default_score=20)  # nothing clears the gate
+    _use(monkeypatch, backend)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=800, min_eligible=5), today=date(2026, 6, 2),
+    )
+    assert status["mode"] == "fallback"
+    assert status["reason"] == "too_few_eligible"
+    assert status["backend"] == "claude_code"
+    assert len(out) == 10
+    assert all("phase2_score" not in c for c in out)
+
+
+def test_claude_code_empty_input_still_falls_back(monkeypatch):
+    backend = _FakeBackend()
+    _use(monkeypatch, backend)
+    out, status = phase2_ranker.rank_and_select(
+        [], _cc_config(), today=date(2026, 6, 2),
+    )
+    assert status == {"mode": "fallback", "reason": "empty_input"}
+    assert out == []
+    assert backend.calls == []
+
+
+def test_claude_code_backend_exception_falls_back(monkeypatch):
+    """A non-LLMBackendError escaping the pool must still land on the
+    `exception` fallback rather than crashing the pipeline."""
+    cands = [_cand(f"brandseed{i:02d}.org") for i in range(5)]
+
+    def boom(pre_narrowed, backend, **kwargs):
+        raise MemoryError("out of memory")
+
+    _use(monkeypatch, _FakeBackend())
+    monkeypatch.setattr(phase2_ranker, "_backend_chunk_all", boom)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(), today=date(2026, 6, 2),
+    )
+    assert status["mode"] == "fallback"
+    assert status["reason"] == "exception:MemoryError"
+    assert len(out) == 5
+    assert all("phase2_score" not in c for c in out)
+
+
+# --- parallelism + determinism ---------------------------------------------
+
+
+def test_claude_code_parallel_run_is_deterministic_and_correctly_ordered(monkeypatch):
+    """Chunks complete out of order under the pool; the returned list must
+    still be sorted by (-score, name) and identical run to run."""
+    cands = [_cand(f"brandseed{i:03d}.org") for i in range(60)]
+    # Deterministic but deliberately non-monotonic scores.
+    scores = {c["name"]: 50 + (i * 7) % 51 for i, c in enumerate(cands)}
+    cfg = _cc_config(chunk_size=8, max_parallel=3, score_gate=60)
+
+    runs = []
+    for _ in range(3):
+        backend = _FakeBackend(scores=scores)
+        _use(monkeypatch, backend)
+        out, status = phase2_ranker.rank_and_select(
+            cands, cfg, today=date(2026, 6, 2),
+        )
+        assert status["mode"] == "ranker"
+        runs.append([(c["name"], c["phase2_score"]) for c in out])
+
+    assert runs[0] == runs[1] == runs[2]
+    expected = sorted(
+        ((n, s) for n, s in scores.items() if s >= 60),
+        key=lambda pair: (-pair[1], pair[0]),
+    )
+    assert runs[0] == expected
+
+
+def test_claude_code_respects_llm_max_parallel(monkeypatch):
+    """max_parallel bounds concurrent chunks - the CLI is not free to fan out
+    across the whole day's candidate set at once."""
+    cands = [_cand(f"brandseed{i:03d}.org") for i in range(40)]
+    live = {"now": 0, "peak": 0}
+    lock = threading.Lock()
+
+    class _CountingBackend(_FakeBackend):
+        def complete(self, *, system, user, timeout_seconds=None):
+            with lock:
+                live["now"] += 1
+                live["peak"] = max(live["peak"], live["now"])
+            try:
+                time.sleep(0.02)
+                return super().complete(
+                    system=system, user=user, timeout_seconds=timeout_seconds
+                )
+            finally:
+                with lock:
+                    live["now"] -= 1
+
+    _use(monkeypatch, _CountingBackend())
+    phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=2, max_parallel=3), today=date(2026, 6, 2),
+    )
+    assert live["peak"] <= 3
+
+
+# --- budget behaviour ------------------------------------------------------
+
+
+def test_claude_code_skips_the_cost_meter_entirely(monkeypatch):
+    """A budget small enough to halt the api path after one batch must not
+    touch the subscription path: nothing is metered, nothing is capped."""
+    cands = [_cand(f"brandseed{i:03d}.org") for i in range(100)]
+    backend = _FakeBackend()
+    _use(monkeypatch, backend)
+
+    cfg = _cc_config(chunk_size=10, daily_budget_eur=0.000001)
+    out, status = phase2_ranker.rank_and_select(cands, cfg, today=date(2026, 6, 2))
+
+    assert status["mode"] == "ranker"          # NOT ranker_partial
+    assert status["ceiling_hit"] is False
+    assert status["cost_usd"] == 0.0
+    assert len(backend.calls) == 10            # every chunk ran
+    assert status["scored_count"] == 100
+    assert len(out) == 100
+
+
+def test_claude_code_cap_comes_from_max_names_not_the_budget_formula(monkeypatch):
+    """target_n = phase2.max_names_claude_code, not
+    floor(daily_budget_usd / cost_per_1000_planning_usd * 1000)."""
+    cands = [_cand(f"brandseed{i:03d}.org") for i in range(50)]
+    backend = _FakeBackend()
+    _use(monkeypatch, backend)
+
+    # The budget formula here would allow 3,000 names; the cap says 12.
+    cfg = _cc_config(chunk_size=800, max_names_claude_code=12)
+    out, status = phase2_ranker.rank_and_select(cands, cfg, today=date(2026, 6, 2))
+
+    assert status["scored_count"] == 12
+    assert len(backend.all_names) == 12
+    assert len(out) == 12
+
+
+def test_claude_code_defaults_are_800_and_13000():
+    assert phase2_ranker.DEFAULTS["chunk_size"] == 800
+    assert phase2_ranker.DEFAULTS["max_names_claude_code"] == 13000
+    cfg = {"llm": {"backend": "claude_code"}, "phase2": {}}
+    assert phase2_ranker._config(cfg, "chunk_size") == 800
+    assert phase2_ranker._config(cfg, "max_names_claude_code") == 13000
+
+
+def test_api_backend_still_enforces_the_cost_ceiling_when_llm_section_present():
+    """Rollback fidelity: with llm.backend='api' the metered path is used
+    verbatim - direct client, batch_size batches, live cost meter."""
+    cands = [_cand(f"brandseed{i:02d}.org") for i in range(20)]
+    rows = [{"domain": cands[i]["name"], "score": 80, "reason": "ok"} for i in range(5)]
+    expensive = _mock_response(rows, input_tokens=20_000_000, output_tokens=20_000_000)
+    client = MagicMock()
+    client.messages.create.return_value = expensive
+
+    cfg = _cc_config(backend="api", min_eligible=3)
+    cfg["phase2"].update(batch_size=5, concurrency=1, max_retry_passes=0)
+    cfg["phase2"]["daily_budget_eur"] = 1.0
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, cfg, today=date(2026, 6, 2), client=client,
+    )
+    assert status["backend"] == "api"
+    assert status["mode"] == "ranker_partial"
+    assert status["reason"] == "cost_ceiling_hit"
+    assert status["ceiling_hit"] is True
+    assert status["cost_usd"] > 0
+    assert client.messages.create.call_count == 1
+    assert len(out) == 5
+
+
+def test_api_backend_ignores_chunk_size_and_uses_batch_size():
+    """chunk_size is a claude_code knob; the metered path must not read it."""
+    cands = [_cand(f"brandseed{i:02d}.org") for i in range(20)]
+    client = _mock_client_returning(
+        [[{"domain": c["name"], "score": 80, "reason": "ok"} for c in cands]]
+    )
+    cfg = _cc_config(backend="api", chunk_size=800, min_eligible=1)
+    cfg["phase2"].update(batch_size=5, concurrency=1, max_retry_passes=0)
+
+    out, status = phase2_ranker.rank_and_select(
+        cands, cfg, today=date(2026, 6, 2), client=client,
+    )
+    assert status["mode"] == "ranker"
+    # 20 candidates / batch_size 5 -> 4 calls, not one 800-name chunk.
+    assert client.messages.create.call_count == 4
+
+
+def test_claude_code_fallback_output_keeps_random_shuffle_path_intact(monkeypatch):
+    """Fallback parity, end to end: what a failed claude_code run hands back
+    must still flow through the untouched random-shuffle trim."""
+    from scripts import pipeline
+    from scripts.enrichment import rdap as _rdap
+
+    monkeypatch.setattr(_rdap, "resolve_rdap_host", lambda n, c: "rdap.test.example")
+    _use(monkeypatch, _FakeBackend(fail_if=lambda names: True))
+
+    cands = [_cand(f"brandseed{i}.org") for i in range(5)]
+    out, status = phase2_ranker.rank_and_select(
+        cands, _cc_config(chunk_size=5), today=date(2026, 6, 2),
+    )
+    assert status["mode"] == "fallback"
+    assert all("phase2_score" not in c for c in out)
+
+    config = {
+        "availability_check": {
+            "max_runtime_per_host_seconds": 3, "global_cap": 100,
+        },
+        "api_min_interval_seconds": {"rdap": 1.0},
+    }
+    final, _ = pipeline._bucket_and_cap_for_availability(
+        out, config, today=date(2026, 6, 2),
+    )
+    final2, _ = pipeline._bucket_and_cap_for_availability(
+        [_cand(f"brandseed{i}.org") for i in range(5)],
+        config, today=date(2026, 6, 2),
+    )
+    assert len(final) == 3
+    assert {c["name"] for c in final} == {c["name"] for c in final2}

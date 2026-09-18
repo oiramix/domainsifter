@@ -79,19 +79,20 @@ def test_validate_env_falls_back_to_os_environ_when_arg_omitted(monkeypatch):
 def test_anthropic_key_missing_warns_with_custom_message(caplog):
     """Per Phase 4 design decision (k): missing key is SOFT-FAIL with a
     LOUD WARNING. validate_env must not raise; the warning must contain
-    the specific phrase 'snapshot classification disabled' so the daily
-    report email surfaces misconfiguration."""
+    the phrase "llm.backend='api'" so an operator is pointed at the
+    thing that actually governs the LLM stages since the 2026-09-18
+    backend switch, rather than at a key the default path ignores."""
     env = dict(REQUIRED)  # no ANTHROPIC_API_KEY
     with caplog.at_level(logging.WARNING, logger="scripts.env_check"):
         env_check.validate_env(env)
     warnings = [rec for rec in caplog.records if rec.levelname == "WARNING"]
     assert any(
         "ANTHROPIC_API_KEY" in rec.message
-        and "snapshot classification disabled" in rec.message
+        and "llm.backend='api'" in rec.message
         for rec in warnings
     ), (
-        "Expected a WARNING citing ANTHROPIC_API_KEY + 'snapshot "
-        "classification disabled'; got: "
+        "Expected a WARNING citing ANTHROPIC_API_KEY + "
+        "\"llm.backend='api'\"; got: "
         + repr([rec.message for rec in warnings])
     )
 
@@ -120,7 +121,7 @@ def test_anthropic_key_empty_string_treated_as_missing(caplog):
     with caplog.at_level(logging.WARNING, logger="scripts.env_check"):
         env_check.validate_env(env)
     assert any(
-        "snapshot classification disabled" in rec.message
+        "llm.backend='api'" in rec.message
         for rec in caplog.records
     )
 

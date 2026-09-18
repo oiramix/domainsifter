@@ -52,7 +52,7 @@ import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from scripts import snapshot_classifier
+from scripts import llm_backend, snapshot_classifier
 
 logger = logging.getLogger("scripts.classify_carryover")
 
@@ -352,13 +352,18 @@ def run(
     dry_run: bool,
     no_push: bool,
     today: date,
+    config: dict | None = None,
     client_factory=snapshot_classifier.make_default_client,
 ) -> int:
     """Orchestrate one backfill run. Returns the process exit code.
 
-    `client_factory` is injectable for tests (pass a lambda that returns
-    a FakeClient or None). Production callers omit it and get the
-    default ANTHROPIC_API_KEY-from-env behaviour.
+    `client_factory` is injectable for tests (pass a lambda that accepts a
+    config dict and returns a fake client or None). Production callers omit
+    it and get the backend named by `config["llm"]["backend"]`.
+
+    `config` carries llm.backend plus the snapshot_classifier knobs; without
+    it the classifier silently uses in-code defaults and config.json edits
+    would not reach this tool.
     """
     payload = _load_json(daily_path, default=None)
     if payload is None:
@@ -382,17 +387,40 @@ def run(
         len(targets), len(domains),
     )
 
-    client = client_factory()
+    # Shadow mode is for the UNATTENDED daily pipeline, where we want verdicts
+    # observed before they start evicting. This tool is the opposite: an
+    # operator runs it deliberately, reviews --dry-run output, then re-runs to
+    # commit. Honouring shadow here would make a wet run silently evict
+    # nothing — the exact failure this tool exists to repair. So force it off
+    # locally, on a copy, without touching the caller's config.
+    config = dict(config or {})
+    classifier_cfg = dict(config.get("snapshot_classifier") or {})
+    if classifier_cfg.get("shadow"):
+        logger.info(
+            "snapshot_classifier.shadow is on in config; overriding to OFF for "
+            "this backfill so toxic entries are actually evicted."
+        )
+    classifier_cfg["shadow"] = False
+    config["snapshot_classifier"] = classifier_cfg
+
+    client = client_factory(config)
     if client is None and not dry_run:
-        # Wet run with no key = nothing useful gets done. Abort with a clear
-        # error rather than silently writing 'unknown' over real data. Dry
-        # run with no key is fine — it just shows the no-op summary.
+        # Wet run with no usable backend = nothing useful gets done. Abort
+        # with a clear error rather than silently writing 'unknown' over real
+        # data. Dry run is fine — it just shows the no-op summary.
+        #
+        # NOTE: since the 2026-09-18 backend switch this fires only for an
+        # unrecognised llm.backend name. A broken `claude` binary or an
+        # expired OAuth token now fails per-batch into all-unknown instead,
+        # which the shadow/eviction logic treats as "classified nothing".
         logger.error(
-            "ANTHROPIC_API_KEY missing — set it in .env before running for real."
+            "No usable LLM backend — check llm.backend in scripts/config.json "
+            "and the token in %s.",
+            llm_backend.cfg(config or {}, "env_file"),
         )
         return 1
 
-    counts = snapshot_classifier.classify_all(targets, client=client)
+    counts = snapshot_classifier.classify_all(targets, client=client, config=config)
     summary = _format_summary(len(targets), counts)
     logger.info(summary)
 
@@ -500,6 +528,11 @@ def main(argv: list[str] | None = None) -> int:
         "--excerpts-path", default=str(EXCERPTS_SIDECAR_PATH),
         help="Override wayback_excerpts.json sidecar path (testing).",
     )
+    parser.add_argument(
+        "--config",
+        default=str(Path(__file__).parent / "config.json"),
+        help="Path to config.json (carries llm.backend + classifier knobs).",
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args(argv)
 
@@ -521,6 +554,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
         no_push=args.no_push,
         today=date.today(),
+        config=_load_json(Path(args.config), default={}) or {},
     )
 
 

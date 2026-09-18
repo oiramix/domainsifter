@@ -93,7 +93,7 @@ def test_main_invokes_snapshot_classifier_with_enriched_list(monkeypatch, cfg, t
     _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
 
     classify_calls = []
-    def fake_classify(cands, *, client=None, pause_seconds=1.0):
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None):
         classify_calls.append({
             "count": len(cands),
             "names": [c["name"] for c in cands],
@@ -108,7 +108,7 @@ def test_main_invokes_snapshot_classifier_with_enriched_list(monkeypatch, cfg, t
                 "empty": 0, "unknown": 0}
     monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
     monkeypatch.setattr(
-        pipeline.snapshot_classifier, "make_default_client", lambda: None,
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
     )
 
     rc = pipeline.main(["--config", str(cfg_path)])
@@ -135,7 +135,7 @@ def test_main_rejects_toxic_at_post_enrichment_filter(monkeypatch, cfg, tmp_path
         "emptypage.com": "empty",
         "mysteryco.com": "unknown",
     }
-    def fake_classify(cands, *, client=None, pause_seconds=1.0):
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None):
         for c in cands:
             c["snapshot_category"] = category_map[c["name"]]
             c["snapshot_classifier_version"] = "v1"
@@ -143,7 +143,7 @@ def test_main_rejects_toxic_at_post_enrichment_filter(monkeypatch, cfg, tmp_path
         return {"legitimate": 1, "parked": 1, "toxic": 1, "empty": 1, "unknown": 1}
     monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
     monkeypatch.setattr(
-        pipeline.snapshot_classifier, "make_default_client", lambda: None,
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
     )
 
     rc = pipeline.main(["--config", str(cfg_path)])
@@ -176,14 +176,14 @@ def test_main_downgrades_parked_and_empty_to_caution(monkeypatch, cfg, tmp_path)
         "emptypage.com": "empty",
         "mysteryco.com": "unknown",
     }
-    def fake_classify(cands, *, client=None, pause_seconds=1.0):
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None):
         for c in cands:
             c["snapshot_category"] = category_map[c["name"]]
             c["snapshot_classifier_version"] = "v1"
         return {"legitimate": 1, "parked": 1, "toxic": 1, "empty": 1, "unknown": 1}
     monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
     monkeypatch.setattr(
-        pipeline.snapshot_classifier, "make_default_client", lambda: None,
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
     )
 
     rc = pipeline.main(["--config", str(cfg_path)])
@@ -205,7 +205,7 @@ def test_main_strips_inline_wayback_excerpt_before_filter(monkeypatch, cfg, tmp_
     cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
     _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
 
-    def fake_classify(cands, *, client=None, pause_seconds=1.0):
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None):
         for c in cands:
             c["snapshot_category"] = "legitimate"
             c["snapshot_classifier_version"] = "v1"
@@ -214,7 +214,7 @@ def test_main_strips_inline_wayback_excerpt_before_filter(monkeypatch, cfg, tmp_
                 "empty": 0, "unknown": 0}
     monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
     monkeypatch.setattr(
-        pipeline.snapshot_classifier, "make_default_client", lambda: None,
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
     )
 
     rc = pipeline.main(["--config", str(cfg_path)])
@@ -238,7 +238,7 @@ def test_main_writes_sidecar_with_classified_excerpts(monkeypatch, cfg, tmp_path
     cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
     _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
 
-    def fake_classify(cands, *, client=None, pause_seconds=1.0):
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None):
         for c in cands:
             c["snapshot_category"] = "legitimate"
             c["snapshot_classifier_version"] = "v1"
@@ -247,7 +247,7 @@ def test_main_writes_sidecar_with_classified_excerpts(monkeypatch, cfg, tmp_path
                 "empty": 0, "unknown": 0}
     monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
     monkeypatch.setattr(
-        pipeline.snapshot_classifier, "make_default_client", lambda: None,
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
     )
 
     rc = pipeline.main(["--config", str(cfg_path)])
@@ -266,7 +266,7 @@ def test_main_no_api_key_passes_through_as_unknown(monkeypatch, cfg, tmp_path):
     cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
     _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
     monkeypatch.setattr(
-        pipeline.snapshot_classifier, "make_default_client", lambda: None,
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
     )
 
     rc = pipeline.main(["--config", str(cfg_path)])
@@ -276,7 +276,14 @@ def test_main_no_api_key_passes_through_as_unknown(monkeypatch, cfg, tmp_path):
     assert len(daily["domains"]) == 5
     for entry in daily["domains"]:
         assert entry["snapshot_category"] == "unknown"
-        assert entry["snapshot_classifier_version"] == "v1"
+        # Assert against the constant, not a literal: the version is bumped
+        # whenever the prompt/parser could move a label (v1 -> v2 on the
+        # 2026-09-18 batching + backend switch), and this test is about the
+        # pass-through behaviour, not the stamp's value.
+        assert (
+            entry["snapshot_classifier_version"]
+            == pipeline.snapshot_classifier.CLASSIFIER_VERSION
+        )
 
 
 # ---------------------------------------------------------------------------

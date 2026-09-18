@@ -1053,9 +1053,13 @@ def main(argv: list[str] | None = None) -> int:
     # verdict-downgraded by output._compute_verdict at write time.
     # pause_seconds=1.0 paces archive.org's Availability API at ~1 req/s,
     # matching scripts/archive_generator.py's pre-existing cadence.
-    classifier_client = snapshot_classifier.make_default_client()
+    # `config` MUST be threaded through both calls: it carries llm.backend
+    # (api vs claude_code) and the snapshot_classifier.shadow / batch_size
+    # knobs. Without it both fall back to in-code defaults and editing
+    # config.json would silently have no effect on this stage.
+    classifier_client = snapshot_classifier.make_default_client(config)
     snapshot_classifier.classify_all(
-        enriched, client=classifier_client, pause_seconds=1.0,
+        enriched, client=classifier_client, pause_seconds=1.0, config=config,
     )
 
     # Persist excerpts to sidecar BEFORE Stage 5 so toxic-rejected entries

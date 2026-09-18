@@ -184,6 +184,385 @@ def test_build_email_strike_limit_day_shows_stop_no_subject_alarm(required_env):
     assert "938 left UNCHECKED" in body
 
 
+# --- LLM-stage signals: backend / ranker / classifier / credit errors -------
+#
+# Regression guard for the 2026-07-23 silent outage: credits hit zero, both
+# LLM stages failed soft, the report kept saying SUCCESS, and the
+# toxic-domain screen was open for ~8 weeks. All domains below are invented
+# (hard rule 1).
+
+_BACKEND_CLAUDE_CODE = (
+    "2026-09-18 06:31:02 INFO scripts.llm_backend "
+    "llm_backend[claude_code]: ok — out=412 tokens, cache_read=18240, 2130ms"
+)
+_BACKEND_API = (
+    "2026-09-18 06:31:02 INFO scripts.llm_backend "
+    "llm_backend[api]: ok — out=388 tokens, cache_read=0, 1980ms"
+)
+_RANKER_SCORED = (
+    "Phase 2 ranker: 312 scored, 8 missing (below-gate); $0.4120 spent of "
+    "$0.9000 ceiling; 84.3s"
+)
+_RANKER_FALLBACK = (
+    "Phase 2 ranker FALLBACK — too_few_eligible (above_gate=3 < min_eligible=40)"
+)
+_RANKER_FALLBACK_NO_CLIENT = (
+    "Phase 2 ranker FALLBACK — no API client "
+    "(ANTHROPIC_API_KEY missing or anthropic SDK absent)"
+)
+_CLASSIFIER_HEALTHY = (
+    "snapshot_classifier: results — 18 legitimate, 7 parked, 3 toxic, "
+    "2 empty, 1 unknown"
+)
+_CLASSIFIER_ALL_UNKNOWN = (
+    "snapshot_classifier: results — 0 legitimate, 0 parked, 0 toxic, "
+    "0 empty, 31 unknown"
+)
+_CREDIT_ERROR_LINE = (
+    "snapshot_classifier: Haiku call failed for marketglow.com: "
+    "Error code: 400 - {'error': {'message': 'Your credit balance is too low "
+    "to access the Anthropic API...'}} — treating as unknown"
+)
+
+
+def test_llm_backend_parses_claude_code():
+    assert send_report._llm_backend(_BACKEND_CLAUDE_CODE + "\n") == "claude_code"
+
+
+def test_llm_backend_parses_api():
+    assert send_report._llm_backend(_BACKEND_API + "\n") == "api"
+
+
+def test_llm_backend_dedupes_repeat_lines():
+    log = "\n".join([_BACKEND_CLAUDE_CODE] * 5) + "\n"
+    assert send_report._llm_backend(log) == "claude_code"
+
+
+def test_llm_backend_reports_both_on_mid_run_switch():
+    log = _BACKEND_CLAUDE_CODE + "\n" + _BACKEND_API + "\n"
+    assert send_report._llm_backend(log) == "claude_code, api"
+
+
+def test_llm_backend_none_when_absent():
+    assert send_report._llm_backend("nothing relevant\n") is None
+    assert send_report._llm_backend("") is None
+
+
+def test_phase2_ranker_outcome_reports_scored_count():
+    assert send_report._phase2_ranker_outcome(_RANKER_SCORED + "\n") == "RANKER (312 scored)"
+
+
+def test_phase2_ranker_outcome_reports_fallback_reason():
+    outcome = send_report._phase2_ranker_outcome(_RANKER_FALLBACK + "\n")
+    assert outcome == "FALLBACK — too_few_eligible"
+
+
+def test_phase2_ranker_outcome_fallback_wins_over_scored_line():
+    """A fallback run logs BOTH lines (it scores, then reverts). The fallback
+    is the fact that matters, so it must win."""
+    log = _RANKER_SCORED + "\n" + _RANKER_FALLBACK + "\n"
+    assert send_report._phase2_ranker_outcome(log) == "FALLBACK — too_few_eligible"
+
+
+def test_phase2_ranker_outcome_handles_no_api_client_fallback():
+    """The no-client fallback has no (above_gate=...) suffix; the whole
+    remainder becomes the reason."""
+    outcome = send_report._phase2_ranker_outcome(_RANKER_FALLBACK_NO_CLIENT + "\n")
+    assert outcome is not None
+    assert outcome.startswith("FALLBACK")
+    assert "no API client" in outcome
+
+
+def test_phase2_ranker_outcome_none_when_absent():
+    assert send_report._phase2_ranker_outcome("no ranker here\n") is None
+
+
+def test_snapshot_classifier_counts_parses_all_five():
+    counts = send_report._snapshot_classifier_counts(_CLASSIFIER_HEALTHY + "\n")
+    assert counts == {
+        "legitimate": 18, "parked": 7, "toxic": 3, "empty": 2, "unknown": 1,
+    }
+
+
+def test_snapshot_classifier_counts_none_when_absent():
+    assert send_report._snapshot_classifier_counts("nothing\n") is None
+
+
+def test_snapshot_classifier_counts_last_match_wins():
+    log = (
+        "snapshot_classifier: results — 1 legitimate, 0 parked, 0 toxic, 0 empty, 0 unknown\n"
+        + _CLASSIFIER_HEALTHY + "\n"
+    )
+    counts = send_report._snapshot_classifier_counts(log)
+    assert counts is not None and counts["legitimate"] == 18
+
+
+def test_classifier_is_blind_true_for_all_unknown():
+    counts = send_report._snapshot_classifier_counts(_CLASSIFIER_ALL_UNKNOWN + "\n")
+    assert send_report._classifier_is_blind(counts) is True
+
+
+def test_classifier_is_blind_false_for_healthy_mix():
+    counts = send_report._snapshot_classifier_counts(_CLASSIFIER_HEALTHY + "\n")
+    assert send_report._classifier_is_blind(counts) is False
+
+
+def test_classifier_is_blind_false_for_zero_domains():
+    """A day with no candidates to classify is not a degradation."""
+    log = "snapshot_classifier: results — 0 legitimate, 0 parked, 0 toxic, 0 empty, 0 unknown\n"
+    assert send_report._classifier_is_blind(send_report._snapshot_classifier_counts(log)) is False
+
+
+def test_classifier_is_blind_false_when_line_missing():
+    assert send_report._classifier_is_blind(None) is False
+
+
+def test_count_credit_balance_errors():
+    log = _CREDIT_ERROR_LINE + "\n" + _CREDIT_ERROR_LINE + "\nunrelated\n"
+    assert send_report._count_credit_balance_errors(log) == 2
+    assert send_report._count_credit_balance_errors("clean run\n") == 0
+
+
+# --- LLM-stage signals rendered into the email ------------------------------
+
+
+def test_build_email_renders_new_llm_fields(required_env):
+    log = (
+        _BACKEND_CLAUDE_CODE + "\n"
+        + _RANKER_SCORED + "\n"
+        + _CLASSIFIER_HEALTHY + "\n"
+        + "Wrote 12 domains to src/data/daily-domains.json\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    body = msg.get_content()
+    assert "LLM backend      : claude_code" in body
+    assert "Phase 2 ranker   : RANKER (312 scored)" in body
+    assert "Snapshot classes : 18 legitimate, 7 parked, 3 toxic, 2 empty, 1 unknown" in body
+    # Healthy day: no escalation, no banner, no credit-errors line.
+    assert "🚨" not in msg["Subject"]
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" not in body
+    assert "Credit errors" not in body
+
+
+def test_build_email_new_fields_degrade_to_placeholders(required_env):
+    """Absent log lines must render placeholders, not crash or omit fields."""
+    msg = send_report._build_email(pipeline_exit=0, log="nothing useful\n", duration_sec=1.0)
+    body = msg.get_content()
+    assert "LLM backend      : (none used)" in body
+    assert "Phase 2 ranker   : (no ranker line in log)" in body
+    assert "Snapshot classes : (no classifier line in log)" in body
+    assert "🚨" not in msg["Subject"]
+
+
+def test_build_email_all_unknown_fires_banner_and_escalates_subject(required_env):
+    """THE regression guard: exit code 0, pipeline 'SUCCESS', but every
+    classification came back unknown → toxic screen off. Must be loud."""
+    log = (
+        _CLASSIFIER_ALL_UNKNOWN + "\n"
+        + "Wrote 31 domains to src/data/daily-domains.json\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    subject = msg["Subject"]
+    assert "🚨 TOXIC SCREEN OFF" in subject
+    assert "SUCCESS" in subject  # the exit code really was 0 — that's the point
+    body = msg.get_content()
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" in body
+    assert "UNSCREENED" in body
+    assert "Snapshot classes : 0 legitimate, 0 parked, 0 toxic, 0 empty, 31 unknown" in body
+
+
+def test_build_email_all_unknown_names_credit_balance_as_likely_cause(required_env):
+    log = (
+        _CREDIT_ERROR_LINE + "\n"
+        + _CREDIT_ERROR_LINE + "\n"
+        + _CLASSIFIER_ALL_UNKNOWN + "\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    body = msg.get_content()
+    assert "Credit errors    : 2 ('credit balance is too low')" in body
+    assert "Likely cause     : 2 x 'credit balance is too low'" in body
+
+
+def test_build_email_healthy_classifier_does_not_fire_banner(required_env):
+    log = _BACKEND_API + "\n" + _CLASSIFIER_HEALTHY + "\n"
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    assert "🚨" not in msg["Subject"]
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" not in msg.get_content()
+
+
+def test_build_email_ranker_fallback_fires_banner_and_escalates_subject(required_env):
+    log = _RANKER_SCORED + "\n" + _RANKER_FALLBACK + "\n" + _CLASSIFIER_HEALTHY + "\n"
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    assert "🚨 PHASE 2 FALLBACK" in msg["Subject"]
+    body = msg.get_content()
+    assert "PHASE 2 RANKER FELL BACK TO MECHANICAL SELECTION" in body
+    assert "Phase 2 ranker   : FALLBACK — too_few_eligible" in body
+    # Classifier was healthy, so only the ranker banner fires.
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" not in body
+
+
+def test_build_email_successful_ranker_does_not_fire_fallback_banner(required_env):
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_RANKER_SCORED + "\n", duration_sec=42.0,
+    )
+    assert "🚨" not in msg["Subject"]
+    assert "FELL BACK TO MECHANICAL SELECTION" not in msg.get_content()
+
+
+def test_build_email_both_llm_banners_fire_together(required_env):
+    """The credit-exhaustion signature: no backend line, ranker fell back,
+    and every classification unknown — all on an exit-0 run."""
+    log = (
+        _RANKER_FALLBACK_NO_CLIENT + "\n"
+        + _CREDIT_ERROR_LINE + "\n"
+        + _CLASSIFIER_ALL_UNKNOWN + "\n"
+        + "Wrote 31 domains to src/data/daily-domains.json\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    subject = msg["Subject"]
+    assert "🚨 TOXIC SCREEN OFF" in subject
+    assert "🚨 PHASE 2 FALLBACK" in subject
+    body = msg.get_content()
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" in body
+    assert "PHASE 2 RANKER FELL BACK TO MECHANICAL SELECTION" in body
+    assert "LLM backend      : (none used)" in body
+
+
+def test_build_email_all_three_alarms_coexist_in_subject(required_env):
+    """A 403 block must not displace the LLM alarms, or vice versa."""
+    log = (
+        _403_LINE + "\n"
+        + _RANKER_FALLBACK + "\n"
+        + _CLASSIFIER_ALL_UNKNOWN + "\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+    subject = msg["Subject"]
+    assert "🚨 RDAP 403 BLOCK" in subject
+    assert "🚨 TOXIC SCREEN OFF" in subject
+    assert "🚨 PHASE 2 FALLBACK" in subject
+
+
+def test_build_email_banner_fires_on_failed_run_too(required_env):
+    """Degradation detection is independent of the pipeline exit code."""
+    msg = send_report._build_email(
+        pipeline_exit=1, log=_CLASSIFIER_ALL_UNKNOWN + "\n", duration_sec=42.0,
+    )
+    assert "FAILED" in msg["Subject"]
+    assert "🚨 TOXIC SCREEN OFF" in msg["Subject"]
+
+
+# --- malformed-input resilience --------------------------------------------
+
+
+@pytest.mark.parametrize("malformed", [
+    "snapshot_classifier: results — banana legitimate, 7 parked\n",
+    "snapshot_classifier: results —\n",
+    "llm_backend[]: ok — out=1\n",
+    "llm_backend[unterminated: ok\n",
+    "Phase 2 ranker: scored, missing\n",
+    "Phase 2 ranker FALLBACK —\n",
+    "Phase 2 ranker FALLBACK\n",
+    "\x00\x01 binary junk \udcff\n",
+    "snapshot_classifier: results — 99999999999999999999 legitimate, 0 parked, "
+    "0 toxic, 0 empty, 0 unknown\n",
+])
+def test_parsers_never_raise_on_malformed_input(malformed):
+    send_report._llm_backend(malformed)
+    send_report._phase2_ranker_outcome(malformed)
+    counts = send_report._snapshot_classifier_counts(malformed)
+    send_report._classifier_is_blind(counts)
+    send_report._count_credit_balance_errors(malformed)
+
+
+def test_build_email_survives_malformed_log(required_env):
+    malformed = (
+        "snapshot_classifier: results — banana legitimate\n"
+        "Phase 2 ranker FALLBACK —\n"
+        "llm_backend[]: ok\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=malformed, duration_sec=1.0)
+    assert msg["Subject"]  # built without raising
+    assert "Snapshot classes : (no classifier line in log)" in msg.get_content()
+
+
+def test_main_exits_zero_on_malformed_log(required_env, monkeypatch):
+    """The whole point of the exit-0 invariant: a parsing surprise in the new
+    LLM fields must not stop the email (or the wrapper). Garbage in the
+    classifier/ranker/backend lines still produces a delivered report."""
+    monkeypatch.setenv("INVOCATION_ID", "abc123")
+    malformed_log = (
+        "snapshot_classifier: results — banana legitimate,,,\n"
+        "Phase 2 ranker FALLBACK —   \n"
+        "llm_backend[: ok\n"
+        "Wrote banana domains to nowhere\n"
+    )
+    journal_mock = MagicMock(returncode=0, stdout=malformed_log, stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=journal_mock))
+
+    smtp_instance = MagicMock()
+    smtp_cm = MagicMock()
+    smtp_cm.__enter__ = MagicMock(return_value=smtp_instance)
+    smtp_cm.__exit__ = MagicMock(return_value=None)
+    monkeypatch.setattr(send_report.smtplib, "SMTP", MagicMock(return_value=smtp_cm))
+
+    assert send_report.main(["--pipeline-exit", "0"]) == 0
+    assert smtp_instance.send_message.called
+
+
+def test_main_ships_report_despite_undecodable_journal_bytes(required_env, monkeypatch):
+    """A lone surrogate in the journal must NOT suppress the email.
+
+    `_truncate` encodes with errors="replace", so undecodable bytes are
+    normalised away instead of raising UnicodeEncodeError. Suppressing the
+    report is the worst possible outcome: this email carries the toxic-screen
+    and ranker-fallback alarms, so it has to ship even on a mangled log.
+    """
+    monkeypatch.setenv("INVOCATION_ID", "abc123")
+    journal_mock = MagicMock(returncode=0, stdout="log with \udcff in it\n", stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=journal_mock))
+    smtp_instance = MagicMock()
+    smtp_cm = MagicMock()
+    smtp_cm.__enter__ = MagicMock(return_value=smtp_instance)
+    smtp_cm.__exit__ = MagicMock(return_value=None)
+    monkeypatch.setattr(send_report.smtplib, "SMTP", MagicMock(return_value=smtp_cm))
+
+    assert send_report.main(["--pipeline-exit", "0"]) == 0
+    assert smtp_instance.send_message.called
+
+
+def test_main_exits_zero_when_email_build_raises(required_env, monkeypatch, capsys):
+    """Last-ditch guard on the exit-0 invariant: an un-anticipated exception
+    while building the report soft-fails rather than propagating a non-zero
+    exit to the wrapper (which would mislabel a healthy run as FAILED)."""
+    monkeypatch.setenv("INVOCATION_ID", "abc123")
+    journal_mock = MagicMock(returncode=0, stdout="ordinary log line\n", stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=journal_mock))
+    monkeypatch.setattr(
+        send_report, "_build_email", MagicMock(side_effect=RuntimeError("boom"))
+    )
+    monkeypatch.setattr(send_report.smtplib, "SMTP", MagicMock())
+
+    assert send_report.main(["--pipeline-exit", "0"]) == 0
+    assert "failed to build email" in capsys.readouterr().err
+
+
+def test_main_exits_zero_when_degradation_banners_fire(required_env, monkeypatch):
+    """Banners change the subject/body but must never change the exit code."""
+    monkeypatch.setenv("INVOCATION_ID", "abc123")
+    log = _CLASSIFIER_ALL_UNKNOWN + "\n" + _RANKER_FALLBACK + "\n"
+    journal_mock = MagicMock(returncode=0, stdout=log, stderr="")
+    monkeypatch.setattr(send_report.subprocess, "run", MagicMock(return_value=journal_mock))
+
+    smtp_instance = MagicMock()
+    smtp_cm = MagicMock()
+    smtp_cm.__enter__ = MagicMock(return_value=smtp_instance)
+    smtp_cm.__exit__ = MagicMock(return_value=None)
+    monkeypatch.setattr(send_report.smtplib, "SMTP", MagicMock(return_value=smtp_cm))
+
+    assert send_report.main(["--pipeline-exit", "0"]) == 0
+    assert smtp_instance.send_message.called
+
+
 # --- truncation ------------------------------------------------------------
 
 
@@ -493,3 +872,59 @@ def test_main_returns_zero_on_missing_env(monkeypatch, capsys):
     assert rc == 0
     err = capsys.readouterr().err
     assert "missing required env var" in err
+
+
+# ---------------------------------------------------------------------------
+# Shadow mode (2026-09-18): the classifier runs and produces real verdicts but
+# deliberately does not apply them. Effective counts are all-unknown by
+# construction, which would otherwise trip the blind-screen alarm EVERY day of
+# the validation window — the surest way to teach an operator to ignore it.
+# ---------------------------------------------------------------------------
+
+_SHADOW_VERDICTS = (
+    "snapshot_classifier: SHADOW verdicts (NOT applied to snapshot_category) "
+    "— 18 legitimate, 4 parked, 3 toxic, 2 empty, 4 unknown"
+)
+_SHADOW_EVICT = (
+    "snapshot_classifier: SHADOW would evict 3 as toxic — "
+    "marketglow.com, tideblock.io, coppernest.org"
+)
+
+
+def test_parse_shadow_verdicts_reads_counts():
+    counts = send_report.parse_shadow_verdicts(_SHADOW_VERDICTS)
+    assert counts == {
+        "legitimate": 18, "parked": 4, "toxic": 3, "empty": 2, "unknown": 4,
+    }
+
+
+def test_parse_shadow_verdicts_absent_returns_none():
+    assert send_report.parse_shadow_verdicts(_CLASSIFIER_ALL_UNKNOWN) is None
+
+
+def test_parse_shadow_would_evict_counts_names():
+    assert send_report.parse_shadow_would_evict(_SHADOW_EVICT) == 3
+    assert send_report.parse_shadow_would_evict("nothing here") == 0
+
+
+def test_shadow_mode_reports_as_deliberate_not_as_breakage(required_env):
+    """The banner must say 'deliberate', and the subject must NOT claim the
+    screen is OFF — that alarm is reserved for the genuinely broken case."""
+    log = "\n".join([_SHADOW_VERDICTS, _SHADOW_EVICT, _CLASSIFIER_ALL_UNKNOWN])
+    msg = send_report._build_email(0, log, 120.0)
+    body = msg.get_content()
+
+    assert "SHADOW MODE (deliberate)" in body
+    assert "3 toxic" in body
+    assert "Would have evicted: 3" in body
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" not in body
+    assert "TOXIC SCREEN OFF" not in msg["Subject"]
+    assert "SCREEN IN SHADOW" in msg["Subject"]
+
+
+def test_all_unknown_without_shadow_line_still_alarms_loudly(required_env):
+    """Regression guard: the shadow carve-out must not disarm the real alarm.
+    This is the 2026-07-23 credit-outage shape — no shadow line at all."""
+    msg = send_report._build_email(0, _CLASSIFIER_ALL_UNKNOWN, 120.0)
+    assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" in msg.get_content()
+    assert "TOXIC SCREEN OFF" in msg["Subject"]

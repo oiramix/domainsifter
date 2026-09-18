@@ -54,9 +54,15 @@ OPTIONAL_ENV_VARS: tuple[str, ...] = (
 # Per-var override for the warning text. Falls back to the generic
 # "corresponding enrichment will be skipped" message when no entry here.
 OPTIONAL_ENV_VAR_WARNINGS: dict[str, str] = {
+    # Since the 2026-09-18 backend switch this key is NOT what drives the LLM
+    # stages: they run on a Claude Code subscription token (llm.backend =
+    # claude_code in scripts/config.json). It only matters if someone rolls
+    # llm.backend back to "api". Saying "classification disabled" here would
+    # send an operator hunting the wrong thing during an incident.
     "ANTHROPIC_API_KEY": (
-        "ANTHROPIC_API_KEY not set — snapshot classification disabled, "
-        "all candidates will pass-through as 'unknown'"
+        "ANTHROPIC_API_KEY not set — only affects llm.backend='api'; the "
+        "default 'claude_code' backend uses the subscription token in "
+        "/etc/domainsifter/claude.env instead"
     ),
 }
 

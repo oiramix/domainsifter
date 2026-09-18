@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import smtplib
 import subprocess
 import sys
@@ -261,13 +262,183 @@ def _rdap_403_alarms(log: str) -> list[str]:
     ]
 
 
+# --- LLM-stage signals (added 2026-09-18) ----------------------------------
+#
+# Why these exist: on 2026-07-23 the Anthropic credit balance hit zero. Both
+# LLM stages (Phase 2 ranker, snapshot classifier) failed SOFT — the pipeline
+# still exited 0 and this report still said "SUCCESS" — so nobody noticed for
+# roughly eight weeks. During that window the toxic-domain screen
+# (snapshot_category == "toxic" -> reject, in filter.py) was wide open and
+# every published domain went out unscreened.
+#
+# The parsers below turn that silent degradation into a subject-line alarm.
+# They are deliberately tolerant: a missed parse must degrade to a
+# "(unavailable)"-style placeholder, never raise, because main() must always
+# exit 0.
+
+# The em dash is what the pipeline logs, but accept a plain hyphen too so a
+# transport that mangles non-ASCII doesn't silently disable the alarm.
+_DASH = r"[—-]"
+
+_LLM_BACKEND_RE = re.compile(r"llm_backend\[([^\]\s]+)\]:\s*ok\b")
+_RANKER_SCORED_RE = re.compile(r"Phase 2 ranker:\s*(\d+)\s+scored\b")
+_RANKER_FALLBACK_RE = re.compile(r"Phase 2 ranker FALLBACK\s*" + _DASH + r"\s*(.+)")
+_CLASSIFIER_RESULTS_RE = re.compile(
+    r"snapshot_classifier:\s*results\s*" + _DASH + r"\s*"
+    r"(\d+)\s+legitimate,\s*(\d+)\s+parked,\s*(\d+)\s+toxic,\s*"
+    r"(\d+)\s+empty,\s*(\d+)\s+unknown"
+)
+
+CLASSIFIER_CATEGORIES = ("legitimate", "parked", "toxic", "empty", "unknown")
+
+
+def _llm_backend(log: str) -> str | None:
+    """Return the LLM backend name(s) that actually served a call this run.
+
+    Parses scripts/llm_backend.py's "llm_backend[<name>]: ok — ..." line
+    (<name> is "claude_code" or "api"). Returns None when no such line
+    appears, which means NO LLM call succeeded this run — on its own that is
+    not proof of breakage (a zero-candidate day makes no calls), but combined
+    with an all-unknown classifier it is the smoking gun.
+
+    If more than one backend served calls (e.g. a mid-run rollback), all
+    distinct names are returned in first-seen order, comma-joined."""
+    seen: list[str] = []
+    for match in _LLM_BACKEND_RE.finditer(log):
+        name = match.group(1)
+        if name not in seen:
+            seen.append(name)
+    return ", ".join(seen) if seen else None
+
+
+def _phase2_ranker_outcome(log: str) -> str | None:
+    """Summarise the Phase 2 ranker's outcome as a one-liner.
+
+    FALLBACK wins over the scored tally, because a fallback run logs BOTH
+    (it scores, finds too few above the gate, then reverts to mechanical
+    selection). The published list on a fallback day does NOT reflect
+    quality ranking, so that is the fact worth surfacing.
+
+    Returns "FALLBACK — <reason>", "RANKER (<n> scored)", or None when the
+    ranker left no trace in the log (disabled / empty input / never reached).
+    """
+    fallbacks = _RANKER_FALLBACK_RE.findall(log)
+    if fallbacks:
+        # Last fallback wins. Trim the "(above_gate=A < min_eligible=B)"
+        # suffix so the header line stays short; the raw line is still in
+        # the full log below.
+        reason = fallbacks[-1].strip()
+        reason = reason.split(" (above_gate=")[0].strip()
+        return f"FALLBACK — {reason}" if reason else "FALLBACK"
+    scored = _RANKER_SCORED_RE.findall(log)
+    if scored:
+        return f"RANKER ({scored[-1]} scored)"
+    return None
+
+
+def _snapshot_classifier_counts(log: str) -> dict[str, int] | None:
+    """Parse the classifier's per-category tally line.
+
+    Returns {"legitimate": A, "parked": B, "toxic": C, "empty": D,
+    "unknown": E} or None when the line is absent (classifier never ran).
+    Last match wins, mirroring _extract_domain_count."""
+    matches = _CLASSIFIER_RESULTS_RE.findall(log)
+    if not matches:
+        return None
+    last = matches[-1]
+    return {name: int(value) for name, value in zip(CLASSIFIER_CATEGORIES, last)}
+
+
+def _count_credit_balance_errors(log: str) -> int:
+    """Count Anthropic "credit balance is too low" occurrences.
+
+    This is the exact phrase from the API's 400 response when the account is
+    out of credit — the root cause of the 2026-07-23 silent outage. Surfaced
+    as the likely-cause line under the degradation banners."""
+    return log.count("credit balance is too low")
+
+
+_SHADOW_VERDICTS_RE = re.compile(
+    r"snapshot_classifier:\s*SHADOW verdicts[^\n]*?"
+    r"(\d+)\s+legitimate,\s*(\d+)\s+parked,\s*(\d+)\s+toxic,\s*"
+    r"(\d+)\s+empty,\s*(\d+)\s+unknown"
+)
+_SHADOW_EVICT_RE = re.compile(r"snapshot_classifier:\s*SHADOW would evict\s+(\d+)\s+as toxic")
+
+
+def parse_shadow_verdicts(log: str) -> dict[str, int] | None:
+    """Counts from the classifier's SHADOW line, or None when not in shadow.
+
+    Shadow mode means the classifier ran and produced real verdicts but
+    deliberately did not apply them, so `snapshot_category` is all-unknown by
+    construction. Without this, the blind-screen alarm would fire every single
+    day of the validation window and train the operator to ignore it — the
+    precise habit that let the 2026-07-23 outage run for ~8 weeks.
+    """
+    match = None
+    for match in _SHADOW_VERDICTS_RE.finditer(log):
+        pass
+    if match is None:
+        return None
+    keys = ("legitimate", "parked", "toxic", "empty", "unknown")
+    return {k: int(match.group(i + 1)) for i, k in enumerate(keys)}
+
+
+def parse_shadow_would_evict(log: str) -> int:
+    """How many domains the armed gate would have dropped this run."""
+    match = None
+    for match in _SHADOW_EVICT_RE.finditer(log):
+        pass
+    return int(match.group(1)) if match else 0
+
+
+def _classifier_is_blind(counts: dict[str, int] | None) -> bool:
+    """True when the classifier processed >0 domains and EVERY one came back
+    "unknown" — i.e. the toxic-domain screen rejected nothing because it
+    learned nothing. This is the condition that went unnoticed for 8 weeks."""
+    if not counts:
+        return False
+    total = sum(counts.values())
+    return total > 0 and counts.get("unknown", 0) == total
+
+
+def _format_classifier_counts(counts: dict[str, int] | None) -> str:
+    """Render the classifier tally for the header, or a placeholder."""
+    if not counts:
+        return "(no classifier line in log)"
+    return ", ".join(f"{counts.get(name, 0)} {name}" for name in CLASSIFIER_CATEGORIES)
+
+
+def _likely_cause_line(credit_errors: int, llm_backend: str | None) -> str:
+    """One line naming the most probable root cause of an LLM degradation."""
+    if credit_errors:
+        return (
+            f"Likely cause     : {credit_errors} x 'credit balance is too low' in this "
+            "run's log — top up the Anthropic account.\n"
+        )
+    if llm_backend is None:
+        return (
+            "Likely cause     : no 'llm_backend[...]: ok' line at all — no LLM call "
+            "succeeded this run (backend misconfigured, CLI missing, or key unset).\n"
+        )
+    return (
+        f"Likely cause     : backend '{llm_backend}' answered at least once, so check "
+        "per-call failures in the log below.\n"
+    )
+
+
 def _truncate(log: str, max_bytes: int = _MAX_LOG_BYTES) -> str:
     """If log exceeds max_bytes, keep head + tail and replace middle with a
     notice. Preserves the most-useful portions (start: config + first errors;
     end: final tally + breakers + exit) within Brevo's 5MB email cap."""
-    encoded = log.encode("utf-8")
+    # errors="replace" so a lone surrogate in the journal (rare, but it has
+    # happened) cannot raise UnicodeEncodeError out of main(). The round-trip
+    # on the short path normalises those bytes away too, so the email always
+    # ships. Suppressing the report is the worst outcome here: the alarm
+    # banners this report carries are the whole point.
+    encoded = log.encode("utf-8", errors="replace")
     if len(encoded) <= max_bytes:
-        return log
+        return encoded.decode("utf-8")
     keep_each = max_bytes // 2
     head = encoded[:keep_each].decode("utf-8", errors="replace")
     tail = encoded[-keep_each:].decode("utf-8", errors="replace")
@@ -296,10 +467,38 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
     rdap_403s = _rdap_403_alarms(log)
     mem_peak = _memory_peak_bytes()
 
+    llm_backend = _llm_backend(log)
+    ranker_outcome = _phase2_ranker_outcome(log)
+    classifier_counts = _snapshot_classifier_counts(log)
+    credit_errors = _count_credit_balance_errors(log)
+    shadow_counts = parse_shadow_verdicts(log)
+    shadow_would_evict = parse_shadow_would_evict(log) if shadow_counts else 0
+    # In shadow mode the screen genuinely isn't evicting, so this still alarms
+    # — but as a DELIBERATE state with a different banner, not as a breakage.
+    # A permanent identical banner across a validation window is how an
+    # operator learns to ignore it.
+    classifier_blind = _classifier_is_blind(classifier_counts) and not shadow_counts
+    classifier_shadow = bool(shadow_counts)
+    ranker_fell_back = bool(ranker_outcome and ranker_outcome.startswith("FALLBACK"))
+
     count_part = f"{domain_count} domains" if domain_count is not None else "domain count unknown"
-    # A 403 is the catastrophic IP-block case — escalate the subject so it is
-    # impossible to miss even at a glance in the inbox.
-    alarm_prefix = "🚨 RDAP 403 BLOCK — " if rdap_403s else ""
+    # Subject-line escalations, most-catastrophic first. A 403 is an outright
+    # IP block; a blind classifier means the toxic-domain screen published
+    # unscreened domains; a ranker fallback means the list is unranked. All
+    # three can happen on an exit-code-0 run, which is exactly why they have
+    # to reach the subject line and not just the body.
+    alarms: list[str] = []
+    if rdap_403s:
+        alarms.append("🚨 RDAP 403 BLOCK")
+    if classifier_blind:
+        alarms.append("🚨 TOXIC SCREEN OFF")
+    elif classifier_shadow:
+        alarms.append("👁 SCREEN IN SHADOW")
+    if ranker_fell_back:
+        alarms.append("🚨 PHASE 2 FALLBACK")
+    # " / " between alarms keeps the single-alarm subject byte-identical to
+    # the pre-2026-09-18 format ("🚨 RDAP 403 BLOCK — Daily run ...").
+    alarm_prefix = " / ".join(alarms) + " — " if alarms else ""
     subject = (
         f"[DomainSifter] {alarm_prefix}Daily run {date_str} UTC: "
         f"{verdict_emoji} {verdict_word} — {count_part}"
@@ -316,7 +515,12 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"RDAP 429 strikes : {rdap_strikes}",
         f"RDAP 429 stops   : {len(rdap_stops)} (host(s) hit the strike limit)",
         f"RDAP 403 blocks  : {len(rdap_403s)}",
+        f"LLM backend      : {llm_backend or '(none used)'}",
+        f"Phase 2 ranker   : {ranker_outcome or '(no ranker line in log)'}",
+        f"Snapshot classes : {_format_classifier_counts(classifier_counts)}",
     ]
+    if credit_errors:
+        header.append(f"Credit errors    : {credit_errors} ('credit balance is too low')")
 
     # Loud alarm/notice blocks above the log, built only when there is
     # something to report so clean days stay clean.
@@ -329,6 +533,49 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
             "limit). Investigate immediately — the egress IP is likely blocked.\n"
             + "\n".join(rdap_403s)
             + "\n"
+        )
+    if classifier_blind:
+        total = sum(classifier_counts.values()) if classifier_counts else 0
+        alert_blocks += (
+            "\n🚨🚨 TOXIC-DOMAIN SCREEN IS NOT RUNNING 🚨🚨\n"
+            "--------------------------------------------\n"
+            f"The snapshot classifier processed {total} domain(s) and returned\n"
+            f"'unknown' for ALL {total} of them (0 legitimate, 0 parked, 0 toxic,\n"
+            "0 empty). 'unknown' is the classifier's failure value, so the\n"
+            "toxic-domain screen in filter.py rejected NOTHING today: every\n"
+            "domain published in this run went out UNSCREENED for spam, malware\n"
+            "and abuse content.\n"
+            "This fires regardless of the exit code. A green SUCCESS verdict does\n"
+            "NOT mean the screen ran — that exact combination went unnoticed for\n"
+            "~8 weeks after the 2026-07-23 credit-balance outage.\n"
+            + _likely_cause_line(credit_errors, llm_backend)
+            + f"LLM backend      : {llm_backend or '(none used)'}\n"
+        )
+    if classifier_shadow:
+        total_shadow = sum(shadow_counts.values())
+        alert_blocks += (
+            "\n👁 TOXIC SCREEN RUNNING IN SHADOW MODE (deliberate) 👁\n"
+            "------------------------------------------------------\n"
+            f"The classifier produced real verdicts for {total_shadow} domain(s) but did\n"
+            "NOT apply them: snapshot_category was left 'unknown', so nothing was\n"
+            "evicted this run. This is the configured validation state\n"
+            "(snapshot_classifier.shadow = true), NOT a failure.\n"
+            f"Shadow verdicts  : {shadow_counts['legitimate']} legitimate, "
+            f"{shadow_counts['parked']} parked, {shadow_counts['toxic']} toxic, "
+            f"{shadow_counts['empty']} empty, {shadow_counts['unknown']} unknown\n"
+            f"Would have evicted: {shadow_would_evict} domain(s) as toxic (names in log)\n"
+            "Published domains ARE still unscreened while this mode is on. To\n"
+            "arm the gate, set snapshot_classifier.shadow = false in config.json.\n"
+        )
+    if ranker_fell_back:
+        alert_blocks += (
+            "\n🚨🚨 PHASE 2 RANKER FELL BACK TO MECHANICAL SELECTION 🚨🚨\n"
+            "---------------------------------------------------------\n"
+            f"{ranker_outcome}\n"
+            "Today's published list was chosen mechanically, NOT by quality\n"
+            "ranking. A persistent fallback means the LLM ranking stage is\n"
+            "effectively switched off — check before assuming list quality.\n"
+            + _likely_cause_line(credit_errors, llm_backend)
         )
     if rdap_stops:
         alert_blocks += (
@@ -408,6 +655,18 @@ def main(argv: list[str] | None = None) -> int:
     except KeyError as exc:
         print(
             f"send_report: missing required env var {exc}; skipping email",
+            file=sys.stderr,
+        )
+        return 0
+    except Exception as exc:  # broad by design — see the exit-0 invariant below
+        # _build_email parses free-form journal text. A malformed or
+        # unexpectedly-encoded log must never turn into a non-zero exit: the
+        # wrapper reads this exit code, and conflating "couldn't build the
+        # report" with "the pipeline failed" is exactly the confusion this
+        # module exists to avoid. Mirrors the broad except around _send.
+        print(
+            f"send_report: failed to build email ({type(exc).__name__}: {exc}); "
+            "skipping email",
             file=sys.stderr,
         )
         return 0

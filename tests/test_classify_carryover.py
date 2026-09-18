@@ -89,17 +89,30 @@ def _no_sleep(monkeypatch):
 
 
 class _ScriptedClient:
-    """Returns a category per call from the responses list. Records calls."""
+    """Batched fake: replies with one scripted category per domain in a batch.
+
+    Mirrors the real `BatchClassifierClient` contract since the 2026-09-18
+    switch — `classify_batch` returns the model's RAW reply text, which the
+    classifier then runs through `llm_backend.parse_json_array`. Categories
+    are consumed in order across all batches, so a test scripting
+    ["legitimate", "toxic", "parked"] labels the first three domains in the
+    order the classifier presents them.
+    """
 
     def __init__(self, responses):
         self._responses = list(responses)
         self.calls: list[str] = []
 
-    def classify(self, user: str) -> str:
+    def classify_batch(self, user: str, *, timeout_seconds: int | None = None) -> str:
         self.calls.append(user)
-        if not self._responses:
-            return "legitimate"
-        return self._responses.pop(0)
+        # The user turn ends with the JSON payload of {"domain": ...} objects;
+        # pull the domains back out so the reply lines up one-for-one.
+        payload = json.loads(user[user.index("[") :])
+        rows = []
+        for item in payload:
+            category = self._responses.pop(0) if self._responses else "legitimate"
+            rows.append({"domain": item["domain"], "category": category})
+        return json.dumps(rows)
 
 
 def _stub_fetch(monkeypatch, by_name):
@@ -350,7 +363,7 @@ class TestRunDryRun:
             force=False, only_unknown=False, limit=None,
             dry_run=True, no_push=False,
             today=date(2026, 5, 18),
-            client_factory=lambda: client,
+            client_factory=lambda *_a, **_k: client,
         )
 
         assert rc == 0
@@ -370,7 +383,7 @@ class TestRunDryRun:
             force=False, only_unknown=False, limit=None,
             dry_run=True, no_push=False,
             today=date(2026, 5, 18),
-            client_factory=lambda: None,  # no key configured
+            client_factory=lambda *_a, **_k: None,  # no key configured
         )
         assert rc == 0
 
@@ -387,10 +400,14 @@ class TestRunLive:
                 force=False, only_unknown=False, limit=None,
                 dry_run=False, no_push=False,
                 today=date(2026, 5, 18),
-                client_factory=lambda: None,
+                client_factory=lambda *_a, **_k: None,
             )
         assert rc == 1
-        assert any("ANTHROPIC_API_KEY missing" in m for m in caplog.messages)
+        # Message changed with the 2026-09-18 backend switch: a missing API
+        # key is no longer the failure mode (the classifier runs on a Claude
+        # Code subscription token now), so the abort names the backend config
+        # instead.
+        assert any("No usable LLM backend" in m for m in caplog.messages)
         # File untouched
         payload_after = json.loads(tmp_paths["daily"].read_text(encoding="utf-8"))
         assert payload_after == sample_payload
@@ -455,7 +472,7 @@ class TestRunLive:
             force=True, only_unknown=False, limit=None,
             dry_run=False, no_push=False,
             today=date(2026, 5, 18),
-            client_factory=lambda: client,
+            client_factory=lambda *_a, **_k: client,
         )
 
         assert rc == 0
@@ -468,7 +485,10 @@ class TestRunLive:
         assert payload_after["domain_count"] == 3
         for d in payload_after["domains"]:
             assert "wayback_excerpt" not in d
-            assert d["snapshot_classifier_version"] == "v1"
+            # Constant, not a literal — bumped to v2 on the 2026-09-18
+            # batching + backend switch. This test is about the stamp being
+            # written, not about which version it names.
+            assert d["snapshot_classifier_version"] == sc.CLASSIFIER_VERSION
 
         # Sidecar: contains all four (including evicted toxic), keyed by name.
         sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))
@@ -539,7 +559,7 @@ class TestRunLive:
                 force=False, only_unknown=False, limit=None,
                 dry_run=False, no_push=False,
                 today=date(2026, 5, 18),
-                client_factory=lambda: client,
+                client_factory=lambda *_a, **_k: client,
             )
         assert rc == 2  # commit-and-push raised → run() returns 2
         # Error message should reference both SHAs so the operator can
@@ -596,7 +616,7 @@ class TestRunLive:
                 force=False, only_unknown=False, limit=None,
                 dry_run=False, no_push=False,
                 today=date(2026, 5, 18),
-                client_factory=lambda: client,
+                client_factory=lambda *_a, **_k: client,
             )
         assert rc == 2
         # The stderr content (sanitized) must appear in logs
@@ -632,7 +652,7 @@ class TestRunLive:
             force=False, only_unknown=False, limit=None,
             dry_run=False, no_push=True,
             today=date(2026, 5, 18),
-            client_factory=lambda: client,
+            client_factory=lambda *_a, **_k: client,
         )
 
         assert rc == 0
@@ -661,7 +681,7 @@ class TestRunLive:
             force=False, only_unknown=False, limit=None,
             dry_run=False, no_push=False,
             today=date(2026, 5, 18),
-            client_factory=lambda: _ScriptedClient([]),
+            client_factory=lambda *_a, **_k: _ScriptedClient([]),
         )
         assert rc == 0
 
@@ -672,7 +692,7 @@ class TestRunLive:
             force=False, only_unknown=False, limit=None,
             dry_run=True, no_push=True,
             today=date(2026, 5, 18),
-            client_factory=lambda: None,
+            client_factory=lambda *_a, **_k: None,
         )
         assert rc == 1
 
@@ -700,7 +720,7 @@ class TestRunLive:
             force=False, only_unknown=False, limit=None,
             dry_run=False, no_push=True,
             today=date(2026, 5, 18),
-            client_factory=lambda: client,
+            client_factory=lambda *_a, **_k: client,
         )
 
         sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))

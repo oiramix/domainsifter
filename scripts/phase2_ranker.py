@@ -31,9 +31,11 @@ Fallback triggers
 -----------------
   - phase2.enabled == false                            → mode=disabled
   - lexical_kept is empty                              → mode=fallback (empty_input)
-  - No Anthropic client (key missing / SDK absent)     → mode=fallback (no_api_client)
+  - No usable model backend (key/SDK absent, or a      → mode=fallback (no_api_client)
+    config typo in llm.backend)
   - Cost ceiling hit BEFORE min_eligible reached       → mode=fallback (cost_ceiling_below_min_eligible)
   - Any uncaught exception during ranking              → mode=fallback (exception)
+  - Every chunk of a claude_code run failed            → mode=fallback (all_chunks_failed)
   - Above-gate count < min_eligible after ranking      → mode=fallback (too_few_eligible)
 
 When the cost ceiling hits AFTER min_eligible is satisfied, the ranker drives
@@ -42,8 +44,34 @@ on PARTIAL results — the unranked candidates are treated as below-gate
 feeds RDAP. Status mode is `ranker_partial` so the email report makes the
 partial run visible.
 
-Budget enforcement (belt + suspenders)
---------------------------------------
+Backends (2026-09-18)
+---------------------
+Model calls go through `scripts.llm_backend`, which offers two paths:
+
+  - `claude_code` — subscription-backed `claude -p`. No per-token cost, but a
+    32k output cap, so names are sent in chunks of `phase2.chunk_size` (800,
+    from the 2026-09-17 calibration of 29.4 output tokens/name) and the
+    chunks run `llm.max_parallel` at a time. The candidate cap comes from
+    `phase2.max_names_claude_code`, NOT the budget formula, and the runtime
+    cost meter is skipped entirely — there is nothing to meter, and leaving
+    it in would halt a free run at an imaginary ceiling.
+  - `api` — the historical metered path, UNCHANGED: `phase2.batch_size` (15)
+    per call against a direct `anthropic` client, planned target_n from the
+    budget formula, runtime cost meter and both ceiling behaviours intact.
+    This is the one-line rollback, so it is kept bit-for-bit.
+
+A config with no `llm` section predates the switch and keeps the `api` path
+(see `_backend_name`). Adding `"llm": {"backend": "claude_code"}` to
+scripts/config.json is what flips production over.
+
+The FULL `RANKER_SYSTEM` text is what gets passed as the backend's `system=`
+argument. Do not paraphrase it: a shortened restatement asking for
+"registrability" scoring was refused outright as a trademark question
+(2026-09-17). A prose reply is treated as a failed chunk, never as an empty
+result — see `llm_backend.parse_json_array`.
+
+Budget enforcement (belt + suspenders) — `api` backend only
+-----------------------------------------------------------
   1. Planned budget — `target_n = floor(daily_budget_usd / cost_per_1000_planning_usd * 1000)`.
      Pre-narrow truncates `lexical_kept` to `target_n` by the existing
      mechanical pre-signal (trigram_match_count desc, apex_len asc, name asc) —
@@ -90,6 +118,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 
 from scripts import lexical_filter
+from scripts import llm_backend
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +146,9 @@ DEFAULTS = {
     "batch_size": 15,
     "concurrency": 6,
     "max_retry_passes": 1,
+    # claude_code-backend knobs. Unused on the `api` backend.
+    "chunk_size": 800,
+    "max_names_claude_code": 13000,
 }
 
 RANKER_SYSTEM = """You score expired-domain candidate names for REGISTRABILITY AS A BRAND.
@@ -202,6 +234,20 @@ def _config(config: dict, key: str) -> Any:
     if key in section:
         return section[key]
     return DEFAULTS[key]
+
+
+def _backend_name(config: dict) -> str:
+    """Which LLM path this run takes: 'api' or whatever `llm.backend` names.
+
+    A config with no `llm` section at all predates the 2026-09-18 backend
+    switch, so it keeps the historical metered-API path bit-for-bit. Once
+    `llm` exists in scripts/config.json, `llm.backend` is authoritative
+    (and `llm_backend.DEFAULTS` supplies 'claude_code' if the key is
+    omitted from an otherwise-present section).
+    """
+    if not (config or {}).get("llm"):
+        return "api"
+    return str(llm_backend.cfg(config, "backend")).strip().lower()
 
 
 def _planned_target_n(daily_budget_usd: float, cost_per_1k_planning_usd: float) -> int:
@@ -370,6 +416,16 @@ def _score_batch(
         )
         return {}
 
+    return _rows_to_scores(rows)
+
+
+def _rows_to_scores(rows: list[Any]) -> dict[str, dict]:
+    """Normalize the model's rows into {lowercase domain: {score, reason}}.
+
+    Shared by both backends. Unparseable or unnamed rows are dropped, which
+    leaves their domain missing-from-response and therefore below-gate —
+    never silently scored.
+    """
     out: dict[str, dict] = {}
     for r in rows:
         if not isinstance(r, dict):
@@ -467,6 +523,108 @@ def _haiku_batch_all(
 
 
 # ---------------------------------------------------------------------------
+# Chunked backend path (claude_code — no cost meter)
+# ---------------------------------------------------------------------------
+
+
+def _score_chunk(
+    backend: Any,
+    chunk: list[dict],
+    timeout_seconds: int | None = None,
+) -> dict[str, dict]:
+    """Send one chunk through the LLM backend and normalize the reply.
+
+    The FULL RANKER_SYSTEM prompt is the system message — see the module
+    docstring for why a paraphrase is not acceptable. `parse_json_array`
+    raises LLMBackendError for prose or a refusal, which the caller counts
+    as a failed chunk rather than an empty result.
+    """
+    text = backend.complete(
+        system=RANKER_SYSTEM,
+        user=_build_user_message(chunk),
+        timeout_seconds=timeout_seconds,
+    )
+    return _rows_to_scores(llm_backend.parse_json_array(text))
+
+
+def _backend_chunk_all(
+    pre_narrowed: list[dict],
+    backend: Any,
+    *,
+    chunk_size: int,
+    max_parallel: int,
+    timeout_seconds: int | None = None,
+) -> tuple[dict[str, dict], dict]:
+    """Rank every name via the LLM backend, in parallel chunks.
+
+    Returns (scored_by_name, meter) with the same shape `_haiku_batch_all`
+    returns, so the orchestrator downstream is identical. The meter's cost
+    fields stay at zero: this backend is subscription-billed, so there is no
+    per-token spend to accumulate and no ceiling to trip.
+
+    A chunk that fails (transport error, timeout, refusal, prose instead of
+    JSON) is counted in `batches_failed` and its names are simply absent from
+    the result — the orchestrator then records them as score=0, i.e.
+    below-gate. One bad chunk never costs us the other chunks' scores, and
+    never raises (hard rule 17). There is no retry pass: a refusal re-refuses
+    and a timeout re-times-out, and a second pass would double a ~20 minute
+    run for little expected gain.
+    """
+    chunk_size = max(1, int(chunk_size))
+    max_parallel = max(1, int(max_parallel))
+
+    meter = _new_cost_meter()
+    scored: dict[str, dict] = {}
+    scored_lock = threading.Lock()
+    chunks = _chunked(pre_narrowed, chunk_size)
+
+    logger.info(
+        "Phase 2 ranker: %d names in %d chunks of %d, %d in parallel "
+        "(backend=%s, no cost meter)",
+        len(pre_narrowed), len(chunks), chunk_size, max_parallel,
+        getattr(backend, "name", "?"),
+    )
+
+    def _run(index: int, chunk: list[dict]) -> tuple[int, dict[str, dict]]:
+        rows = _score_chunk(backend, chunk, timeout_seconds)
+        return index, rows
+
+    with ThreadPoolExecutor(max_workers=max_parallel) as pool:
+        futures = [pool.submit(_run, i, c) for i, c in enumerate(chunks)]
+        for fut in as_completed(futures):
+            try:
+                index, rows = fut.result()
+            except llm_backend.LLMBackendError as exc:
+                with meter["lock"]:
+                    meter["batches_failed"] += 1
+                logger.warning(
+                    "Phase 2 ranker: chunk failed (%s) — its domains are "
+                    "treated as below-gate: %s",
+                    type(exc).__name__, exc,
+                )
+                continue
+            except Exception as exc:  # defence in depth — never crash a run
+                with meter["lock"]:
+                    meter["batches_failed"] += 1
+                logger.warning(
+                    "Phase 2 ranker: chunk raised %s — its domains are "
+                    "treated as below-gate: %s",
+                    type(exc).__name__, exc,
+                )
+                continue
+            with scored_lock:
+                scored.update(rows)
+            with meter["lock"]:
+                meter["batches_ok"] += 1
+            logger.info(
+                "Phase 2 ranker: chunk %d/%d returned %d scores",
+                index + 1, len(chunks), len(rows),
+            )
+
+    return scored, meter
+
+
+# ---------------------------------------------------------------------------
 # Score distribution (for logging + report)
 # ---------------------------------------------------------------------------
 
@@ -512,8 +670,13 @@ def rank_and_select(
       status: dict surfaced to logging + the email report. Keys:
         - mode: 'ranker' | 'ranker_partial' | 'disabled' | 'fallback'
         - reason: present when mode in ('fallback', 'ranker_partial')
+        - backend: 'api' | 'claude_code', once a backend was chosen
         - scored_count, above_gate_count, cost_usd, ceiling_hit, score_distribution
-          when ranking ran at all
+          when ranking ran at all. On the claude_code backend cost_usd is 0.0
+          and ceiling_hit is always False — nothing is metered.
+
+    `client` is only consulted on the `api` backend; the claude_code backend
+    is built from config by `llm_backend.get_backend`.
     """
     cfg_get: Callable[[str], Any] = lambda k: _config(config, k)
     if not cfg_get("enabled"):
@@ -524,44 +687,73 @@ def rank_and_select(
         logger.info("Phase 2 ranker: empty input — passing through")
         return list(lexical_kept), {"mode": "fallback", "reason": "empty_input"}
 
-    if client is None:
-        client = make_default_client()
-    if client is None:
-        logger.warning(
-            "Phase 2 ranker FALLBACK — no API client "
-            "(ANTHROPIC_API_KEY missing or anthropic SDK absent)"
-        )
-        logger.warning("→ reverting to mechanical selection")
-        return list(lexical_kept), {"mode": "fallback", "reason": "no_api_client"}
-
-    daily_budget_eur = float(cfg_get("daily_budget_eur"))
-    eur_to_usd = float(cfg_get("eur_to_usd"))
-    daily_budget_usd = daily_budget_eur * eur_to_usd
-    ceiling_usd = daily_budget_usd * CEILING_FRACTION
-    target_n = _planned_target_n(
-        daily_budget_usd, float(cfg_get("cost_per_1000_planning_usd")),
-    )
+    backend_name = _backend_name(config)
+    use_backend = backend_name != "api"
+    backend: Any | None = None
     score_gate = int(cfg_get("score_gate"))
     min_eligible = int(cfg_get("min_eligible"))
+    ceiling_usd = 0.0
 
-    logger.info(
-        "Phase 2 ranker ENABLED — lexical=%d, budget=€%.2f ($%.2f), "
-        "ceiling=$%.2f, target_n=%d, gate=%d, min_eligible=%d",
-        len(lexical_kept), daily_budget_eur, daily_budget_usd,
-        ceiling_usd, target_n, score_gate, min_eligible,
-    )
+    if use_backend:
+        try:
+            backend = llm_backend.get_backend(config)
+        except llm_backend.LLMBackendError as exc:
+            logger.warning("Phase 2 ranker FALLBACK — no usable backend: %s", exc)
+            logger.warning("→ reverting to mechanical selection")
+            return list(lexical_kept), {"mode": "fallback", "reason": "no_api_client"}
+        # Free at the point of use: the budget formula and the runtime cost
+        # meter would both cap a run that costs nothing. Cap on names instead.
+        target_n = max(0, int(cfg_get("max_names_claude_code")))
+        logger.info(
+            "Phase 2 ranker ENABLED — lexical=%d, backend=%s (no per-token "
+            "cost; cost meter skipped), target_n=%d, gate=%d, min_eligible=%d",
+            len(lexical_kept), backend_name, target_n, score_gate, min_eligible,
+        )
+    else:
+        if client is None:
+            client = make_default_client()
+        if client is None:
+            logger.warning(
+                "Phase 2 ranker FALLBACK — no API client "
+                "(ANTHROPIC_API_KEY missing or anthropic SDK absent)"
+            )
+            logger.warning("→ reverting to mechanical selection")
+            return list(lexical_kept), {"mode": "fallback", "reason": "no_api_client"}
+
+        daily_budget_eur = float(cfg_get("daily_budget_eur"))
+        eur_to_usd = float(cfg_get("eur_to_usd"))
+        daily_budget_usd = daily_budget_eur * eur_to_usd
+        ceiling_usd = daily_budget_usd * CEILING_FRACTION
+        target_n = _planned_target_n(
+            daily_budget_usd, float(cfg_get("cost_per_1000_planning_usd")),
+        )
+
+        logger.info(
+            "Phase 2 ranker ENABLED — lexical=%d, budget=€%.2f ($%.2f), "
+            "ceiling=$%.2f, target_n=%d, gate=%d, min_eligible=%d",
+            len(lexical_kept), daily_budget_eur, daily_budget_usd,
+            ceiling_usd, target_n, score_gate, min_eligible,
+        )
 
     pre_narrowed = pre_narrow(lexical_kept, target_n)
     logger.info(
-        "Pre-narrow: %d → %d (top by trigram+length, fits budget)",
+        "Pre-narrow: %d → %d (top by trigram+length, within target_n)",
         len(lexical_kept), len(pre_narrowed),
     )
 
     start = time.monotonic()
     try:
-        scored_by_name, meter = _haiku_batch_all(
-            pre_narrowed, client, cfg_get, ceiling_usd,
-        )
+        if use_backend:
+            scored_by_name, meter = _backend_chunk_all(
+                pre_narrowed,
+                backend,
+                chunk_size=int(cfg_get("chunk_size")),
+                max_parallel=int(llm_backend.cfg(config, "max_parallel")),
+            )
+        else:
+            scored_by_name, meter = _haiku_batch_all(
+                pre_narrowed, client, cfg_get, ceiling_usd,
+            )
     except Exception as exc:
         logger.error(
             "Phase 2 ranker FAILED — %s: %s", type(exc).__name__, exc,
@@ -596,17 +788,43 @@ def rank_and_select(
     distribution = _score_distribution(scored)
     above_gate = [c for c in scored if int(c.get("phase2_score", 0)) >= score_gate]
 
-    logger.info(
-        "Phase 2 ranker: %d scored, %d missing (below-gate); $%.4f spent of $%.4f ceiling; %.1fs",
-        len(scored) - missing_count, missing_count,
-        meter["total_usd"], ceiling_usd, elapsed,
-    )
+    if use_backend:
+        logger.info(
+            "Phase 2 ranker: %d scored, %d missing (below-gate); "
+            "%d chunks ok / %d failed; %.1fs",
+            len(scored) - missing_count, missing_count,
+            meter["batches_ok"], meter["batches_failed"], elapsed,
+        )
+    else:
+        logger.info(
+            "Phase 2 ranker: %d scored, %d missing (below-gate); $%.4f spent of $%.4f ceiling; %.1fs",
+            len(scored) - missing_count, missing_count,
+            meter["total_usd"], ceiling_usd, elapsed,
+        )
     logger.info("Phase 2 ranker score distribution: %s", distribution)
     logger.info(
         "Phase 2 ranker above-gate (>=%d): %d of %d (%.1f%%)",
         score_gate, len(above_gate), len(scored),
         100.0 * len(above_gate) / max(1, len(scored)),
     )
+
+    # Fallback: every chunk of a chunked run failed, so nothing was ranked.
+    # Distinct from too_few_eligible, which means the model DID answer and
+    # simply judged the day's names poorly.
+    if use_backend and meter["batches_ok"] == 0:
+        logger.warning(
+            "Phase 2 ranker FALLBACK — all_chunks_failed (%d chunks, none "
+            "usable)", meter["batches_failed"],
+        )
+        logger.warning("→ reverting to mechanical selection")
+        return list(lexical_kept), {
+            "mode": "fallback",
+            "reason": "all_chunks_failed",
+            "backend": backend_name,
+            "chunks_failed": meter["batches_failed"],
+            "cost_usd": 0.0,
+            "ceiling_hit": False,
+        }
 
     # Fallback: above-gate count below min_eligible.
     if len(above_gate) < min_eligible:
@@ -626,6 +844,7 @@ def rank_and_select(
         return list(lexical_kept), {
             "mode": "fallback",
             "reason": reason,
+            "backend": backend_name,
             "above_gate_count": len(above_gate),
             "min_eligible": min_eligible,
             "cost_usd": round(meter["total_usd"], 4),
@@ -637,13 +856,22 @@ def rank_and_select(
         key=lambda c: (-int(c.get("phase2_score", 0)), c.get("name", "")),
     )
 
-    mode = "ranker_partial" if meter["ceiling_hit"] else "ranker"
+    # A run is PARTIAL when some names never got a verdict: the cost ceiling
+    # halted the api path, or a chunk failed on the backend path. Either way
+    # the email report should show that the list is short by accident.
+    partial_reason: str | None = None
     if meter["ceiling_hit"]:
+        partial_reason = "cost_ceiling_hit"
+    elif use_backend and meter["batches_failed"]:
+        partial_reason = "chunks_failed"
+    mode = "ranker_partial" if partial_reason else "ranker"
+
+    if partial_reason:
         logger.warning(
-            "Phase 2 ranker MODE=RANKER_PARTIAL — cost ceiling hit; "
-            "feeding %d score-ordered candidates to RDAP "
+            "Phase 2 ranker MODE=RANKER_PARTIAL — %s; feeding %d "
+            "score-ordered candidates to RDAP "
             "(remaining %d treated as below-gate)",
-            len(above_gate), missing_count,
+            partial_reason, len(above_gate), missing_count,
         )
     else:
         logger.info(
@@ -651,8 +879,9 @@ def rank_and_select(
             len(above_gate),
         )
 
-    return above_gate, {
+    status: dict[str, Any] = {
         "mode": mode,
+        "backend": backend_name,
         "scored_count": len(scored),
         "above_gate_count": len(above_gate),
         "missing_count": missing_count,
@@ -663,6 +892,9 @@ def rank_and_select(
         "batches_failed": meter["batches_failed"],
         "wall_clock_seconds": round(elapsed, 1),
     }
+    if partial_reason:
+        status["reason"] = partial_reason
+    return above_gate, status
 
 
 # ---------------------------------------------------------------------------
