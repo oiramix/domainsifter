@@ -140,6 +140,16 @@
     "api_model": "claude-haiku-4-5-20251001",
     "api_max_tokens": 8192
   },
+  "archive_generator": {
+    "_doc": "Permanent per-domain reference pages (scripts/archive_generator.py), chained off a successful pipeline run via OnSuccess= in systemd/domainsifter.service. These pages are the site's ONLY long-tail SEO content; it produced 113 of them and then stopped dead on 2026-07-21 when the API credit balance hit zero, firing and failing silently every day since. Now runs on the shared llm.* subscription backend. sidecar_excerpts_path points at the wayback_excerpts.json written by pipeline Stage 4b: having the archived title/meta/headings is what lets a page state what the site WAS rather than speculating from the domain name, which is what the pre-2026-09-19 prompt did. timeout_seconds null defers to llm.timeout_seconds.",
+    "_doc_excerpt_caps": "Caps on the untrusted archived text persisted into each page's frontmatter. These MUST stay in sync with MAX_FIELD_CHARS / MAX_HEADING_CHARS / MAX_HEADINGS in src/pages/d/[domain].astro: the page truncates the same text again at render time, so a smaller value there would re-truncate what we already shortened and append a second ellipsis ('...…').",
+    "sidecar_excerpts_path": "src/data/wayback_excerpts.json",
+    "timeout_seconds": null,
+    "consecutive_failures_abort": 5,
+    "excerpt_max_field_chars": 300,
+    "excerpt_max_heading_chars": 140,
+    "excerpt_max_headings": 5
+  },
   "snapshot_classifier": {
     "_doc": "Wayback-excerpt content classifier. Its 'toxic' verdict is the ONLY thing that trips the toxic gate in filter.keep_post_enrichment (scripts/filter.py). That gate has been open since 2026-07-23 because the classifier returned 'unknown' for every domain once API credits ran out. batch_size groups domains per model call (the old path made one call per domain, which is unusable against Claude Code's per-call overhead). shadow=true writes the verdict to snapshot_category_shadow and leaves snapshot_category='unknown', so nothing is evicted while we validate the new backend against the API-era verdicts; set false to arm it for real.",
     "batch_size": 20,

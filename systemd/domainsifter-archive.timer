@@ -1,0 +1,83 @@
+# Safety-net timer for the DomainSifter archive page generator — fires at
+# 14:00 UTC daily.
+#
+# WHAT IT RUNS
+# domainsifter-archive.service, i.e. scripts/archive_generator.py: reads
+# src/data/daily-domains.json, generates one Markdown reference page per
+# new Clean/Promising domain via Anthropic Haiku, appends to
+# src/data/archive-index.json, then commits and pushes to origin/main.
+#
+# THIS IS A SECOND TRIGGER, NOT THE ONLY ONE. Read this before assuming
+# the archive was unscheduled: domainsifter.service (and
+# domainsifter-force.service) already chain it with
+# `OnSuccess=domainsifter-archive.service` in their [Unit] section. That
+# is the PRIMARY trigger and it is working. `systemctl list-unit-files`
+# reporting domainsifter-archive.service as `static` is the CORRECT state
+# for a unit with no [Install] section that another unit starts — it is
+# not evidence that nothing fires it. See RECOVERY.md "Archive didn't run"
+# and the 2026-05-21 STATE.md entry for commit 623b947.
+#
+# WHY A TIMER ON TOP OF OnSuccess=
+# OnSuccess= fires only when the pipeline unit exits 0. On a day the
+# pipeline fails — CZDS outage, RDAP ban, push rejection — the archive
+# never runs at all, even though yesterday's still-unarchived
+# Clean/Promising entries are sitting in daily-domains.json waiting.
+# _filter_qualifying has no date filter, so an independent daily fire
+# drains that backlog without operator intervention. On a normal day this
+# timer is a cheap no-op: the chained run already archived everything, the
+# index dedupes, the generator logs "No new qualifying domains", and
+# nothing is committed or pushed.
+#
+# WHY 14:00 UTC
+# The pipeline starts at 09:00 UTC (domainsifter.timer) and currently
+# finishes between 11:45 and 12:25 UTC — the upper end after the LLM
+# ranker came back on 2026-09-19 and added ~25 min. The chained archive
+# run then takes roughly another 20 min of Haiku calls before ITS own
+# commit and push. So the realistic worst case today is the pipeline's
+# push at ~12:25 and the chained archive's push at ~12:45.
+#
+# 14:00 UTC buys ~95 minutes past the worst observed pipeline finish and
+# ~75 minutes past the chained archive's finish. That margin is deliberate
+# and is about pushes, not CPU: run-daily.sh and archive_generator BOTH
+# `git push` to origin/main, and a push landing while origin has moved is
+# exactly how this project broke on 2026-05-21 (see RECOVERY.md,
+# "Pipeline succeeded, push failed"). The gap must absorb a slow run, not
+# merely an average one. It also leaves 19 hours of clearance before the
+# next 09:00 UTC pipeline start, so a long archive backlog drain cannot
+# run into tomorrow's window either.
+#
+# Note that systemd will not run two instances of the same unit
+# concurrently: if this timer somehow fires while the OnSuccess-chained
+# run is still active, the start job queues behind it rather than racing
+# it. The 14:00 choice is about the PUSH window, which systemd cannot
+# serialize for us because the pipeline's push comes from a different
+# unit.
+#
+# Persistent=true matches domainsifter.timer: a missed 14:00 UTC firing
+# (server down) runs on next boot instead of waiting a day. This is safe
+# for the archive — it is idempotent and the same-day guard deliberately
+# does not apply to it (RECOVERY.md). One caveat for the operator: a boot
+# catch-up can fire at an arbitrary time, including mid-pipeline. If it
+# does, the archive reads a daily-domains.json from the previous run and
+# may push while the pipeline is still working toward its own push. That
+# is a recoverable push rejection, not data loss, and the recipe is the
+# "Pipeline succeeded, push failed" scenario in RECOVERY.md.
+#
+# INSTALL (server-side, run as root once):
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter-archive.timer /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now domainsifter-archive.timer
+#   systemctl list-timers | grep domainsifter   # confirm next 14:00 UTC firing
+#
+# Logs: journalctl -u domainsifter-archive.service -f
+
+[Unit]
+Description=Run DomainSifter archive page generator at 14:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 14:00:00 UTC
+Persistent=true
+Unit=domainsifter-archive.service
+
+[Install]
+WantedBy=timers.target

@@ -717,3 +717,102 @@ def test_project_does_not_leak_inline_wayback_excerpt():
     cand["snapshot_category"] = "legitimate"
     payload = output.build_payload([cand], VERDICT_CFG)
     assert "wayback_excerpt" not in payload["domains"][0]
+
+
+# --- phase2_reason (added 2026-09-19) ----------------------------------------
+
+
+def payload_reason(payload: dict) -> str | None:
+    return payload["domains"][0]["phase2_reason"]
+
+
+def test_phase2_reason_in_contract_fields():
+    """Architectural assertion: the ranker's justification is part of the
+    published contract now, not private R2-only data."""
+    assert "phase2_reason" in output.CONTRACT_FIELDS
+
+
+def test_phase2_reason_projected_when_present():
+    cand = _cand("marketglow.com", 80,
+                 phase2_reason="explicit service intent, clear and trustworthy")
+    payload = output.build_payload([cand], CONFIG)
+    assert payload["domains"][0]["phase2_reason"] == (
+        "explicit service intent, clear and trustworthy"
+    )
+
+
+def test_phase2_reason_null_when_absent():
+    """Fallback days (mechanical selection) and pre-migration carryover have
+    no reason at all. Publish null — never "" and never a missing key, so
+    the frontend's single null check covers every case."""
+    cand = _cand("tideblock.io", 70)
+    assert "phase2_reason" not in cand
+    assert payload_reason(output.build_payload([cand], CONFIG)) is None
+
+
+def test_phase2_reason_placeholder_is_published_as_null():
+    """phase2_ranker writes "missing from response" when a candidate was sent
+    to the model but came back absent. That's a pipeline marker, not a
+    justification — it must not surface on the site."""
+    cand = _cand("coppernest.org", 65, phase2_reason="missing from response")
+    payload = output.build_payload([cand], CONFIG)
+    assert payload_reason(payload) is None
+
+
+def test_phase2_reason_blank_and_non_string_are_published_as_null():
+    for junk in ("", "   ", None, 42, {"reason": "nope"}):
+        cand = _cand("blankreason.com", 65, phase2_reason=junk)
+        payload = output.build_payload([cand], CONFIG)
+        assert payload_reason(payload) is None, f"junk value {junk!r} leaked"
+
+
+def test_phase2_reason_is_whitespace_stripped():
+    cand = _cand("trimmed.com", 65, phase2_reason="  aged brand, clean history \n")
+    payload = output.build_payload([cand], CONFIG)
+    assert payload_reason(payload) == "aged brand, clean history"
+
+
+def test_phase2_reason_absence_does_not_disturb_other_projection():
+    """Backward compatibility: a candidate with no phase2_reason projects
+    exactly the same contract keys and values as before the migration, plus
+    the new null field."""
+    cand = _cand("amberkite.org", 75, days_listed=4,
+                 cc_source_domain_count=12, first_seen_date="2026-09-15")
+    d = output.build_payload([cand], CONFIG)["domains"][0]
+    assert set(d.keys()) == set(output.CONTRACT_FIELDS)
+    assert d["name"] == "amberkite.org"
+    assert d["score"] == 75
+    assert d["days_listed"] == 4
+    assert d["cc_source_domain_count"] == 12
+    assert d["first_seen_date"] == "2026-09-15"
+    assert len(d["registrars"]) == 2
+    assert d["phase2_reason"] is None
+
+
+def test_phase2_reason_does_not_affect_quality_floor_or_verdict():
+    """The reason is presentation data only — it must not change which
+    candidates publish, nor their verdict."""
+    cfg = {**VERDICT_CFG, "publish_min_score": 30,
+           "publish_min_enrichment_completeness": 0.50}
+    without = _cand("samecase.com", 75, wayback_snapshots=2000,
+                    open_page_rank=3.0, cc_source_domain_count=200)
+    with_reason = {**without, "phase2_reason": "strong niche authority"}
+    a = output.build_payload([without], cfg)["domains"][0]
+    b = output.build_payload([with_reason], cfg)["domains"][0]
+    assert a["verdict"] == b["verdict"] == "Clean"
+    assert {k: v for k, v in a.items() if k != "phase2_reason"} == {
+        k: v for k, v in b.items() if k != "phase2_reason"
+    }
+
+
+def test_phase2_reason_round_trips_through_write_output(tmp_path):
+    """Carryover depends on this: tomorrow's run reads yesterday's published
+    JSON back in, so the reason must survive the file write."""
+    target = tmp_path / "daily.json"
+    output.write_output(
+        [_cand("marketglow.com", 80, phase2_reason="clear commercial intent")],
+        CONFIG,
+        output_path=target,
+    )
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    assert payload["domains"][0]["phase2_reason"] == "clear commercial intent"

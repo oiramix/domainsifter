@@ -4,8 +4,9 @@
 # Replicates what the GHA workflow used to do end-to-end:
 #   1. git fetch + reset --hard origin/main (defensive sync — see Step 1)
 #   2. pip install -r requirements.txt      (idempotent; cheap if up-to-date)
-#   3. python -m scripts.pipeline           (writes src/data/daily-domains.json)
-#   4. git add + commit + push              (publishes the refreshed JSON)
+#   3. python -m scripts.pipeline           (writes src/data/daily-domains.json
+#                                            + src/data/wayback_excerpts.json)
+#   4. git add + commit + push              (publishes both of those files)
 #
 # Invoked by systemd/domainsifter.timer at 06:30 UTC daily. Logs to
 # journalctl via systemd's StandardOutput=journal capture.
@@ -156,12 +157,36 @@ echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] appending available-set to domain archive
 git config user.name "domainsifter-pipeline"
 git config user.email "99090280+oiramix@users.noreply.github.com"
 
-git add src/data/daily-domains.json
+# Stage BOTH pipeline outputs. daily-domains.json is the site's data
+# contract; wayback_excerpts.json is the archived-content sidecar
+# (title/meta/h1/h2 per domain) written by pipeline.py Stage 4b and about
+# to power the per-domain pages.
+#
+# Why the sidecar must be staged here: it is a TRACKED file, so Step 1's
+# `git reset --hard origin/main` restores it to whatever origin has at the
+# start of every run. Before this line existed, the pipeline rewrote it
+# locally, nobody committed it, and the next morning's reset silently
+# threw the day's work away — only scripts/classify_carryover.py ever
+# pushed it, so origin held a stale, partial sidecar. Staging it here
+# makes the daily run the primary publisher; carryover stays a secondary
+# writer of the same file (same two-path `git add`, see
+# classify_carryover._git_commit_and_push).
+#
+# The sidecar GROWS OVER TIME (one entry per domain ever excerpted, 300+
+# today) and is intentionally committed in full. It is not a cache and
+# must not be gitignored or pruned — the site reads it directly, and the
+# merge semantics in classify_carryover assume prior entries survive.
+git add src/data/daily-domains.json src/data/wayback_excerpts.json
 
 # Skip-if-no-changes guard — matches the GHA workflow exactly. Without it,
 # a no-change day would create an empty commit that's noise in the log.
+#
+# `git diff --cached` inspects the whole index, not a single path, so this
+# still does the right thing when only ONE of the two files changed: any
+# staged delta at all → we commit. It only short-circuits when BOTH are
+# byte-identical to origin/main.
 if git diff --cached --quiet; then
-  echo "No changes to commit (daily output unchanged)."
+  echo "No changes to commit (daily output and excerpts sidecar unchanged)."
   exit 0
 fi
 

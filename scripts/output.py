@@ -6,6 +6,13 @@ PLAN.md Principle 5 with three schema migrations applied:
   - 2026-04-28 evening: added `total_candidates_evaluated` (top-level) so
     the frontend can render "Showing N of M candidates evaluated today"
     without inventing a count.
+  - 2026-09-19: added `phase2_reason` per-domain field — the short (3-6
+    word) justification scripts/phase2_ranker.py writes onto each
+    candidate it shortlists. Until now it reached only the private R2
+    overflow record, so the site could show a verdict but never a reason.
+    Null on every day the ranker didn't run (mechanical-fallback days) and
+    on every pre-2026-09-19 carryover entry; the frontend must treat
+    absence as "no reason to show", never as an error.
   - 2026-05-17: added `verdict` per-domain field ("Clean"/"Promising"/
     "Caution"). Previously computed client-side from score alone in
     DomainTable.astro and generate_newsletter.py; the new tightened
@@ -122,7 +129,20 @@ CONTRACT_FIELDS = (
     # the frontend's first-paint budget.
     "snapshot_category",
     "snapshot_classifier_version",
+    # Phase 2 ranker justification (added 2026-09-19). Short free text from
+    # the shortlist model, e.g. "explicit service intent, clear and
+    # trustworthy". Null whenever the ranker didn't produce one — fallback
+    # days, carryover written before this migration, and the ranker's own
+    # "missing from response" placeholder (see _phase2_reason). Publishing
+    # it here also means carryover entries keep their reason across days,
+    # since tomorrow's run reads this file back in.
+    "phase2_reason",
 )
+
+# scripts/phase2_ranker.py writes this literal when a candidate was sent to
+# the model but came back absent from its response. It is a pipeline marker,
+# not a justification, so it must never reach the site.
+_PHASE2_REASON_PLACEHOLDER = "missing from response"
 
 # Enrichment fields used to compute completeness ratio. A candidate's
 # completeness = (count of these fields that are not null) / len(this tuple).
@@ -215,6 +235,24 @@ def _compute_verdict(candidate: dict, config: dict) -> str:
     return "Caution"
 
 
+def _phase2_reason(candidate: dict) -> str | None:
+    """Return the ranker's justification, or None when there isn't a real one.
+
+    None (not "") is the published value for: field absent (fallback days,
+    pre-migration carryover), non-string junk, whitespace-only text, and the
+    ranker's "missing from response" placeholder. The frontend renders the
+    reason only when it is a non-empty string, so one null check covers
+    every one of those cases.
+    """
+    raw = candidate.get("phase2_reason")
+    if not isinstance(raw, str):
+        return None
+    text = raw.strip()
+    if not text or text.lower() == _PHASE2_REASON_PLACEHOLDER:
+        return None
+    return text
+
+
 def _project(candidate: dict, registrars_config: list[dict], config: dict) -> dict:
     name = candidate.get("name", "")
     return {
@@ -249,6 +287,7 @@ def _project(candidate: dict, registrars_config: list[dict], config: dict) -> di
         # field; project them as None so JSON shape stays uniform.
         "snapshot_category": candidate.get("snapshot_category"),
         "snapshot_classifier_version": candidate.get("snapshot_classifier_version"),
+        "phase2_reason": _phase2_reason(candidate),
     }
 
 

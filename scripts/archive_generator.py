@@ -1,5 +1,5 @@
 """Archive subsystem — generate permanent reference pages for Clean and
-Promising domains via Anthropic Haiku, then commit + push.
+Promising domains via the shared LLM backend, then commit + push.
 
 Independent of the daily pipeline. Runs ~10 minutes after pipeline
 completion via its own systemd timer / cron entry:
@@ -9,21 +9,52 @@ completion via its own systemd timer / cron entry:
       >> /var/log/domainsifter/archive.log 2>&1
 
 Reads:
-  - src/data/daily-domains.json    (pipeline output)
-  - src/data/archive-index.json    (master index; created empty on first run)
-  - env ANTHROPIC_API_KEY           (required)
+  - scripts/config.json             (--config; carries llm.* + archive_generator.*)
+  - src/data/daily-domains.json     (pipeline output)
+  - src/data/archive-index.json     (master index; created empty on first run)
+  - src/data/wayback_excerpts.json  (excerpt sidecar; path from config)
   - env GITHUB_TOKEN                (required for the push)
 
 Writes:
   - src/content/archive/{name}.md  (one Markdown file per new archive entry)
   - src/data/archive-index.json    (appended in place)
 
+2026-09-19 — THREE CHANGES
+
+1. BACKEND. The direct `anthropic` client is gone. Generation now goes
+   through `scripts.llm_backend.get_backend(config)`, the same interface
+   `phase2_ranker` and `snapshot_classifier` use, so the subscription-backed
+   `claude_code` backend and the metered `api` backend are one config value
+   apart (hard rule 9). This module stopped producing pages on 2026-07-21
+   when the API credit balance hit zero; ANTHROPIC_API_KEY is no longer a
+   gate here — the backend decides.
+
+2. GROUNDING. The page prompt now has two explicit modes. With a Wayback
+   excerpt the page states what the site WAS, quoting/paraphrasing the real
+   title, meta description and headings. WITHOUT one it writes a shorter,
+   purely factual page from the numeric signals and says outright that the
+   historical content could not be retrieved. Speculation from the domain
+   name ("the name suggests possible connections to fitness, productivity,
+   entertainment, or educational content") is forbidden in both modes —
+   under hard rule 2 a guess presented as fact is an invented fact.
+
+3. EVIDENCE IN FRONTMATTER. The ranker's `phase2_reason`, the classifier's
+   `snapshot_category`, and the archived page's title / meta description /
+   h1 / h2 are now persisted into the frontmatter as OPTIONAL keys. They are
+   read live nowhere: daily-domains.json is a 14-day rolling window and
+   wayback_excerpts.json only covers what the classifier saw, while an
+   archive page is permanent — none of the 113 pages written before this
+   date still appear in the daily list, so a live read would show the
+   evidence for two weeks and then drop it on the next rebuild. See
+   `_evidence_fields`.
+
 Behavior:
   1. Load daily-domains.json.
   2. Filter to entries with verdict in {Clean, Promising} AND not already
      in archive-index (the index is source of truth for "already archived").
-  3. For each qualifying entry: call Haiku, write {name}.md with Astro
-     frontmatter + the generated body.
+  3. For each qualifying entry: resolve its Wayback excerpt (sidecar first,
+     per-domain fetch as fallback), call the backend, write {name}.md with
+     Astro frontmatter + the generated body.
   4. Append each new entry to archive-index.json.
   5. Atomic file writes — temp-write + os.replace — so a mid-run failure
      never leaves a partial index.
@@ -32,10 +63,11 @@ Behavior:
      scripts/run-daily.sh).
 
 Failure modes:
-  - Per-domain Haiku failure → log, skip the domain, continue with others.
-    Failed domain stays out of archive-index; will retry on the next run.
-  - 5 consecutive Haiku failures → circuit breaker opens, exit non-zero
-    (cron / log monitor will surface it).
+  - Per-domain backend failure (LLMBackendError or anything else) → log,
+    skip the domain, continue with others. The failed domain stays out of
+    archive-index; it is retried on the next run.
+  - 5 consecutive failures → circuit breaker opens, exit non-zero (cron /
+    log monitor will surface it). Threshold is config-driven.
   - git push failure → exit non-zero. Local commit is left in place; next
     day's run will see a clean state again after the operator resolves
     the push (typically a manual pull --ff-only).
@@ -47,11 +79,14 @@ built pages including the dynamic /d/{name} routes on the next Astro
 build (triggered by the push that this script makes). robots.txt already
 points to sitemap-index.xml. This script does not write public/sitemap.xml.
 
-Cost: Haiku 4.5 at ~$1/MTok input, ~$5/MTok output; ~1.5k input + 600
-output per domain ≈ $0.0045/call. Steady-state ~10-30 new domains/day
-≈ $0.05-0.15/day ≈ $1.50-4.50/month. First-run backfill may hit ~50-150
-calls depending on how many qualifying entries are currently in
-daily-domains.json. Verify pricing at docs.claude.com before bulk runs.
+Frontmatter: the YAML block is generated by `_build_frontmatter`, NOT by
+the model, and its keys are the zod schema in src/content/config.ts. The
+first thirteen keys are the original required contract; renaming or
+reordering one breaks the Astro content-collection build. The evidence keys
+added in change 3 are optional on both sides and are omitted entirely when
+absent, which is what keeps the 113 pages that predate them valid. The
+excerpt values are untrusted third-party text and go through
+`_clean_untrusted_text` + `_yaml_quote` before they are written.
 
 Operational notes — see commit message header.
 """
@@ -68,23 +103,22 @@ import tempfile
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-
-from scripts.wayback_excerpt import fetch_excerpt
 from typing import Any
+
+from scripts import llm_backend
+from scripts.wayback_excerpt import fetch_excerpt
 
 logger = logging.getLogger("scripts.archive_generator")
 
 
 # --- Constants ---------------------------------------------------------------
 
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
-HAIKU_MAX_TOKENS = 800
-HAIKU_TEMPERATURE = 0.4
 CONSECUTIVE_FAILURES_ABORT = 5
 
 QUALIFYING_VERDICTS = ("Clean", "Promising")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = REPO_ROOT / "scripts" / "config.json"
 DAILY_DOMAINS_PATH = REPO_ROOT / "src" / "data" / "daily-domains.json"
 ARCHIVE_INDEX_PATH = REPO_ROOT / "src" / "data" / "archive-index.json"
 ARCHIVE_CONTENT_DIR = REPO_ROOT / "src" / "content" / "archive"
@@ -93,7 +127,8 @@ ARCHIVE_CONTENT_DIR = REPO_ROOT / "src" / "content" / "archive"
 # instead of refetching from archive.org, eliminating ~60s of wall-clock per
 # day's archive run. Falls back to per-domain fetch_excerpt for any name
 # not present in the sidecar (covers backfilled carryover from before
-# Phase 4 + transient sidecar-write failures).
+# Phase 4 + transient sidecar-write failures). Overridable via config key
+# `sidecar_excerpts_path`.
 SIDECAR_EXCERPTS_PATH = REPO_ROOT / "src" / "data" / "wayback_excerpts.json"
 
 GITHUB_REPO_URL_TEMPLATE = "https://x-access-token:{token}@github.com/oiramix/domainsifter.git"
@@ -101,66 +136,169 @@ GIT_USER_NAME = "domainsifter-archive"
 GIT_USER_EMAIL = "99090280+oiramix@users.noreply.github.com"
 
 
-# --- Haiku system prompt ---------------------------------------------------
+# --- Config (hard rule 9) ----------------------------------------------------
+
+# Applied when a key is absent from config["archive_generator"], so the module
+# behaves sensibly before the keys land in scripts/config.json.
+DEFAULTS: dict[str, Any] = {
+    # Sidecar of pre-computed Wayback excerpts, relative to the repo root
+    # (absolute paths are honoured as-is).
+    "sidecar_excerpts_path": "src/data/wayback_excerpts.json",
+    # Per-page wall-clock cap handed to the backend. None → llm.timeout_seconds.
+    "timeout_seconds": None,
+    # Circuit breaker: consecutive per-domain failures that abort the run.
+    "consecutive_failures_abort": CONSECUTIVE_FAILURES_ABORT,
+    # Caps on the untrusted excerpt text persisted into frontmatter. These
+    # mirror MAX_FIELD_CHARS / MAX_HEADING_CHARS / MAX_HEADINGS in
+    # src/pages/d/[domain].astro so the page's own truncation is a no-op on
+    # what we write (no double ellipsis) and one 40 kB spam heading can't
+    # bloat a permanent .md file.
+    "excerpt_max_field_chars": 300,
+    "excerpt_max_heading_chars": 140,
+    "excerpt_max_headings": 5,
+}
+
+# The ranker writes this into phase2_reason when a name was sent to the model
+# but came back absent from the reply. It is a pipeline marker, not a
+# justification, and must never reach a page. scripts/output.py filters it on
+# the JSON side; duplicated (not imported) here because this module must stay
+# correct against any daily-domains.json, including ones written before that
+# filter existed.
+PHASE2_REASON_PLACEHOLDER = "missing from response"
+
+
+def cfg(config: dict | None, key: str) -> Any:
+    """Read ``config["archive_generator"][key]``.
+
+    Falls back to a top-level key of the same name (so an operator who adds
+    ``sidecar_excerpts_path`` at the root of config.json still gets the
+    behaviour they intended), then to DEFAULTS.
+    """
+    section = (config or {}).get("archive_generator")
+    if isinstance(section, dict) and key in section:
+        return section[key]
+    if isinstance(config, dict) and key in config:
+        return config[key]
+    return DEFAULTS[key]
+
+
+def _sidecar_path_from_config(config: dict | None) -> Path:
+    """Resolve the excerpt sidecar path, relative paths against REPO_ROOT."""
+    raw = cfg(config, "sidecar_excerpts_path")
+    if not raw:
+        return SIDECAR_EXCERPTS_PATH
+    path = Path(str(raw))
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+# --- System prompt -----------------------------------------------------------
 #
-# 2026-05-18 revision: Historical use is now strictly grounded in the
-# Wayback excerpt fetched per-domain by scripts/wayback_excerpt.py. When
-# the excerpt is null or empty, the section is OMITTED. The previous
-# language ("based on the name structure", "the linguistic composition
-# suggests", "describe what kind of website this likely was") was an
-# invitation to hallucinate and produced the deepsand.net / waterangels.net
-# style invented descriptions that triggered this rewrite. All such
-# speculation-invitation phrases are excised throughout the prompt.
+# 2026-09-19 revision. Two modes, chosen by the caller from the excerpt, not
+# by the model from a conditional buried in one long prompt:
+#
+#   GROUNDED    — a Wayback excerpt with real content exists. The page says
+#                 what the site WAS, from the excerpt's own title / meta /
+#                 h1 / h2.
+#   NO-EXCERPT  — nothing was retrievable. The page is SHORTER, sticks to the
+#                 numeric signals, and states plainly that the historical
+#                 content could not be retrieved.
+#
+# The previous single prompt told the model to OMIT the historical section
+# when ungrounded, which readers experienced as an unexplained gap; and its
+# earlier ancestor invited "the name suggests…" speculation, which is what
+# produced the 4minutes.net page this rewrite exists to replace.
 
-HAIKU_SYSTEM_PROMPT = """You are writing SEO-optimized reference pages for DomainSifter, a domain-research service that publishes daily evaluations of recently-dropped (expired) domains. Each page documents one specific domain at the moment it became available for re-registration, including the historical web presence, authority signals, and DomainSifter's verdict.
+MODE_MARKER_GROUNDED = "MODE: GROUNDED"
+MODE_MARKER_NO_EXCERPT = "MODE: NO-EXCERPT"
 
-YOUR TASK
-Given a JSON record describing one domain, write a 250-400 word reference page in clean Markdown format. The page must rank in Google for long-tail searches about this specific domain (e.g., "[domain] expired", "[domain] history", "is [domain] available", "[domain] backlinks").
+_SYSTEM_PROMPT_COMMON = """You are writing reference pages for DomainSifter, a domain-research service that publishes daily evaluations of recently-dropped (expired) domains. Each page documents one specific domain at the moment it became available for re-registration: what the site was, what authority signals it carries, and DomainSifter's verdict.
 
-CONTENT REQUIREMENTS
-
-The page must include, in this order:
-
-1. ## Heading: The domain name plain text (no formatting tricks). This is the H2.
-
-2. Lead paragraph (40-60 words): State plainly what this domain is, when it became available, and DomainSifter's verdict in one sentence. The first sentence must contain the full domain name exactly as a buyer would search it.
-
-3. Authority signals subsection (### Authority and historical presence):
-   2-3 short paragraphs interpreting the Wayback snapshot count, OpenPageRank score, and Common Crawl backlinks count in plain language. Tie each number to what it means for someone considering registering this domain. Avoid bullet-point-only sections — mix prose with the numbers. Do NOT speculate about the kind of website that produced these numbers in this subsection — that belongs in "Historical use" only.
-
-4. Historical use subsection (### Historical use):
-   This subsection is GROUNDED ONLY in the `wayback_excerpt` field of the input JSON.
-
-   When `wayback_excerpt` is present AND at least one of its fields (title, meta_description, h1, h2) is non-empty:
-     - Write 1-2 short paragraphs describing the site based ONLY on those signals. Quote or closely paraphrase the title and meta_description. Mention what the h1 / h2 headings reveal about the site's structure or topical focus.
-     - If the title or meta_description indicates a parked page, domain-for-sale notice, or generic placeholder/error page, report that factually (e.g. "The most recent snapshot showed a parked-page placeholder rather than active content").
-     - Do NOT speculate beyond what the excerpt directly states. Do NOT extrapolate "the site probably also did X."
-
-   When `wayback_excerpt` is null OR all four of its content fields (title, meta_description, h1, h2) are empty:
-     - OMIT the entire "### Historical use" subsection. Skip directly from "### Authority and historical presence" to "### Why we labeled this {verdict}".
-     - Do NOT write a stub. Do NOT write "the historical content could not be determined." Do NOT mention the snapshot count again here. Just leave the section out completely.
-
-   NEVER infer historical content from the domain name itself. Without a Wayback excerpt, you have no basis to describe what the site was. Silence is correct.
-
-5. Verdict subsection (### Why we labeled this {verdict}):
-   2-3 sentences explaining the verdict in terms a domain buyer cares about. Reference the actual quantitative signals (snapshot count, OPR, backlinks). For Clean: explain what positive signals justified the highest confidence. For Promising: name the signal strengths that matter and any limitations.
-
-6. Closing line: A brief honest disclaimer that the evaluation reflects the state on {dropped_date} and that domain availability changes quickly. Encourage verification at the registrar.
-
-TONE
-Neutral, factual, mildly informative. Not salesy. Not overly technical. Reads like Wikipedia or a quality SEO blog, not like AI fluff. No exclamation marks. No "imagine the possibilities" type filler. Every sentence must contain specific information.
-
-CRITICAL CONSTRAINTS
-- Never invent facts. If a field is missing or zero, say so honestly or omit.
-- Never use generic AI-ese ("In today's digital landscape...", "Discover the potential of...", "Unlock the power of...").
-- The exact domain name must appear at least 4 times naturally across the page.
-- Use the TLD naturally ("[domain].net" not just "[domain]").
-- NEVER describe what a domain "was", "likely was", "may have been", "could have served", or "appears to be" based on the domain name itself. The name is not evidence of historical content. Only the `wayback_excerpt` is.
-- NEVER write phrases like "based on the name structure", "the linguistic composition suggests", "the name suggests", or "likely operated as" anywhere on the page. These are speculation invitations and are forbidden.
+INPUT
+The user turn contains one JSON record for a single domain. Its `wayback_excerpt` field, when present, holds text scraped from the last archived snapshot of the site: `title`, `meta_description`, `h1` (a list) and `h2` (a list). That excerpt is the ONLY evidence available about what the site was. The name is not evidence: nothing about the site's purpose, audience or content may be inferred from the domain name itself.
 
 OUTPUT FORMAT
-Return only the Markdown body starting with the ## heading. No frontmatter, no meta-commentary, no preamble. The generator script will add frontmatter.
+Return only the Markdown body, starting with the `##` heading. No frontmatter, no preamble, no meta-commentary, no closing question. The generator script adds the frontmatter.
+
+TONE
+Neutral, factual, encyclopedic. It should read like a reference entry, not like marketing copy or an AI assistant talking. No exclamation marks. Every sentence must carry specific information.
+
+ABSOLUTE PROHIBITIONS — a page that breaks any of these is unpublishable
+- Never invent a fact. When a field is missing, null or zero, say so plainly or leave it out.
+- Never speculate about what the site was, might have been, probably was, or appears to have been, based on the domain name, its word structure, or its TLD. The phrases "the name suggests", "based on the name structure", "the linguistic composition suggests", "likely operated as", "may have served", "could have been used for" and anything equivalent are forbidden anywhere on the page.
+- Never offer several possibilities at once. "Possible connections to fitness, productivity, entertainment, or educational content" is four guesses in one sentence and is exactly what this instruction forbids.
+- Never write marketing or promotional claims: no "great investment", "strong potential", "perfect for", "unlock", "imagine", no calls to action beyond the closing verification line.
+- Never state or imply traffic figures, visitor numbers, revenue, resale price, appraisal or valuation of any kind. None of that is in the record.
+- Never invent testimonials, reviews, endorsements, rankings, awards or any other social proof.
+- Never use generic AI filler ("In today's digital landscape", "Discover the potential of", "Unlock the power of").
+
+NON-ENGLISH CONTENT
+Excerpts are frequently not in English — Chinese, German, Russian and Japanese are all common. When the excerpt is not in English:
+- Write the page in English and DESCRIBE the content: name the language, and say in English what the title, description and headings are about.
+- Do NOT paste an untranslated foreign-language string and present it as the site's brand, tagline or English name. A short quoted fragment is acceptable only when you immediately translate or gloss it in English.
+- The script a site was written in is not itself a signal of quality, legitimacy or abuse. Do not treat it as one.
+
+DOMAIN NAME USAGE
+Always write the domain with its TLD ("example.net", not "example"). The first sentence must contain the full domain name exactly as a buyer would search it.
 """
+
+_SYSTEM_PROMPT_GROUNDED = """
+MODE: GROUNDED
+A Wayback excerpt with real content is attached to this record. Write the FULL page: 250-400 words of clean Markdown, sections in this exact order. The domain name must appear naturally at least 4 times across the page.
+
+1. `## ` heading: the domain name as plain text, nothing else. This is the H2.
+
+2. Lead paragraph (40-60 words): what the domain is, when it became available, one clause saying what the site was according to the excerpt, and DomainSifter's verdict.
+
+3. `### Authority and historical presence`
+   2-3 short paragraphs interpreting the Wayback snapshot count, the OpenPageRank score and the Common Crawl source-domain count in plain language, tying each number to what it means for someone considering registering this domain. Mix prose with the numbers rather than listing them. Keep the description of the site's content out of this subsection — it belongs in the next one.
+
+4. `### Historical use`
+   1-2 paragraphs describing what the site WAS, grounded ONLY in the excerpt's title, meta_description, h1 and h2:
+   - State the subject of the site directly, in the past tense, citing the title and meta description. Quote them where quoting is clearer than paraphrase.
+   - Say what the h1 and h2 headings reveal about the site's structure or topical focus.
+   - When the title or meta description shows a parked page, a domain-for-sale notice, a generic placeholder or an error page, report that as the finding ("the final snapshot showed a parked-page placeholder rather than active content") and do not dress it up.
+   - Do not extrapolate past the excerpt. If it shows a recipe index, the site had a recipe index; it does not follow that the site "also offered meal planning".
+   - Note the date of the snapshot the excerpt came from, so a reader knows how current the description is.
+
+5. `### Why we labeled this {verdict}`
+   2-3 sentences explaining the verdict in terms a domain buyer cares about, referencing the actual quantitative signals. For Clean, name the positive signals that justified the highest confidence. For Promising, name both the strengths and the limitations.
+
+6. Closing line: one sentence noting that the evaluation reflects the state on the dropped date, that availability changes quickly, and that the reader should verify the current status with a registrar.
+"""
+
+_SYSTEM_PROMPT_NO_EXCERPT = """
+MODE: NO-EXCERPT
+No archived content could be retrieved for this domain: either no usable Wayback snapshot exists or the snapshot carried no title, description or headings. You therefore have NO evidence whatsoever about what the site was, and you must not fill the gap with a guess.
+
+Write a SHORTER, purely factual page: 120-200 words of clean Markdown, sections in this exact order. The domain name must appear naturally at least 3 times.
+
+1. `## ` heading: the domain name as plain text. This is the H2.
+
+2. Lead paragraph (30-50 words): the domain, when it became available, and DomainSifter's verdict. Do not characterise the site.
+
+3. `### Authority and historical presence`
+   1-2 paragraphs using ONLY the numbers present in the record: Wayback snapshot count, the date of the most recent snapshot, OpenPageRank, Common Crawl source-domain count, certificate history. Say what each number does and does not establish. A field that is null or zero is reported as absent, never glossed over and never estimated.
+
+4. `### Historical use`
+   One or two sentences, and nothing more: state plainly that the archived content of the site could not be retrieved, and that DomainSifter therefore makes no claim about what the site hosted. Do not describe, characterise, hint at or guess the content. Do not restate the snapshot count here. Do not speculate from the domain name — the name is not evidence.
+
+5. `### Why we labeled this {verdict}`
+   2 sentences grounding the verdict in the quantitative signals only, and acknowledging that the absence of retrievable content is itself a limitation on the evaluation.
+
+6. Closing line: one sentence noting that the evaluation reflects the state on the dropped date, that availability changes quickly, and that the reader should verify the current status with a registrar.
+"""
+
+
+def build_system_prompt(has_excerpt: bool) -> str:
+    """Pick the grounded or the no-excerpt page contract.
+
+    Splitting the two modes into separate prompts (rather than one prompt
+    with a conditional) means the model never sees the instructions for the
+    branch it is not in, which is what keeps "no evidence" pages from
+    drifting back into description.
+    """
+    tail = _SYSTEM_PROMPT_GROUNDED if has_excerpt else _SYSTEM_PROMPT_NO_EXCERPT
+    return _SYSTEM_PROMPT_COMMON + tail
 
 
 # --- Pure helpers (unit-tested) ---------------------------------------------
@@ -201,19 +339,253 @@ def _slug_for(name: str) -> str:
     return s
 
 
-def _build_haiku_user_message(record: dict) -> str:
-    """The user-turn prompt sent alongside the system prompt. JSON-pretty so
-    Haiku can pattern-match the fields without ambiguity."""
+def _excerpt_has_content(excerpt: dict | None) -> bool:
+    """True when the excerpt carries at least one usable content field.
+
+    A snapshot whose title / meta / h1 / h2 are all empty is evidence of
+    nothing, so it routes to the NO-EXCERPT prompt exactly like a missing
+    excerpt does. Metadata (snapshot_timestamp, snapshot_url) does not
+    count — it says when we looked, not what we found.
+    """
+    if not isinstance(excerpt, dict):
+        return False
+    if (excerpt.get("title") or "").strip():
+        return True
+    if (excerpt.get("meta_description") or "").strip():
+        return True
+    for key in ("h1", "h2"):
+        values = excerpt.get(key) or []
+        if isinstance(values, list) and any(str(v).strip() for v in values):
+            return True
+    return False
+
+
+def _excerpt_for_prompt(excerpt: dict | None) -> dict | None:
+    """Normalise the excerpt to the fields the page may be grounded in.
+
+    snapshot_url is dropped (a web.archive.org URL in the prompt invites the
+    model to write about archive.org rather than the site); snapshot_timestamp
+    is kept because the page cites how current the description is.
+    """
+    if not _excerpt_has_content(excerpt):
+        return None
+    assert isinstance(excerpt, dict)  # narrowed by _excerpt_has_content
+    return {
+        "title": excerpt.get("title"),
+        "meta_description": excerpt.get("meta_description"),
+        "h1": excerpt.get("h1") or [],
+        "h2": excerpt.get("h2") or [],
+        "snapshot_timestamp": excerpt.get("snapshot_timestamp"),
+    }
+
+
+def _build_user_message(record: dict, excerpt: dict | None = None) -> str:
+    """The user turn sent alongside the system prompt.
+
+    JSON-pretty so the model can pattern-match fields without ambiguity, and
+    ensure_ascii=False so a Chinese or German excerpt arrives as readable text
+    instead of \\uXXXX escapes (the model is asked to describe it in English,
+    which it cannot do from escapes).
+
+    The leading mode line repeats the system prompt's branch so the
+    instruction survives a long record, and gives the tests a stable hook.
+    """
+    grounded = _excerpt_for_prompt(excerpt)
+    enriched = {**record, "wayback_excerpt": grounded}
+    if grounded is not None:
+        header = (
+            f"{MODE_MARKER_GROUNDED} — this record has a Wayback excerpt. "
+            f"Describe what the site was using only that excerpt."
+        )
+    else:
+        header = (
+            f"{MODE_MARKER_NO_EXCERPT} — no archived content was retrievable "
+            f"for this domain. Write the short factual page and state that the "
+            f"historical content could not be retrieved. Do not speculate."
+        )
     return (
+        f"{header}\n\n"
         "Generate the archive page for this domain:\n\n"
-        + json.dumps(record, indent=2, sort_keys=True)
+        + json.dumps(enriched, indent=2, sort_keys=True, ensure_ascii=False)
     )
 
 
-def _build_frontmatter(record: dict, archived_date: str) -> str:
+def _is_unsafe_char(ch: str) -> bool:
+    """C0/C1 control characters and the bidi embedding/override/isolate family.
+
+    Controls would need escaping in YAML; the bidi family is worse, because it
+    silently reorders the text printed around it. Same set that
+    src/pages/d/[domain].astro strips on the rendering side.
+    """
+    code = ord(ch)
+    return (
+        code < 0x20
+        or 0x7F <= code <= 0x9F
+        or 0x202A <= code <= 0x202E
+        or 0x2066 <= code <= 0x2069
+    )
+
+
+def _clean_untrusted_text(value: Any, max_chars: int) -> str | None:
+    """Normalise one piece of third-party archived text for storage.
+
+    Excerpts come from spam pages as often as from real ones. Strip control
+    and bidi characters, collapse whitespace (which also removes the newlines
+    that would otherwise have to survive a YAML round-trip), and cap the
+    length INCLUDING the ellipsis so the page's own 300-char truncation never
+    fires a second time and produces "...…".
+
+    Returns None for non-strings and for anything that is empty after
+    cleaning — callers omit the key entirely rather than writing null.
+    """
+    if not isinstance(value, str):
+        return None
+    stripped = "".join(" " if _is_unsafe_char(ch) else ch for ch in value)
+    stripped = " ".join(stripped.split())
+    if not stripped:
+        return None
+    if len(stripped) > max_chars:
+        stripped = stripped[: max_chars - 1].rstrip() + "…"
+    return stripped
+
+
+def _yaml_quote(value: str) -> str:
+    """Render a string as a YAML double-quoted scalar.
+
+    Double-quoted is the one YAML style that can hold any character, so a
+    stray quote, colon, hash, leading dash or newline in an untrusted excerpt
+    cannot terminate the scalar and corrupt the frontmatter (which would fail
+    `npm run build` for the whole site, not just one page). Non-ASCII is
+    emitted as itself — the file is UTF-8 and js-yaml reads it as such — so a
+    Chinese title stays legible in the repo.
+    """
+    out = [
+        '"',
+    ]
+    for ch in value:
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ord(ch) < 0x20 or 0x7F <= ord(ch) <= 0x9F:
+            out.append(f"\\u{ord(ch):04x}")
+        else:
+            out.append(ch)
+    out.append('"')
+    return "".join(out)
+
+
+def _yaml_string_list(values: list[str]) -> str:
+    """Flow-style sequence of quoted scalars: ["a", "b"]."""
+    return "[" + ", ".join(_yaml_quote(v) for v in values) + "]"
+
+
+def _phase2_reason(record: dict, max_chars: int) -> str | None:
+    """The ranker's justification, or None when there isn't a real one.
+
+    None covers: field absent (fallback days, pre-2026-09-19 carryover),
+    non-string junk, whitespace-only text, and the "missing from response"
+    placeholder. Mirrors scripts/output.py::_phase2_reason.
+    """
+    raw = record.get("phase2_reason")
+    if not isinstance(raw, str):
+        return None
+    if raw.strip().lower() == PHASE2_REASON_PLACEHOLDER:
+        return None
+    return _clean_untrusted_text(raw, max_chars)
+
+
+def _evidence_fields(
+    record: dict, excerpt: dict | None, config: dict | None = None,
+) -> dict[str, Any]:
+    """The optional evidence block appended to the frontmatter.
+
+    WHY THIS IS IN THE MARKDOWN AND NOT READ LIVE (2026-09-19):
+    daily-domains.json is a 14-day rolling window and wayback_excerpts.json
+    only covers domains the classifier has seen, while an archive page is
+    permanent — today none of the 113 existing pages still appear in the
+    daily list. Reading the evidence live means it shows for two weeks and
+    then vanishes on a rebuild. Written here, it is captured once, at the
+    moment we knew it, and kept.
+
+    Every key is omitted when absent. The zod schema in
+    src/content/config.ts marks all of them optional and nullable, because
+    the 113 pages written before this change have none of them and a
+    required field fails the site build.
+    """
+    field_cap = int(cfg(config, "excerpt_max_field_chars"))
+    heading_cap = int(cfg(config, "excerpt_max_heading_chars"))
+    max_headings = int(cfg(config, "excerpt_max_headings"))
+
+    out: dict[str, Any] = {}
+
+    reason = _phase2_reason(record, field_cap)
+    if reason:
+        out["phase2_reason"] = reason
+
+    category = record.get("snapshot_category")
+    if isinstance(category, str) and category.strip():
+        out["snapshot_category"] = category.strip()
+
+    if not isinstance(excerpt, dict):
+        return out
+
+    title = _clean_untrusted_text(excerpt.get("title"), field_cap)
+    if title:
+        out["excerpt_title"] = title
+    meta = _clean_untrusted_text(excerpt.get("meta_description"), field_cap)
+    if meta:
+        out["excerpt_meta_description"] = meta
+    for src_key, dest_key in (("h1", "excerpt_h1"), ("h2", "excerpt_h2")):
+        raw = excerpt.get(src_key)
+        if not isinstance(raw, list):
+            continue
+        cleaned = [
+            text for text in (
+                _clean_untrusted_text(item, heading_cap) for item in raw
+            ) if text
+        ][:max_headings]
+        if cleaned:
+            out[dest_key] = cleaned
+
+    # Provenance, and only when there is text for it to date. The page says
+    # "reproduced verbatim from the Wayback Machine capture of X on DATE —
+    # this is the previous owner's content, not ours", which is what makes
+    # quoting a spam page honest instead of misleading. If the date resolved
+    # from the sidecar alone it would disappear the moment the domain rolled
+    # out of it, leaving undated third-party content standing as evidence.
+    # A lone timestamp with no text would be the mirror-image fault: a date
+    # attached to nothing.
+    if any(key.startswith("excerpt_") for key in out):
+        # Wayback timestamps are 14 digits, but this is still third-party
+        # data and gets the same cleaning and quoting as the prose.
+        stamp = _clean_untrusted_text(excerpt.get("snapshot_timestamp"), field_cap)
+        if stamp:
+            out["excerpt_snapshot_timestamp"] = stamp
+    return out
+
+
+def _build_frontmatter(
+    record: dict,
+    archived_date: str,
+    *,
+    excerpt: dict | None = None,
+    config: dict | None = None,
+) -> str:
     """YAML frontmatter that Astro's content collection schema parses. Keys
     match the zod schema in src/content/config.ts — adding or renaming a
-    field requires updating both."""
+    field requires updating both.
+
+    The first thirteen keys are the original, required contract and are
+    emitted unconditionally, in order, for every page. The evidence keys
+    from `_evidence_fields` follow and are emitted only when present.
+    """
     payload = {
         "name": record["name"],
         "tld": record["tld"],
@@ -229,6 +601,7 @@ def _build_frontmatter(record: dict, archived_date: str) -> str:
         "first_seen_date": record.get("first_seen_date"),
         "availability_verified_at": record.get("availability_verified_at"),
     }
+    payload.update(_evidence_fields(record, excerpt, config))
     lines = ["---"]
     for k, v in payload.items():
         if v is None:
@@ -237,18 +610,44 @@ def _build_frontmatter(record: dict, archived_date: str) -> str:
             lines.append(f"{k}: {'true' if v else 'false'}")
         elif isinstance(v, (int, float)):
             lines.append(f"{k}: {v}")
+        elif isinstance(v, list):
+            lines.append(f"{k}: {_yaml_string_list(v)}")
         else:
-            # Wrap strings in double-quotes; escape internal quotes. Domain
-            # names and ISO dates never contain quotes, but be safe.
-            escaped = str(v).replace('\\', '\\\\').replace('"', '\\"')
-            lines.append(f'{k}: "{escaped}"')
+            lines.append(f"{k}: {_yaml_quote(str(v))}")
     lines.append("---")
     return "\n".join(lines) + "\n"
 
 
-def _build_markdown_file(record: dict, body: str, archived_date: str) -> str:
+def _build_markdown_file(
+    record: dict,
+    body: str,
+    archived_date: str,
+    *,
+    excerpt: dict | None = None,
+    config: dict | None = None,
+) -> str:
     """Full file content: frontmatter + blank line + body + trailing newline."""
-    return _build_frontmatter(record, archived_date) + "\n" + body.rstrip() + "\n"
+    frontmatter = _build_frontmatter(
+        record, archived_date, excerpt=excerpt, config=config,
+    )
+    return frontmatter + "\n" + body.rstrip() + "\n"
+
+
+def _index_entry(record: dict, archived_date: str) -> dict:
+    """One archive-index.json row. Deliberately a subset of the frontmatter —
+    the index feeds the archive listing page, not the detail page."""
+    name = record["name"]
+    return {
+        "name": name,
+        "tld": record.get("tld") or name.rsplit(".", 1)[-1],
+        "verdict": record["verdict"],
+        "score": int(record.get("score") or 0),
+        "dropped_date": record.get("dropped_date"),
+        "archived_date": archived_date,
+        "wayback_snapshots": record.get("wayback_snapshots"),
+        "cc_source_domain_count": record.get("cc_source_domain_count"),
+        "open_page_rank": record.get("open_page_rank"),
+    }
 
 
 # --- I/O helpers -------------------------------------------------------------
@@ -296,37 +695,67 @@ def _atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
-# --- Haiku call --------------------------------------------------------------
+# --- Backend client ----------------------------------------------------------
 
 
-class HaikuClient:
-    """Thin wrapper around anthropic.Anthropic.messages.create so the
-    generator's main path can be tested without the real SDK. Real client
-    is instantiated lazily so tests that mock `client_factory` never need
-    ANTHROPIC_API_KEY in the environment."""
+class ArchivePageClient:
+    """One archive page per call, over an scripts.llm_backend Backend.
 
-    def __init__(self, api_key: str) -> None:
-        # Lazy import — keeps the test path runnable on machines without
-        # the anthropic SDK installed (it's added to requirements.txt for
-        # OVH; tests mock around it).
-        from anthropic import Anthropic
-        self._client = Anthropic(api_key=api_key)
+    Deliberately thin — the backend owns transport, auth and timeouts. The
+    system prompt is chosen per call by the caller (grounded vs no-excerpt),
+    so it is passed in rather than owned here.
+
+    `generate` raises llm_backend.LLMBackendError and nothing else from the
+    backend; callers treat that as a per-domain soft failure (hard rule 17).
+    """
+
+    def __init__(self, backend: Any, *, timeout_seconds: int | None = None) -> None:
+        self._backend = backend
+        self._timeout = timeout_seconds
+
+    @property
+    def backend_name(self) -> str:
+        return str(getattr(self._backend, "name", "unknown"))
 
     def generate(self, system: str, user: str) -> str:
-        resp = self._client.messages.create(
-            model=HAIKU_MODEL,
-            max_tokens=HAIKU_MAX_TOKENS,
-            temperature=HAIKU_TEMPERATURE,
-            system=system,
-            messages=[{"role": "user", "content": user}],
+        text = self._backend.complete(
+            system=system, user=user, timeout_seconds=self._timeout,
         )
-        # Concatenate text blocks (Anthropic returns a list of content blocks).
-        out: list[str] = []
-        for block in resp.content:
-            text = getattr(block, "text", None)
-            if text:
-                out.append(text)
-        return "".join(out).strip()
+        return (text or "").strip()
+
+
+def make_default_client(config: dict | None = None) -> ArchivePageClient:
+    """Build the client named by ``config["llm"]["backend"]``.
+
+    An unconstructable backend is a config error, which hard rule 17 puts in
+    the crash-the-run column — unlike the classifier, this module produces no
+    useful output at all without a backend, so failing soft would just write
+    nothing and report success.
+    """
+    try:
+        backend = llm_backend.get_backend(config or {})
+    except llm_backend.LLMBackendError as exc:
+        raise RuntimeError(f"no usable LLM backend: {exc}") from exc
+    client = ArchivePageClient(
+        backend, timeout_seconds=cfg(config, "timeout_seconds"),
+    )
+    logger.info("archive_generator: using llm backend %r", client.backend_name)
+    return client
+
+
+def _generate_body(client: Any, record: dict, excerpt: dict | None) -> str:
+    """One page body. Picks the prompt mode from the excerpt and calls the
+    client. Propagates whatever the client raises — callers decide."""
+    has_excerpt = _excerpt_has_content(excerpt)
+    logger.debug(
+        "Generating %s in %s mode",
+        record.get("name"),
+        "grounded" if has_excerpt else "no-excerpt",
+    )
+    return client.generate(
+        system=build_system_prompt(has_excerpt),
+        user=_build_user_message(record, excerpt),
+    )
 
 
 # --- Git operations ----------------------------------------------------------
@@ -442,7 +871,7 @@ def _resolve_excerpt(
             return cached, "sidecar-hit"
         # Sidecar has a non-dict, non-None value — corruption. Fall through
         # to fetch as a defensive fallback rather than passing garbage to
-        # Haiku.
+        # the model.
         logger.warning(
             "Sidecar entry for %s is not dict|None (got %s); falling back to fetch.",
             name, type(cached).__name__,
@@ -471,16 +900,18 @@ def generate_archive(
     daily_path: Path = DAILY_DOMAINS_PATH,
     index_path: Path = ARCHIVE_INDEX_PATH,
     content_dir: Path = ARCHIVE_CONTENT_DIR,
-    client: HaikuClient | None = None,
+    client: Any | None = None,
     today: date | None = None,
     git_push: bool = True,
     github_token: str | None = None,
+    config: dict | None = None,
 ) -> dict:
     """Process today's daily-domains.json into archive pages. Returns a
     status dict with counts. Raises on systemic failures (config error,
     breaker tripped, push failed)."""
     today = today or date.today()
     today_iso = today.isoformat()
+    config = config or {}
 
     daily_payload = _load_json(daily_path, default={"domains": []})
     domains = daily_payload.get("domains") or []
@@ -506,12 +937,10 @@ def generate_archive(
     )
 
     if client is None:
-        api_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY missing — required for Haiku calls.")
-        client = HaikuClient(api_key)
+        client = make_default_client(config)
 
     content_dir.mkdir(parents=True, exist_ok=True)
+    abort_after = int(cfg(config, "consecutive_failures_abort"))
 
     # Sidecar-first excerpt resolution (Phase 4, 2026-05-20): pipeline's
     # Stage 4b populates src/data/wayback_excerpts.json so this loop hits
@@ -519,12 +948,28 @@ def generate_archive(
     # Per-domain fetch_excerpt is still the fallback for entries the
     # classifier didn't see (e.g., backfilled carryover from before Phase
     # 4 wire-in, or a day where Stage 4b's sidecar write failed).
-    sidecar_excerpts = _load_sidecar_excerpts()
+    sidecar_excerpts = _load_sidecar_excerpts(_sidecar_path_from_config(config))
 
     new_entries: list[dict] = []
+    grounded_count = 0
     consecutive_failures = 0
     for record in qualifying:
         name = record["name"]
+        md_path = content_dir / f"{_slug_for(name)}.md"
+
+        # Second gate, after the archive-index one: a page already on disk is
+        # never regenerated. Costs nothing to check and makes a lost or
+        # rolled-back index entry self-heal without re-spending a model call
+        # or churning an existing published page.
+        if md_path.exists():
+            logger.info(
+                "%s already has a page at %s but is missing from the index; "
+                "restoring the index entry without regenerating.",
+                name, md_path.name,
+            )
+            new_entries.append(_index_entry(record, today_iso))
+            already.add(name)
+            continue
 
         excerpt, source = _resolve_excerpt(record, sidecar_excerpts)
         # Only pause AFTER a real archive.org hit (not after a sidecar
@@ -533,56 +978,49 @@ def generate_archive(
         if source in ("fetch", "fetch-error"):
             time.sleep(1.0)
 
-        enriched_record = {**record, "wayback_excerpt": excerpt}
-
         try:
-            body = client.generate(
-                system=HAIKU_SYSTEM_PROMPT,
-                user=_build_haiku_user_message(enriched_record),
-            )
+            body = _generate_body(client, record, excerpt)
         except Exception as exc:
             consecutive_failures += 1
             logger.warning(
-                "Haiku call failed for %s (%d/%d consecutive): %s",
-                name, consecutive_failures, CONSECUTIVE_FAILURES_ABORT, exc,
+                "Backend call failed for %s (%d/%d consecutive): %s",
+                name, consecutive_failures, abort_after, exc,
             )
-            if consecutive_failures >= CONSECUTIVE_FAILURES_ABORT:
+            if consecutive_failures >= abort_after:
                 raise RuntimeError(
-                    f"{CONSECUTIVE_FAILURES_ABORT} consecutive Haiku failures; "
-                    f"circuit breaker open. Inspect API status and retry."
+                    f"{abort_after} consecutive backend failures; "
+                    f"circuit breaker open. Inspect the LLM backend and retry."
                 ) from exc
             continue
 
         if not body or "##" not in body:
             consecutive_failures += 1
             logger.warning(
-                "Haiku returned empty / malformed body for %s; skipping.", name,
+                "Backend returned empty / malformed body for %s; skipping.", name,
             )
-            if consecutive_failures >= CONSECUTIVE_FAILURES_ABORT:
+            if consecutive_failures >= abort_after:
                 raise RuntimeError(
-                    f"{CONSECUTIVE_FAILURES_ABORT} consecutive malformed responses; "
+                    f"{abort_after} consecutive malformed responses; "
                     f"circuit breaker open."
                 )
             continue
         consecutive_failures = 0
 
-        slug = _slug_for(name)
-        md_path = content_dir / f"{slug}.md"
-        _atomic_write_text(md_path, _build_markdown_file(record, body, today_iso))
-        entry = {
-            "name": name,
-            "tld": record.get("tld") or name.rsplit(".", 1)[-1],
-            "verdict": record["verdict"],
-            "score": int(record.get("score") or 0),
-            "dropped_date": record.get("dropped_date"),
-            "archived_date": today_iso,
-            "wayback_snapshots": record.get("wayback_snapshots"),
-            "cc_source_domain_count": record.get("cc_source_domain_count"),
-            "open_page_rank": record.get("open_page_rank"),
-        }
-        new_entries.append(entry)
+        _atomic_write_text(
+            md_path,
+            _build_markdown_file(
+                record, body, today_iso, excerpt=excerpt, config=config,
+            ),
+        )
+        new_entries.append(_index_entry(record, today_iso))
         already.add(name)
-        logger.info("Archived %s → %s", name, md_path.name)
+        if _excerpt_has_content(excerpt):
+            grounded_count += 1
+        logger.info(
+            "Archived %s → %s (%s)",
+            name, md_path.name,
+            "grounded" if _excerpt_has_content(excerpt) else "no-excerpt",
+        )
 
     if new_entries:
         archived_entries.extend(new_entries)
@@ -594,6 +1032,10 @@ def generate_archive(
         logger.info(
             "Updated archive-index: +%d new, %d total entries.",
             len(new_entries), len(archived_entries),
+        )
+        logger.info(
+            "Grounding coverage: %d/%d pages written from a Wayback excerpt.",
+            grounded_count, len(new_entries),
         )
 
     if git_push and new_entries:
@@ -607,6 +1049,7 @@ def generate_archive(
         "new_count": len(new_entries),
         "total_archived": len(archived_entries),
         "attempted": len(qualifying),
+        "grounded_count": grounded_count,
     }
 
 
@@ -617,16 +1060,17 @@ def _render_one_page(
     record: dict,
     *,
     excerpt: dict | None,
-    client: HaikuClient,
+    client: Any,
     output_dir: Path,
     today_iso: str,
+    config: dict | None = None,
 ) -> tuple[bool, str | None]:
-    """Per-domain work: Haiku call → write .md. Excerpt is provided by the
+    """Per-domain work: backend call → write .md. Excerpt is provided by the
     caller (so this helper doesn't decide whether to fetch vs read sidecar
     vs use None).
 
     Returns (success, reason). reason is None on success, a short string
-    on failure ('haiku-error', 'haiku-malformed'). Caller decides whether
+    on failure ('backend-error', 'backend-malformed'). Caller decides whether
     a failure aborts the run or just logs.
 
     Phase 4 (2026-05-20): excerpt-fetching responsibility moved out to
@@ -635,24 +1079,22 @@ def _render_one_page(
     dry-run paths."""
     name = record["name"]
 
-    enriched_record = {**record, "wayback_excerpt": excerpt}
-
     try:
-        body = client.generate(
-            system=HAIKU_SYSTEM_PROMPT,
-            user=_build_haiku_user_message(enriched_record),
-        )
+        body = _generate_body(client, record, excerpt)
     except Exception as exc:
-        logger.warning("Haiku call failed for %s: %s", name, exc)
-        return False, "haiku-error"
+        logger.warning("Backend call failed for %s: %s", name, exc)
+        return False, "backend-error"
 
     if not body or "##" not in body:
-        logger.warning("Haiku returned empty / malformed body for %s; skipping.", name)
-        return False, "haiku-malformed"
+        logger.warning("Backend returned empty / malformed body for %s; skipping.", name)
+        return False, "backend-malformed"
 
     slug = _slug_for(name)
     md_path = output_dir / f"{slug}.md"
-    _atomic_write_text(md_path, _build_markdown_file(record, body, today_iso))
+    _atomic_write_text(
+        md_path,
+        _build_markdown_file(record, body, today_iso, excerpt=excerpt, config=config),
+    )
     logger.info("Rendered %s → %s", name, md_path)
     return True, None
 
@@ -662,8 +1104,9 @@ def generate_for_domains(
     output_dir: Path,
     *,
     daily_path: Path = DAILY_DOMAINS_PATH,
-    client: HaikuClient | None = None,
+    client: Any | None = None,
     today: date | None = None,
+    config: dict | None = None,
 ) -> dict:
     """Dry-run: process ONLY the named domains, write to `output_dir`,
     do NOT update archive-index.json, do NOT push.
@@ -684,6 +1127,7 @@ def generate_for_domains(
     """
     today = today or date.today()
     today_iso = today.isoformat()
+    config = config or {}
 
     daily_payload = _load_json(daily_path, default={"domains": []})
     by_name = {d["name"]: d for d in (daily_payload.get("domains") or []) if d.get("name")}
@@ -711,10 +1155,7 @@ def generate_for_domains(
         }
 
     if client is None:
-        api_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY missing — required for Haiku calls.")
-        client = HaikuClient(api_key)
+        client = make_default_client(config)
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -723,7 +1164,7 @@ def generate_for_domains(
     # Dry-run path benefits more from sidecar hits than the production
     # path (typical dry-run targets are 1-2 specific named domains that
     # were classified earlier today / yesterday).
-    sidecar_excerpts = _load_sidecar_excerpts()
+    sidecar_excerpts = _load_sidecar_excerpts(_sidecar_path_from_config(config))
 
     rendered: list[str] = []
     failed: list[str] = []
@@ -737,6 +1178,7 @@ def generate_for_domains(
             client=client,
             output_dir=output_dir,
             today_iso=today_iso,
+            config=config,
         )
         if ok:
             rendered.append(record["name"])
@@ -773,6 +1215,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Override archive-index.json path.",
     )
     parser.add_argument(
+        "--config", default=str(CONFIG_PATH),
+        help=(
+            "Path to config.json (carries llm.backend plus the "
+            "archive_generator.* knobs)."
+        ),
+    )
+    parser.add_argument(
         "--only", default=None,
         help=(
             "Dry-run: comma-separated domain names. Processes ONLY these "
@@ -797,6 +1246,8 @@ def main(argv: list[str] | None = None) -> int:
         stream=sys.stdout,
     )
 
+    config = _load_json(Path(args.config), default={}) or {}
+
     # Dry-run branch: --only + --output-dir bypass the production path
     # entirely. No index update, no git push, no archive-index gate.
     if args.only or args.output_dir:
@@ -812,6 +1263,7 @@ def main(argv: list[str] | None = None) -> int:
                 names,
                 Path(args.output_dir),
                 daily_path=Path(args.daily_path),
+                config=config,
             )
         except RuntimeError as exc:
             logger.error("Dry-run aborted: %s", exc)
@@ -827,6 +1279,7 @@ def main(argv: list[str] | None = None) -> int:
             daily_path=Path(args.daily_path),
             index_path=Path(args.index_path),
             git_push=not args.no_push,
+            config=config,
         )
     except RuntimeError as exc:
         logger.error("Archive run aborted: %s", exc)

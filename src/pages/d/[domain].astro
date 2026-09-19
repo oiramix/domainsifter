@@ -6,10 +6,27 @@
 // URL shape: /d/{domain} (dot in path is fine — Astro emits
 // dist/d/{domain}/index.html). See scripts/archive_generator.py header
 // for the generator side.
+//
+// Evidence wire-in (2026-09-19): this page also reads two pipeline outputs
+// directly, which is a deliberate, approved widening of the normal
+// "archive .md is the only input" coupling:
+//   - src/data/daily-domains.json   → phase2_reason (why the ranker
+//                                      shortlisted the name) and
+//                                      snapshot_category, for domains still
+//                                      on the current published list.
+//   - src/data/wayback_excerpts.json → the archived title / meta
+//                                      description / headings from the last
+//                                      Wayback capture.
+// Both are optional on every page: older archive entries have rolled off
+// the daily list, and the sidecar only covers domains the classifier saw.
+// Missing data degrades to an honest "we don't have this" note — never to
+// a claim that we checked something we didn't.
 import { getCollection, getEntry } from 'astro:content';
 import Layout from '../../layouts/Layout.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
+import dailyPayload from '../../data/daily-domains.json';
+import waybackExcerpts from '../../data/wayback_excerpts.json';
 
 const SITE_URL = 'https://domainsifter.com';
 
@@ -24,6 +41,148 @@ export async function getStaticPaths() {
 const { entry } = Astro.props;
 const { Content } = await entry.render();
 const d = entry.data;
+
+// --- Pipeline evidence lookup ------------------------------------------------
+// Shapes are declared locally rather than imported: the JSON files are
+// generated, and TypeScript would otherwise infer today's exact literal
+// shape (which omits phase2_reason on pre-migration files) and reject the
+// optional reads below.
+interface DailyDomain {
+  name: string;
+  phase2_reason?: string | null;
+  snapshot_category?: string | null;
+}
+interface WaybackExcerpt {
+  snapshot_timestamp?: string | null;
+  snapshot_url?: string | null;
+  title?: string | null;
+  meta_description?: string | null;
+  h1?: string[] | null;
+  h2?: string[] | null;
+}
+
+const dailyDomains =
+  (dailyPayload as unknown as { domains?: DailyDomain[] }).domains ?? [];
+// Only domains still on the current published list have a live row; every
+// older archive page simply gets null here.
+const liveRow = dailyDomains.find((row) => row.name === d.name) ?? null;
+
+// --- Untrusted-text handling --------------------------------------------------
+// Everything below originates from third-party archived pages. Much of it is
+// spam, and non-Latin scripts (Chinese, German, Indonesian) are common. It is
+// interpolated with {} only — never set:html — so Astro escapes it. On top of
+// that we strip control and bidi-override characters (which can visually
+// reorder surrounding text), collapse whitespace, and cap lengths so a single
+// 40kB heading can't blow out the page.
+const MAX_FIELD_CHARS = 300;
+const MAX_HEADING_CHARS = 140;
+const MAX_HEADINGS = 5;
+
+const cleanText = (value: unknown, maxChars: number): string | null => {
+  if (typeof value !== 'string') return null;
+  const stripped = value
+    // C0/C1 controls, then LRE/RLE/PDF/LRO/RLO and the isolate family.
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!stripped) return null;
+  return stripped.length > maxChars
+    ? `${stripped.slice(0, maxChars).trimEnd()}…`
+    : stripped;
+};
+
+const cleanHeadings = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+        .map((h) => cleanText(h, MAX_HEADING_CHARS))
+        .filter((h): h is string => h !== null)
+        .slice(0, MAX_HEADINGS)
+    : [];
+
+const excerptMap = waybackExcerpts as unknown as Record<
+  string,
+  WaybackExcerpt | null
+>;
+// Distinguish three states honestly:
+//   - key absent            → we have no archived sample for this domain
+//   - key present but null  → we looked and Wayback returned nothing usable
+//   - key present with data → render it
+const sidecarKnown = Object.prototype.hasOwnProperty.call(excerptMap, d.name);
+const rawExcerpt = sidecarKnown ? excerptMap[d.name] : null;
+
+// DURABILITY: the archive page is permanent, but BOTH src/data files it reads
+// are 14-day rolling windows — a domain drops out of daily-domains.json and,
+// eventually, out of the sidecar. So archive_generator.py bakes the evidence
+// into this page's own frontmatter at generation time (2026-09-19). Frontmatter
+// therefore WINS; the rolling files are only a fallback, which is what keeps
+// the 113 pre-migration pages working until they are regenerated.
+const fm = d as typeof d & {
+  phase2_reason?: string | null;
+  snapshot_category?: string | null;
+  excerpt_title?: string | null;
+  excerpt_meta_description?: string | null;
+  excerpt_h1?: string[] | null;
+  excerpt_h2?: string[] | null;
+  excerpt_snapshot_timestamp?: string | null;
+};
+
+const excerptTitle = cleanText(fm.excerpt_title ?? rawExcerpt?.title, MAX_FIELD_CHARS);
+const excerptDescription = cleanText(
+  fm.excerpt_meta_description ?? rawExcerpt?.meta_description,
+  MAX_FIELD_CHARS,
+);
+const excerptH1 = cleanHeadings(fm.excerpt_h1 ?? rawExcerpt?.h1);
+const excerptH2 = cleanHeadings(fm.excerpt_h2 ?? rawExcerpt?.h2);
+// "Known" means we have a record of having LOOKED — from either source. Without
+// this, a page whose evidence lives only in frontmatter would fall into the
+// "we have no archived sample" copy despite quoting one.
+const excerptKnown =
+  sidecarKnown ||
+  fm.excerpt_title != null ||
+  fm.excerpt_meta_description != null ||
+  fm.excerpt_h1 != null ||
+  fm.excerpt_h2 != null;
+const hasExcerpt = Boolean(
+  excerptTitle || excerptDescription || excerptH1.length || excerptH2.length,
+);
+const excerptLookedUpEmpty = excerptKnown && !hasExcerpt;
+
+// Wayback timestamps are YYYYMMDDhhmmss. Render just the date, and only when
+// the string actually parses — no guessing.
+const snapshotTimestamp =
+  fm.excerpt_snapshot_timestamp ?? rawExcerpt?.snapshot_timestamp ?? '';
+const snapshotDate = /^\d{8}/.test(snapshotTimestamp)
+  ? `${snapshotTimestamp.slice(0, 4)}-${snapshotTimestamp.slice(4, 6)}-${snapshotTimestamp.slice(6, 8)}`
+  : null;
+// Only ever link out to web.archive.org, and never pass link equity to an
+// archived spam page.
+const rawSnapshotUrl = rawExcerpt?.snapshot_url ?? '';
+const snapshotUrl = /^https?:\/\/web\.archive\.org\//.test(rawSnapshotUrl)
+  ? rawSnapshotUrl
+  : null;
+
+// Ranker justification. Null on fallback days, on pre-2026-09-19 carryover,
+// and on every archive entry that has rolled off the daily list.
+const phase2Reason = cleanText(
+  fm.phase2_reason ?? liveRow?.phase2_reason,
+  MAX_FIELD_CHARS,
+);
+
+// Content classifier verdict on the archived snapshot. `toxic` never reaches
+// publication (filter.keep_post_enrichment rejects it upstream), so only the
+// four reachable categories are described here.
+const snapshotCategory = fm.snapshot_category ?? liveRow?.snapshot_category ?? null;
+const SNAPSHOT_CATEGORY_COPY: Record<string, string> = {
+  legitimate: 'Our classifier read the archived page as a real, content-bearing site.',
+  parked: 'Our classifier read the archived page as a parking page, not an active site.',
+  empty: 'Our classifier found the archived page blank or placeholder-only.',
+};
+const snapshotCategoryNote = snapshotCategory
+  ? SNAPSHOT_CATEGORY_COPY[snapshotCategory] ?? null
+  : null;
+// `unknown` means the classifier could not categorise the page — stated as
+// such rather than dressed up as a finding.
+const snapshotCategoryUnknown = snapshotCategory === 'unknown';
 
 // Lightweight similar-domain query: other entries with the same TLD, by
 // score desc. Excludes the current entry. Capped at 5. Pure build-time
@@ -172,6 +331,17 @@ const verdictPill =
       </span>
     </div>
 
+    {/* Why the name was shortlisted, straight from the ranking model that
+        made the call. Absent on fallback days and on entries that have
+        rolled off the daily list — then this block simply doesn't render. */}
+    {phase2Reason && (
+      <p class="mb-6 text-sm text-stone-600 break-words">
+        <span class="font-medium text-ink">Why we shortlisted it:</span>{' '}
+        <span dir="auto">{phase2Reason}</span>
+        <span class="text-stone-400"> — DomainSifter shortlist model</span>
+      </p>
+    )}
+
     {/* Stock @tailwindcss/typography defaults — prose-stone matches the
         brand stone palette; max-w-none because the <main> container above
         already constrains the width. No per-element prose modifiers on
@@ -180,6 +350,85 @@ const verdictPill =
     <article class="prose prose-stone max-w-none">
       <Content />
     </article>
+
+    {/* Archived-content evidence. Everything inside the stone panel is
+        third-party text from the Wayback capture, interpolated with {} so
+        Astro escapes it; no set:html anywhere in this section. */}
+    <section class="mt-12 border-t border-stone-200 pt-8">
+      <h2 class="text-base font-semibold text-ink mb-3">What this site used to be</h2>
+
+      {hasExcerpt ? (
+        <>
+          <p class="text-sm text-stone-600 mb-3">
+            {snapshotDate
+              ? `Reproduced verbatim from the Wayback Machine capture of ${d.name} on ${snapshotDate}.`
+              : `Reproduced verbatim from the last Wayback Machine capture of ${d.name}.`}
+            {' '}This is the previous owner's content, not ours, and we do not
+            vouch for it — expect spam and non-English text.
+            {snapshotUrl && (
+              <>
+                {' '}
+                <a
+                  href={snapshotUrl}
+                  rel="nofollow ugc noopener noreferrer"
+                  target="_blank"
+                  class="text-accent hover:underline"
+                >View the capture on archive.org</a>.
+              </>
+            )}
+          </p>
+
+          <div class="rounded-md bg-stone-50 ring-1 ring-inset ring-stone-200 p-4 text-sm space-y-3 overflow-hidden">
+            {excerptTitle && (
+              <div>
+                <span class="block text-xs uppercase tracking-wide text-stone-500">Page title</span>
+                <span class="block text-stone-800 break-words" dir="auto">{excerptTitle}</span>
+              </div>
+            )}
+            {excerptDescription && (
+              <div>
+                <span class="block text-xs uppercase tracking-wide text-stone-500">Meta description</span>
+                <span class="block text-stone-800 break-words" dir="auto">{excerptDescription}</span>
+              </div>
+            )}
+            {excerptH1.length > 0 && (
+              <div>
+                <span class="block text-xs uppercase tracking-wide text-stone-500">Main heading</span>
+                <ul class="list-disc pl-5 space-y-1 text-stone-800">
+                  {excerptH1.map((h) => <li class="break-words" dir="auto">{h}</li>)}
+                </ul>
+              </div>
+            )}
+            {excerptH2.length > 0 && (
+              <div>
+                <span class="block text-xs uppercase tracking-wide text-stone-500">
+                  Section headings
+                </span>
+                <ul class="list-disc pl-5 space-y-1 text-stone-800">
+                  {excerptH2.map((h) => <li class="break-words" dir="auto">{h}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <p class="text-sm text-stone-600">
+          {excerptLookedUpEmpty
+            ? `We looked for the last Wayback Machine capture of ${d.name} and did not get usable page content back, so there is nothing to quote here.`
+            : `We do not have an archived content sample for ${d.name}. The signals on this page come from snapshot counts, link data, and certificate history rather than from the page text itself.`}
+        </p>
+      )}
+
+      {snapshotCategoryNote && (
+        <p class="mt-3 text-sm text-stone-600 break-words">{snapshotCategoryNote}</p>
+      )}
+      {snapshotCategoryUnknown && (
+        <p class="mt-3 text-sm text-stone-600 break-words">
+          Our classifier could not categorise the archived page, so we make no
+          claim about what it contained.
+        </p>
+      )}
+    </section>
 
     {similar.length > 0 && (
       <section class="mt-12 border-t border-stone-200 pt-8">
