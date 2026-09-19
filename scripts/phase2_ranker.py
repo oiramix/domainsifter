@@ -553,6 +553,7 @@ def _backend_chunk_all(
     *,
     chunk_size: int,
     max_parallel: int,
+    retry_passes: int = 1,
     timeout_seconds: int | None = None,
 ) -> tuple[dict[str, dict], dict]:
     """Rank every name via the LLM backend, in parallel chunks.
@@ -620,6 +621,56 @@ def _backend_chunk_all(
                 "Phase 2 ranker: chunk %d/%d returned %d scores",
                 index + 1, len(chunks), len(rows),
             )
+
+    # --- retry pass over whatever is still unscored -----------------------
+    #
+    # The first production run (2026-09-19) scored only 10,497 of 13,000
+    # names. Two chunks failed outright on malformed JSON, and four returned
+    # short (one gave 287 of 800) because the model stopped emitting. Both
+    # shapes leave names silently below-gate without ever being judged.
+    #
+    # Retrying by NAME rather than by chunk covers both causes at once, and
+    # the retry chunks are smaller — a shorter reply is likelier to come back
+    # whole, which is the same reasoning behind the chunk_size reduction.
+    #
+    # Retries are bounded by phase2.max_retry_passes (default 1). A refusal
+    # will re-refuse, but malformed JSON and early stops are transient, which
+    # is why this is worth one pass and not zero.
+    for attempt in range(max(0, int(retry_passes))):
+        missing = [c for c in pre_narrowed if c.get("name") not in scored]
+        if not missing:
+            break
+        retry_size = max(1, chunk_size // 2)
+        retry_chunks = _chunked(missing, retry_size)
+        logger.info(
+            "Phase 2 ranker: retry pass %d — %d unscored names in %d chunks "
+            "of %d",
+            attempt + 1, len(missing), len(retry_chunks), retry_size,
+        )
+        with ThreadPoolExecutor(max_workers=max_parallel) as pool:
+            futures = [
+                pool.submit(_score_chunk, backend, c, timeout_seconds)
+                for c in retry_chunks
+            ]
+            for fut in as_completed(futures):
+                try:
+                    rows = fut.result()
+                except Exception as exc:  # retry is best-effort by design
+                    logger.warning(
+                        "Phase 2 ranker: retry chunk failed (%s) — its "
+                        "domains stay below-gate: %s",
+                        type(exc).__name__, exc,
+                    )
+                    continue
+                with scored_lock:
+                    scored.update(rows)
+        recovered = len(missing) - sum(
+            1 for c in pre_narrowed if c.get("name") not in scored
+        )
+        logger.info(
+            "Phase 2 ranker: retry pass %d recovered %d of %d names",
+            attempt + 1, recovered, len(missing),
+        )
 
     return scored, meter
 
@@ -749,6 +800,7 @@ def rank_and_select(
                 backend,
                 chunk_size=int(cfg_get("chunk_size")),
                 max_parallel=int(llm_backend.cfg(config, "max_parallel")),
+                retry_passes=int(cfg_get("max_retry_passes")),
             )
         else:
             scored_by_name, meter = _haiku_batch_all(

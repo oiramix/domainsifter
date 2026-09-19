@@ -703,3 +703,63 @@ def test_claude_code_result_feeds_parse_json_array(tmp_path):
         run.return_value = _completed(_envelope(result=payload))
         rows = lb.parse_json_array(backend.complete(system="s", user="u"))
     assert rows == [{"domain": DOMAIN_A, "score": 90}]
+
+
+# ---------------------------------------------------------------------------
+# Salvage (2026-09-19): the first production ranker run lost two whole chunks
+# — 1,600 scored names — because one stray character in a 24,000-token reply
+# made the whole array unparseable, and four more chunks returned short
+# because the model stopped emitting mid-array. A strict all-or-nothing parse
+# is too brittle at that output length.
+# ---------------------------------------------------------------------------
+
+
+def test_salvage_recovers_objects_from_missing_comma():
+    """The exact production failure: 'Expecting , delimiter'."""
+    broken = (
+        '[{"domain":"marketglow.com","score":71,"reason":"a"}'
+        '{"domain":"tideblock.io","score":66,"reason":"b"}]'
+    )
+    rows = lb.parse_json_array(broken)
+    assert [r["domain"] for r in rows] == ["marketglow.com", "tideblock.io"]
+
+
+def test_salvage_recovers_objects_from_truncated_array():
+    """Model stopped emitting mid-array: no closing bracket at all."""
+    trunc = (
+        '[{"domain":"marketglow.com","score":70,"reason":"x"},'
+        '{"domain":"tideblock.io","score":65,"reason":"y"},'
+        '{"domain":"copper'
+    )
+    rows = lb.parse_json_array(trunc)
+    assert [r["domain"] for r in rows] == ["marketglow.com", "tideblock.io"]
+
+
+def test_salvage_is_not_desynced_by_braces_inside_strings():
+    broken = (
+        '[{"domain":"marketglow.com","score":70,"reason":"uses {curly} braces"}'
+        '{"domain":"tideblock.io","score":60,"reason":"ok"}]'
+    )
+    assert len(lb.parse_json_array(broken)) == 2
+
+
+def test_salvage_is_not_desynced_by_escaped_quotes():
+    broken = (
+        '[{"domain":"marketglow.com","score":70,"reason":"say \\"hi\\""}'
+        '{"domain":"tideblock.io","score":60,"reason":"ok"}]'
+    )
+    assert len(lb.parse_json_array(broken)) == 2
+
+
+@pytest.mark.parametrize("refusal", [
+    "I can't score these domain names for registrability.",
+    "I am not able to help with assessing trademark availability.",
+    "[",
+    "[ this is not json ",
+])
+def test_salvage_does_not_weaken_refusal_detection(refusal):
+    """LOAD-BEARING: prose contains no JSON objects, so salvage yields
+    nothing and the caller still trips its fallback. Salvage must never turn
+    a refusal into a silently-empty result."""
+    with pytest.raises(lb.LLMBackendError):
+        lb.parse_json_array(refusal)

@@ -862,14 +862,30 @@ def test_claude_code_attaches_score_and_reason_to_each_candidate(monkeypatch):
 
 
 def _doomed_chunk(backend: "_FakeBackend") -> set[str]:
-    """Names of the single chunk that the `poisoned` marker landed in.
+    """Names of the FIRST chunk that the `poisoned` marker landed in.
 
     `pre_narrow` reorders candidates before chunking, so a test must not
-    assume WHICH names share a chunk — only that exactly one chunk was hit.
+    assume WHICH names share a chunk.
+
+    Since 2026-09-19 a failed chunk is retried once (phase2.max_retry_passes),
+    so the poisoned name legitimately appears in more than one call: the
+    original chunk plus its retry. The first hit is the original.
     """
     hit = [set(c["names"]) for c in backend.calls if "poisoned.org" in c["names"]]
-    assert len(hit) == 1
+    assert hit, "expected the poisoned name to reach the backend at least once"
     return hit[0]
+
+
+def _still_doomed(backend: "_FakeBackend") -> set[str]:
+    """Names still unscored after the retry pass.
+
+    The retry re-chunks the unscored names at half size, so only the smaller
+    sub-chunk that still contains the poison fails again. Everything else in
+    the original chunk is recovered — which is the whole point of retrying by
+    NAME rather than re-running the same failed chunk.
+    """
+    hit = [set(c["names"]) for c in backend.calls if "poisoned.org" in c["names"]]
+    return hit[-1]
 
 
 def test_claude_code_one_failed_chunk_leaves_other_chunks_scored(monkeypatch):
@@ -889,9 +905,13 @@ def test_claude_code_one_failed_chunk_leaves_other_chunks_scored(monkeypatch):
     assert status["reason"] == "chunks_failed"
     assert status["batches_failed"] == 1
     assert status["batches_ok"] == 1
-    assert status["missing_count"] == len(doomed)
-    # The surviving chunk is fully scored; the failed one is entirely absent.
-    assert {c["name"] for c in out} == {c["name"] for c in cands} - doomed
+    # The retry pass re-chunks the unscored names at half size, so most of the
+    # doomed chunk is recovered and only the sub-chunk still carrying the
+    # poison stays below-gate.
+    still_doomed = _still_doomed(backend)
+    assert still_doomed < doomed, "retry should recover part of the failed chunk"
+    assert status["missing_count"] == len(still_doomed)
+    assert {c["name"] for c in out} == {c["name"] for c in cands} - still_doomed
 
 
 def test_claude_code_prose_refusal_chunk_is_treated_as_batch_failure(monkeypatch):
@@ -915,8 +935,14 @@ def test_claude_code_prose_refusal_chunk_is_treated_as_batch_failure(monkeypatch
     assert status["mode"] == "ranker_partial"
     assert status["reason"] == "chunks_failed"
     assert status["batches_failed"] == 1
-    assert status["missing_count"] == len(doomed)
-    assert {c["name"] for c in out} == {c["name"] for c in cands} - doomed
+    # Retried once (a refusal re-refuses), so only the half-size sub-chunk
+    # still carrying the refusal marker stays unscored.
+    still_doomed = _still_doomed(backend)
+    assert still_doomed < doomed, "retry should recover part of the refused chunk"
+    assert status["missing_count"] == len(still_doomed)
+    # Everything the retry recovered IS scored; only the sub-chunk that kept
+    # refusing is absent.
+    assert {c["name"] for c in out} == {c["name"] for c in cands} - still_doomed
 
 
 def test_claude_code_all_chunks_failed_falls_back_unchanged(monkeypatch):

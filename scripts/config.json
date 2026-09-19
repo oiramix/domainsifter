@@ -125,7 +125,8 @@
     "concurrency": 6,
     "max_retry_passes": 1,
     "_claude_code_doc": "Used only when llm.backend == 'claude_code'. Claude Code carries ~25k tokens of its own system prompt + tool defs on EVERY call, so the API path's batch_size=15 would be almost pure overhead; we chunk far larger instead. chunk_size 800 is set from a 2026-09-17 measurement on the OVH box: 29.4 output tokens per ranked name against a 32k output cap gives a hard ceiling near 1090 names/call, so 800 leaves margin for a verbose day. max_names_claude_code REPLACES the budget-derived target_n (daily_budget_eur / cost_per_1000_planning_usd), which is meaningless when inference is covered by the Max subscription rather than metered tokens; the runtime cost meter is likewise skipped on this backend. Both budget mechanisms stay fully active for llm.backend == 'api' so rollback is faithful.",
-    "chunk_size": 800,
+    "_chunk_size_note": "Lowered 800 -> 300 after the first production run (2026-09-19) scored only 10,497 of 13,000 names. At 800 names (~24k output tokens) two chunks came back as malformed JSON and four stopped early — one returned 287 of 800 — and every unreturned name silently became below-gate without being judged. Shorter replies come back complete far more reliably. The cost is more calls (~43 vs 17), which is free on the subscription backend and runs llm.max_parallel at a time.",
+    "chunk_size": 300,
     "max_names_claude_code": 13000
   },
   "llm": {

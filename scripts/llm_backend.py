@@ -281,6 +281,57 @@ def _strip_fences(text: str) -> str:
     return (body[:closing] if closing != -1 else body).strip()
 
 
+def _salvage_objects(body: str) -> list[dict]:
+    """Pull every well-formed JSON object out of a malformed array.
+
+    Why this exists: on 2026-09-19, the first production run lost two whole
+    chunks — 1,600 scored names — to `Expecting ',' delimiter`. A single bad
+    character somewhere in a 24,000-token reply discarded 800 otherwise
+    perfect scores, because a strict parse is all-or-nothing.
+
+    Scans for balanced `{...}` spans while respecting string literals and
+    escapes, so a brace inside a "reason" value cannot desync the depth
+    count. Each span is parsed independently; bad ones are skipped.
+
+    This does NOT weaken refusal detection (trap 2 in the module docstring):
+    prose contains no JSON objects, so salvage yields nothing and the caller
+    still gets an LLMBackendError.
+    """
+    out: list[dict] = []
+    depth = 0
+    start: int | None = None
+    in_string = False
+    escaped = False
+    for i, ch in enumerate(body):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    try:
+                        obj = json.loads(body[start : i + 1])
+                    except json.JSONDecodeError:
+                        pass
+                    else:
+                        if isinstance(obj, dict):
+                            out.append(obj)
+                    start = None
+    return out
+
+
 def parse_json_array(text: str) -> list[dict]:
     """Parse the model's reply as a JSON array of objects.
 
@@ -292,11 +343,35 @@ def parse_json_array(text: str) -> list[dict]:
     """
     body = _strip_fences(text)
     start, end = body.find("["), body.rfind("]")
-    if start == -1 or end <= start:
+    if start == -1:
+        raise LLMBackendError(f"reply is not a JSON array (prose?): {body[:200]!r}")
+    if end <= start:
+        # An opening bracket but no closing one: the model was cut off
+        # mid-array. Four chunks did exactly this on 2026-09-19. Everything
+        # it managed to emit is still usable.
+        salvaged = _salvage_objects(body[start:])
+        if salvaged:
+            logger.warning(
+                "llm_backend: reply was truncated mid-array; salvaged %d "
+                "objects from it rather than discarding the batch",
+                len(salvaged),
+            )
+            return salvaged
         raise LLMBackendError(f"reply is not a JSON array (prose?): {body[:200]!r}")
     try:
         parsed = json.loads(body[start : end + 1])
     except json.JSONDecodeError as exc:
+        # Best-effort recovery before giving up on the whole batch — see
+        # _salvage_objects for why losing 800 names to one stray comma is
+        # not acceptable.
+        salvaged = _salvage_objects(body[start : end + 1])
+        if salvaged:
+            logger.warning(
+                "llm_backend: reply was malformed JSON (%s); salvaged %d "
+                "objects from it rather than discarding the batch",
+                exc, len(salvaged),
+            )
+            return salvaged
         raise LLMBackendError(f"reply is not valid JSON: {exc}") from exc
     if not isinstance(parsed, list):
         raise LLMBackendError(f"reply parsed to {type(parsed).__name__}, want list")
