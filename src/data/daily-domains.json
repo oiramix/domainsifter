@@ -1,46 +1,9 @@
 {
-  "generated_at": "2026-09-19T12:20:42Z",
-  "domain_count": 292,
-  "today_count": 58,
-  "carryover_count": 234,
+  "generated_at": "2026-09-19T14:07:53Z",
+  "domain_count": 270,
+  "today_count": 56,
+  "carryover_count": 214,
   "domains": [
-    {
-      "name": "allmysonsonbroadway.com",
-      "tld": "com",
-      "dropped_date": "2026-09-12",
-      "wayback_snapshots": 1876,
-      "wayback_last_snapshot": "2026-03-15",
-      "open_page_rank": 2.58,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 68,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dallmysonsonbroadway.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=allmysonsonbroadway.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=allmysonsonbroadway.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-12T11:14:53Z",
-      "first_seen_date": "2026-09-12",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 7,
-      "cc_source_domain_count": 1495,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
     {
       "name": "languageidentifier.com",
       "tld": "com",
@@ -77,43 +40,6 @@
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
       "snapshot_classifier_version": "v2"
-    },
-    {
-      "name": "christopherscottblog.com",
-      "tld": "com",
-      "dropped_date": "2026-09-12",
-      "wayback_snapshots": 40027,
-      "wayback_last_snapshot": "2026-03-15",
-      "open_page_rank": 2.55,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 63,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dchristopherscottblog.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=christopherscottblog.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=christopherscottblog.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-12T10:44:21Z",
-      "first_seen_date": "2026-09-12",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 7,
-      "cc_source_domain_count": 2587,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
     },
     {
       "name": "thegreenseason.org",
@@ -186,45 +112,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "official-fitspresso.com",
-      "tld": "com",
-      "dropped_date": "2026-09-17",
-      "wayback_snapshots": 81,
-      "wayback_last_snapshot": "2026-06-08",
-      "open_page_rank": 2.79,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 61,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dofficial-fitspresso.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=official-fitspresso.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=official-fitspresso.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-17T10:11:14Z",
-      "first_seen_date": "2026-09-17",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 2,
-      "cc_source_domain_count": 1954,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "trustwalletlogin.com",
@@ -260,8 +149,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "axialvectorengine.com",
@@ -298,7 +187,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "creditenlignes.com",
@@ -335,7 +224,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "ridgemotorsports.net",
@@ -372,7 +261,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "wyevalleyhistory.net",
@@ -409,7 +298,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "greaterrange.com",
@@ -446,7 +335,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "giantbrandsolutions.com",
@@ -483,44 +372,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "homeairdirect.com",
-      "tld": "com",
-      "dropped_date": "2026-09-15",
-      "wayback_snapshots": 3823,
-      "wayback_last_snapshot": "2025-10-07",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 56,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhomeairdirect.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=homeairdirect.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=homeairdirect.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-15T09:39:46Z",
-      "first_seen_date": "2026-09-15",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 4,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "allancarrmovie.com",
@@ -556,8 +408,8 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "erotischechocolade.com",
@@ -594,7 +446,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "rotorservice.net",
@@ -630,8 +482,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "moonriverarabians.com",
@@ -667,45 +519,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
-    },
-    {
-      "name": "bearthailand.com",
-      "tld": "com",
-      "dropped_date": "2026-09-18",
-      "wayback_snapshots": 2714,
-      "wayback_last_snapshot": "2026-01-23",
-      "open_page_rank": 1.95,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dbearthailand.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=bearthailand.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=bearthailand.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-18T10:34:38Z",
-      "first_seen_date": "2026-09-18",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 1,
-      "cc_source_domain_count": 9,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
     },
     {
       "name": "merceriedeparis.com",
@@ -742,7 +557,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "adentantownnews.com",
@@ -779,7 +594,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "catloversportal.com",
@@ -816,118 +631,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "inheatherskitchen.com",
-      "tld": "com",
-      "dropped_date": "2026-09-10",
-      "wayback_snapshots": 1477,
-      "wayback_last_snapshot": "2025-05-19",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dinheatherskitchen.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=inheatherskitchen.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=inheatherskitchen.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-10T09:53:03Z",
-      "first_seen_date": "2026-09-10",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 9,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "sartoriallystreet.com",
-      "tld": "com",
-      "dropped_date": "2026-09-05",
-      "wayback_snapshots": 1015,
-      "wayback_last_snapshot": "2025-09-24",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsartoriallystreet.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=sartoriallystreet.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=sartoriallystreet.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-05T10:31:34Z",
-      "first_seen_date": "2026-09-05",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "slabatterystore.com",
-      "tld": "com",
-      "dropped_date": "2026-09-05",
-      "wayback_snapshots": 2529,
-      "wayback_last_snapshot": "2025-03-20",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dslabatterystore.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=slabatterystore.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=slabatterystore.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-05T09:58:41Z",
-      "first_seen_date": "2026-09-05",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "denbydalecentre.org",
@@ -963,45 +667,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "oliviermartinez.net",
-      "tld": "net",
-      "dropped_date": "2026-09-13",
-      "wayback_snapshots": 1554,
-      "wayback_last_snapshot": "2026-03-18",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 55,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Doliviermartinez.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=oliviermartinez.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=oliviermartinez.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-13T10:14:36Z",
-      "first_seen_date": "2026-09-13",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 6,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "forestmanagers.net",
@@ -1037,8 +704,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "roostinteriordesign.com",
@@ -1111,82 +778,8 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "ellaboratoriodeedus.com",
-      "tld": "com",
-      "dropped_date": "2026-09-15",
-      "wayback_snapshots": 1338,
-      "wayback_last_snapshot": "2021-12-28",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 54,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dellaboratoriodeedus.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=ellaboratoriodeedus.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=ellaboratoriodeedus.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-15T10:41:03Z",
-      "first_seen_date": "2026-09-15",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 4,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "stampapartners.com",
-      "tld": "com",
-      "dropped_date": "2026-09-15",
-      "wayback_snapshots": 2051,
-      "wayback_last_snapshot": "2026-03-15",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 54,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dstampapartners.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=stampapartners.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=stampapartners.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-15T09:53:08Z",
-      "first_seen_date": "2026-09-15",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 4,
-      "cc_source_domain_count": 1320,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "bettingmastertechnic.com",
@@ -1222,8 +815,8 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "gregorywaygallery.com",
@@ -1259,8 +852,8 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "wireddesignsolutions.com",
@@ -1297,7 +890,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "seattletechexperts.com",
@@ -1334,7 +927,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "wardreservices.com",
@@ -1371,7 +964,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "signaturecreations.org",
@@ -1408,7 +1001,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "challengearea.net",
@@ -1445,7 +1038,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thecomputerwarehouse.net",
@@ -1482,7 +1075,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "goldstarcouriers.net",
@@ -1518,7 +1111,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -1667,7 +1260,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "deeprootslibrary.com",
@@ -1704,7 +1297,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "elevatorstale.com",
@@ -1740,8 +1333,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "simplesolutionsbook2.com",
@@ -1778,7 +1371,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "theoasiscommunity.org",
@@ -1814,8 +1407,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "marketingautomotive.net",
@@ -1852,7 +1445,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "freecreditreportonline.net",
@@ -1889,7 +1482,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "friscorefrigeratorrepair.com",
@@ -1925,7 +1518,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -2000,7 +1593,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thecollectorpage.com",
@@ -2037,7 +1630,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "horizonpromosyon.com",
@@ -2074,7 +1667,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "helene-charier.com",
@@ -2110,8 +1703,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "oticaplaneta.com",
@@ -2148,7 +1741,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "theaphroditegroup.com",
@@ -2222,81 +1815,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "pentictonelvisfestival.com",
-      "tld": "com",
-      "dropped_date": "2026-09-12",
-      "wayback_snapshots": 83983,
-      "wayback_last_snapshot": "2026-03-25",
-      "open_page_rank": 1.68,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 51,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dpentictonelvisfestival.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=pentictonelvisfestival.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=pentictonelvisfestival.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-12T10:15:55Z",
-      "first_seen_date": "2026-09-12",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 7,
-      "cc_source_domain_count": 7,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "empirematesentertainment.com",
-      "tld": "com",
-      "dropped_date": "2026-09-05",
-      "wayback_snapshots": 2511,
-      "wayback_last_snapshot": "2026-08-28",
-      "open_page_rank": 2.39,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 51,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dempirematesentertainment.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=empirematesentertainment.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=empirematesentertainment.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-05T10:58:11Z",
-      "first_seen_date": "2026-09-05",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 14,
-      "cc_source_domain_count": 4,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thebrightcareer.com",
@@ -2332,8 +1851,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "dantecalderon.dev",
@@ -2370,7 +1889,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "lakeworthproperties.net",
@@ -2407,7 +1926,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "medicalbillingandcoding.net",
@@ -2444,7 +1963,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "allamericanwindows.net",
@@ -2481,7 +2000,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "lechateauduchocolat.com",
@@ -2517,7 +2036,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -2555,7 +2074,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "fithealthyplanet.com",
@@ -2592,44 +2111,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "chinesehomemadevedio.com",
-      "tld": "com",
-      "dropped_date": "2026-09-05",
-      "wayback_snapshots": 471,
-      "wayback_last_snapshot": "2025-07-20",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 50,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dchinesehomemadevedio.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=chinesehomemadevedio.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=chinesehomemadevedio.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-05T10:03:41Z",
-      "first_seen_date": "2026-09-05",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "brighterchoicems.org",
@@ -2666,44 +2148,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "galacticbowling.net",
-      "tld": "net",
-      "dropped_date": "2026-09-06",
-      "wayback_snapshots": 2787,
-      "wayback_last_snapshot": "2026-07-27",
-      "open_page_rank": 1.21,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 50,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgalacticbowling.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=galacticbowling.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=galacticbowling.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-06T10:16:37Z",
-      "first_seen_date": "2026-09-06",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 13,
-      "cc_source_domain_count": 3,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "onlinecanadaviagra.net",
@@ -2740,7 +2185,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "abcinteractiveaudits.com",
@@ -2776,7 +2221,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -2814,7 +2259,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "notanothermovie.com",
@@ -2851,7 +2296,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "presencia-online.com",
@@ -2887,8 +2332,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "churchatcanyoncreek.com",
@@ -2925,7 +2370,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "globaltechcraftsol.com",
@@ -2962,7 +2407,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "precisionwisdom.com",
@@ -2998,8 +2443,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "comiteecologicointerescolar.org",
@@ -3036,7 +2481,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "whitelightelements.online",
@@ -3073,7 +2518,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "abuserecoverycentral.net",
@@ -3110,7 +2555,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "applebusiness.info",
@@ -3147,7 +2592,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "alltoursandattractions.com",
@@ -3183,7 +2628,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -3257,7 +2702,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -3295,7 +2740,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "higurashichabo.com",
@@ -3332,44 +2777,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "carefreevillasflorida.com",
-      "tld": "com",
-      "dropped_date": "2026-09-12",
-      "wayback_snapshots": 299,
-      "wayback_last_snapshot": "2026-01-24",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 48,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcarefreevillasflorida.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=carefreevillasflorida.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=carefreevillasflorida.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-12T10:31:14Z",
-      "first_seen_date": "2026-09-12",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 7,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "intrinsiqresearch.com",
@@ -3406,7 +2814,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "scentsationalfragrance.com",
@@ -3442,8 +2850,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "webdesignersindia.net",
@@ -3480,7 +2888,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "homepagemarketing.net",
@@ -3517,7 +2925,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "casteelcreekretreat.com",
@@ -3553,7 +2961,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -3590,7 +2998,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -3628,7 +3036,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "feleciaforarizona.com",
@@ -3665,7 +3073,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "philcongenchongqing.com",
@@ -3702,7 +3110,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "yorkriverdistrict.org",
@@ -3739,7 +3147,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "chotooutdoorgear.net",
@@ -3776,7 +3184,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "triathlontraining.net",
@@ -3813,7 +3221,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "arcadiahealthservices.com",
@@ -3886,7 +3294,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -3923,7 +3331,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -3961,7 +3369,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "scandesigners.com",
@@ -3997,8 +3405,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "intercervecera.com",
@@ -4034,8 +3442,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "networkcablingatlanta.com",
@@ -4072,7 +3480,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "centrodesaluddental.com",
@@ -4108,8 +3516,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "statepatrolservices.com",
@@ -4146,7 +3554,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "richmondchristiancenter.org",
@@ -4183,7 +3591,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "sourceresearch.net",
@@ -4220,7 +3628,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "coastalartseadesigns.com",
@@ -4293,7 +3701,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -4330,7 +3738,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -4442,7 +3850,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "florencecouture.com",
@@ -4478,8 +3886,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "sacredearthpictures.com",
@@ -4516,7 +3924,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "understandusa.com",
@@ -4553,7 +3961,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "regencyuniversity.online",
@@ -4589,8 +3997,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "poordecisions.net",
@@ -4626,8 +4034,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "hellosunshineco.net",
@@ -4664,7 +4072,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "sustainmicroenterprise.org",
@@ -4700,7 +4108,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -4737,8 +4145,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "michellehalewood.com",
@@ -4775,7 +4183,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "silversurfertraveller.com",
@@ -4812,44 +4220,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "papasleatherbarn.com",
-      "tld": "com",
-      "dropped_date": "2026-09-12",
-      "wayback_snapshots": 1959,
-      "wayback_last_snapshot": "2026-02-18",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 44,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dpapasleatherbarn.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=papasleatherbarn.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=papasleatherbarn.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-12T10:58:55Z",
-      "first_seen_date": "2026-09-12",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 7,
-      "cc_source_domain_count": 1,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "dominionsteelinc.com",
@@ -4886,7 +4257,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "fashioneducation.site",
@@ -4922,8 +4293,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "simpletechsolutions.biz",
@@ -4960,7 +4331,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "teresasfashionistallc.biz",
@@ -4997,7 +4368,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "smartfinstories.biz",
@@ -5034,7 +4405,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "greenparcbeautycenter.online",
@@ -5071,7 +4442,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "southeastenergy.net",
@@ -5108,7 +4479,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "terracontracting.net",
@@ -5145,7 +4516,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "creatureconflict.net",
@@ -5182,7 +4553,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "smartedevelopers.net",
@@ -5218,8 +4589,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "hearthstonevillage.net",
@@ -5255,44 +4626,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "brightdawnnutrition.com",
-      "tld": "com",
-      "dropped_date": "2026-09-19",
-      "wayback_snapshots": 3049,
-      "wayback_last_snapshot": "2026-06-24",
-      "open_page_rank": 1.18,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 43,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dbrightdawnnutrition.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=brightdawnnutrition.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=brightdawnnutrition.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-19T10:22:30Z",
-      "first_seen_date": "2026-09-19",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 0,
-      "cc_source_domain_count": 14,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -5329,7 +4663,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -5366,7 +4700,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -5440,7 +4774,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -5477,7 +4811,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -5515,7 +4849,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "dimarproperties.com",
@@ -5552,7 +4886,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "americanvisioncare.com",
@@ -5589,7 +4923,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "i-dealsolution.com",
@@ -5626,7 +4960,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "oceangardenrealty.com",
@@ -5662,8 +4996,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "osteria-restaurant.com",
@@ -5700,7 +5034,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "morrisindustries.org",
@@ -5737,7 +5071,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "agrandmotherlove.store",
@@ -5810,7 +5144,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -5885,7 +5219,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "realestateproplus.com",
@@ -5921,8 +5255,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "grosbollbeckerticebarr.com",
@@ -5959,7 +5293,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "accentedmarketing.com",
@@ -5996,7 +5330,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "firearmsreloading.com",
@@ -6033,7 +5367,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "printingwhale.com",
@@ -6070,7 +5404,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thehowellsmail.com",
@@ -6107,7 +5441,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "casianaresidencestagaytay.com",
@@ -6144,7 +5478,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "concealedcarrylicensetexas.com",
@@ -6181,7 +5515,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "directoryislamic.com",
@@ -6218,7 +5552,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "pocketbusiness.dev",
@@ -6255,7 +5589,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "agoldengrasshopper.net",
@@ -6291,8 +5625,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "smarthealthshopforum.com",
@@ -6365,7 +5699,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -6402,7 +5736,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -6440,7 +5774,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "designswithliv.com",
@@ -6477,7 +5811,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "entrepuntasytacones.com",
@@ -6513,45 +5847,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "technologyfortnight.com",
-      "tld": "com",
-      "dropped_date": "2026-09-08",
-      "wayback_snapshots": 29921,
-      "wayback_last_snapshot": "2025-08-14",
-      "open_page_rank": 2.25,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 41,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtechnologyfortnight.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=technologyfortnight.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=technologyfortnight.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-08T10:09:12Z",
-      "first_seen_date": "2026-09-08",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 11,
-      "cc_source_domain_count": 1,
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "eastnashvillediscoballs.com",
@@ -6588,7 +5885,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "nucleitalentsolutions.com",
@@ -6625,7 +5922,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "yingerinvestments.com",
@@ -6661,8 +5958,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "verslasourcedeletre.net",
@@ -6698,8 +5995,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "compassioncenter.net",
@@ -6735,8 +6032,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "drseanalexander.net",
@@ -6772,8 +6069,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "greatergracecharteracademy.org",
@@ -6847,7 +6144,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "huntressatelier.com",
@@ -6884,7 +6181,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "nicholsonturf.com",
@@ -6921,7 +6218,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "cavaliereconstructionllc.com",
@@ -6958,7 +6255,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "sanierung-fugendesign.com",
@@ -6995,7 +6292,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "santaritalonghorns.com",
@@ -7032,7 +6329,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "allianceforsamissions.org",
@@ -7069,7 +6366,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "htgcellaccessories.online",
@@ -7106,7 +6403,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "freedomdentrepair.net",
@@ -7142,8 +6439,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "accountreceivable.info",
@@ -7179,8 +6476,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "radicleleadership.com",
@@ -7291,7 +6588,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "grnesolutions.com",
@@ -7327,8 +6624,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "whippedaddiction.com",
@@ -7365,7 +6662,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "attorneysportorange.com",
@@ -7401,8 +6698,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "exceldirectional.com",
@@ -7439,7 +6736,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "atteindrelacible.com",
@@ -7475,8 +6772,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "montateaquiypedalea.org",
@@ -7513,7 +6810,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "animateafrica.net",
@@ -7550,7 +6847,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "avalonsoftware.net",
@@ -7586,44 +6883,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "torch-learning-centre.com",
-      "tld": "com",
-      "dropped_date": "2026-09-19",
-      "wayback_snapshots": 561,
-      "wayback_last_snapshot": "2022-06-21",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 38,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtorch-learning-centre.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=torch-learning-centre.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=torch-learning-centre.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-19T10:48:43Z",
-      "first_seen_date": "2026-09-19",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 0,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -7661,7 +6921,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "ekdantainfotech.com",
@@ -7697,8 +6957,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "homegrownindiana.com",
@@ -7735,7 +6995,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "bloodlocaleditions.com",
@@ -7771,8 +7031,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "nestandcraftinteriors.com",
@@ -7808,8 +7068,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "raasconstruction.com",
@@ -7846,7 +7106,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "sterlinghaircoach.com",
@@ -7883,7 +7143,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "fernmontessori.org",
@@ -7919,8 +7179,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thebossconsultant.org",
@@ -7956,8 +7216,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "batistaplenitude.org",
@@ -7993,8 +7253,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "globaltraction.org",
@@ -8031,7 +7291,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "everythingtrending.store",
@@ -8067,8 +7327,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "purpleentertainment.info",
@@ -8105,7 +7365,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "acafamilyinsurance.com",
@@ -8215,7 +7475,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -8252,7 +7512,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -8327,7 +7587,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "kisiselasistanim.com",
@@ -8363,8 +7623,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thrivinglivesils.com",
@@ -8401,7 +7661,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "jendococonstructioncorporation.com",
@@ -8438,7 +7698,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "tfhsolutionsgroup.com",
@@ -8474,8 +7734,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "inkedimpressions.store",
@@ -8512,7 +7772,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "cherryontoppers.com",
@@ -8548,7 +7808,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -8586,7 +7846,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "christiansullivanfit.com",
@@ -8623,7 +7883,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "literatureedu.com",
@@ -8660,7 +7920,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "cowtowndoordecor.com",
@@ -8697,7 +7957,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "martyflynnforstatesenate.com",
@@ -8734,7 +7994,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "merlinproduction.com",
@@ -8771,7 +8031,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "myfloralletter.com",
@@ -8808,7 +8068,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thebrownbearcamperco.com",
@@ -8845,7 +8105,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "root-productions.com",
@@ -8882,7 +8142,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "beelieveinreading.org",
@@ -8919,7 +8179,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "patriotcontracting.info",
@@ -8956,7 +8216,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "clearwaterimages.biz",
@@ -9104,7 +8364,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "carleycorporation.com",
@@ -9178,7 +8438,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "signmarkindustries.com",
@@ -9215,7 +8475,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "starsulcatarinense.com",
@@ -9252,7 +8512,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "noticiasentecnologia.com",
@@ -9289,7 +8549,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "smarthomenational.com",
@@ -9326,7 +8586,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "rufusrestoration.com",
@@ -9363,7 +8623,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "studentrescueproject.org",
@@ -9400,7 +8660,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "southerncorner.org",
@@ -9547,8 +8807,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "extremeautoreconditioning.net",
@@ -9584,8 +8844,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "genuineartistry.info",
@@ -9622,7 +8882,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "innerconnectcoaching.com",
@@ -9658,8 +8918,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "purecharmbeauty.com",
@@ -9696,7 +8956,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "ranchopicante.com",
@@ -9732,45 +8992,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "virtuepointinfotech.com",
-      "tld": "com",
-      "dropped_date": "2026-09-08",
-      "wayback_snapshots": 1753,
-      "wayback_last_snapshot": "2026-05-15",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 33,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dvirtuepointinfotech.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=virtuepointinfotech.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=virtuepointinfotech.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-08T10:31:48Z",
-      "first_seen_date": "2026-09-08",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 11,
-      "cc_source_domain_count": 1,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thecleansweepllc.com",
@@ -9807,7 +9030,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "madisontownecentre.org",
@@ -9843,8 +9066,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "feralcatcondoproject.org",
@@ -9881,7 +9104,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "walgreenslistens.site",
@@ -9918,7 +9141,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "thebarenecessity.biz",
@@ -9955,7 +9178,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "cottageconnections.net",
@@ -9992,7 +9215,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "decodecommunity.net",
@@ -10029,7 +9252,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "accurateprinting.org",
@@ -10139,7 +9362,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2"
     },
     {
@@ -10214,7 +9437,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "kabayancablegroup.com",
@@ -10251,7 +9474,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "sancarloscentromedico.com",
@@ -10288,7 +9511,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "aristotleassociates.com",
@@ -10325,7 +9548,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "enterprisepmsolutions.com",
@@ -10361,45 +9584,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
-    },
-    {
-      "name": "hangamemoneypark.com",
-      "tld": "com",
-      "dropped_date": "2026-09-05",
-      "wayback_snapshots": 24,
-      "wayback_last_snapshot": "2025-07-19",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 32,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhangamemoneypark.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=hangamemoneypark.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=hangamemoneypark.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-05T09:45:41Z",
-      "first_seen_date": "2026-09-05",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 14,
-      "cc_source_domain_count": 1,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "matrixhealthservices.net",
@@ -10435,8 +9621,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "creative-creative.com",
@@ -10473,7 +9659,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "multicommunicationid.com",
@@ -10510,7 +9696,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "cerconebrowncompany.com",
@@ -10547,7 +9733,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "coastalpropservices.com",
@@ -10583,8 +9769,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "elevateflowonline.org",
@@ -10620,8 +9806,8 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "ironforgeenterprises.org",
@@ -10658,7 +9844,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "nxgentechnology.tech",
@@ -10695,7 +9881,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "eastlancswebservices.com",
@@ -10732,7 +9918,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "xfitscollections.online",
@@ -10769,7 +9955,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     },
     {
       "name": "leguponcareers.net",
@@ -10806,7 +9992,7 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v1"
+      "snapshot_classifier_version": "v2"
     }
   ],
   "total_candidates_evaluated": 2741
