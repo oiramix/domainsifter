@@ -1043,6 +1043,12 @@ def test_main_runs_structural_then_lexical_then_enrich_then_post(monkeypatch, cf
     assert enriched_names == ["great.com"]
     written = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
     assert [d["name"] for d in written["domains"]] == ["great.com"]
+    # The two funnel counters are genuinely different numbers: 3 domains
+    # dropped and were scanned, 1 survived the cheap filters and was
+    # individually evaluated. Publishing only the narrow one understates
+    # the day's work (the whole point of total_drops_scanned).
+    assert written["total_drops_scanned"] == 3
+    assert written["total_candidates_evaluated"] == 1
 
 
 # DNS pre-filter end-to-end integration test was removed 2026-05-17 when
@@ -1228,6 +1234,11 @@ def test_main_happy_path_writes_output(monkeypatch, cfg, tmp_path):
     assert written["domain_count"] == 2
     names = sorted(d["name"] for d in written["domains"])
     assert names == ["alsogood.com", "great.com"]
+    # The raw drop count reaches the published payload (added 2026-09-19).
+    # Nothing is filtered out on this happy path, so it equals the number of
+    # stubbed drops; the two counters are shown diverging in
+    # test_main_runs_structural_then_lexical_then_enrich_then_post.
+    assert written["total_drops_scanned"] == 2
     # Each emitted domain has both registrars wired up with substituted URLs.
     for d in written["domains"]:
         reg_names = [r["name"] for r in d["registrars"]]

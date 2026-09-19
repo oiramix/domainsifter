@@ -170,6 +170,67 @@ def test_total_evaluated_omitted_when_not_passed():
     assert "total_candidates_evaluated" not in payload
 
 
+# --- total_drops_scanned (added 2026-09-19) ----------------------------------
+
+
+def test_total_drops_scanned_in_payload_when_passed():
+    payload = output.build_payload(
+        [_cand("marketglow.com", 80)], CONFIG, total_drops_scanned=222155,
+    )
+    assert payload["total_drops_scanned"] == 222155
+
+
+def test_total_drops_scanned_is_independent_of_total_evaluated():
+    """The two counters measure different ends of the funnel and must not be
+    derived from, or confused with, each other."""
+    payload = output.build_payload(
+        [_cand("marketglow.com", 80)],
+        CONFIG,
+        total_evaluated=2741,
+        total_drops_scanned=222155,
+    )
+    assert payload["total_drops_scanned"] == 222155
+    assert payload["total_candidates_evaluated"] == 2741
+
+
+@pytest.mark.parametrize("kwargs", [{}, {"total_drops_scanned": None}])
+def test_total_drops_scanned_absent_not_zero_when_unknown(kwargs):
+    """Hard rule 2: "0 drops scanned" is a lie. An unknown count is an
+    ABSENT key, never a zero default."""
+    payload = output.build_payload([_cand("marketglow.com", 80)], CONFIG, **kwargs)
+    assert "total_drops_scanned" not in payload
+
+
+def test_total_drops_scanned_zero_is_published_when_explicitly_passed():
+    """An explicit 0 is data (a day with no new drops), not a default."""
+    payload = output.build_payload(
+        [_cand("marketglow.com", 80)], CONFIG, total_drops_scanned=0,
+    )
+    assert payload["total_drops_scanned"] == 0
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    [
+        ({"total_drops_scanned": 222155}, 222155),
+        ({"total_drops_scanned": None}, None),
+        ({}, None),
+    ],
+)
+def test_total_drops_scanned_round_trips_through_write_output(
+    tmp_path, kwargs, expected,
+):
+    """End-to-end through the atomic file write: present, explicit-None and
+    omitted all behave the same on disk as they do in build_payload."""
+    target = tmp_path / "daily.json"
+    output.write_output([_cand("tideblock.io", 80)], CONFIG, output_path=target, **kwargs)
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    if expected is None:
+        assert "total_drops_scanned" not in payload
+    else:
+        assert payload["total_drops_scanned"] == expected
+
+
 # --- persistent-list bucket counts -------------------------------------------
 
 

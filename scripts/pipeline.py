@@ -962,7 +962,13 @@ def main(argv: list[str] | None = None) -> int:
         "Carryover validation: %d kept, %d registered (now in today's zone), %d aged out",
         len(retained_carryover), registered_count, dropped_by_age,
     )
-    logger.info("Today's new drops: %d", len(drops))
+    # The wide end of the funnel: every newly-dropped domain this run looked
+    # at, before any filter. Captured HERE (not re-derived later) because
+    # `drops` is consumed by the filter stages below, and published as
+    # `total_drops_scanned` so the site and the newsletter can state the real
+    # figure instead of the ~80x-smaller post-filter count.
+    total_drops_scanned = len(drops)
+    logger.info("Today's new drops: %d", total_drops_scanned)
 
     # Stage 1: structural filter (cheap; pre-enrichment) — applies ONLY to
     # today's new drops. Carryover already passed structural+lexical when
@@ -1092,12 +1098,14 @@ def main(argv: list[str] | None = None) -> int:
     # (publish_min_score + publish_min_enrichment_completeness) and the
     # publication cap. The payload includes today_count + carryover_count
     # so the frontend can split into the two-card layout. total_evaluated
-    # is what entered availability check today (the dominant filter).
+    # is what entered availability check today (the dominant filter);
+    # total_drops_scanned is the raw drop set it was filtered down from.
     written_path = output.write_output(
         final_list,
         config,
         output_path=args.output,
         total_evaluated=total_evaluated,
+        total_drops_scanned=total_drops_scanned,
     )
 
     publication_cap = int(config.get("max_candidates_for_publication", 300))

@@ -13,6 +13,17 @@ PLAN.md Principle 5 with three schema migrations applied:
     Null on every day the ranker didn't run (mechanical-fallback days) and
     on every pre-2026-09-19 carryover entry; the frontend must treat
     absence as "no reason to show", never as an error.
+  - 2026-09-19: added `total_drops_scanned` (top-level, OPTIONAL) — the
+    raw number of newly-dropped domains the run examined, i.e. the size of
+    today's zone-diff drop set BEFORE any filtering (pipeline.py's
+    "Today's new drops: %d"). Distinct from `total_candidates_evaluated`
+    (see below); the two are ~80x apart on a normal day and WILL be
+    confused if read casually, so: SCANNED is the wide end of the funnel
+    (every drop), EVALUATED is the narrow end (what survived the cheap
+    filters and got individually checked). Absent — never 0 — whenever the
+    writer didn't know the count: every pre-2026-09-19 carryover file, any
+    caller that omits it, sample data. Consumers must treat absence as
+    "unknown" and say nothing rather than render a zero.
   - 2026-05-17: added `verdict` per-domain field ("Clean"/"Promising"/
     "Caution"). Previously computed client-side from score alone in
     DomainTable.astro and generate_newsletter.py; the new tightened
@@ -26,7 +37,10 @@ Output shape:
     {
         "generated_at": "2026-04-27T06:00:00Z",
         "domain_count": 47,                   # passed all filters AND quality floor
+        "total_drops_scanned": 222155,        # OPTIONAL: every new drop the
+                                              #   run looked at, pre-filter
         "total_candidates_evaluated": 1000,   # entered enrichment phase
+                                              #   (a subset of the above)
         "domains": [
             {
                 "name": "example.com", "tld": "com", "dropped_date": "2026-04-26",
@@ -358,6 +372,7 @@ def build_payload(
     *,
     generated_at: datetime | None = None,
     total_evaluated: int | None = None,
+    total_drops_scanned: int | None = None,
 ) -> dict:
     """Build the final JSON payload (does not write to disk).
 
@@ -370,6 +385,13 @@ def build_payload(
     (post-lexical, post-cap-trim). It's included in the payload so the
     frontend can render "Showing N of M candidates evaluated today"
     without making up a number.
+
+    `total_drops_scanned` is the WIDER count: every newly-dropped domain
+    the run examined before any filter ran (pipeline: `len(drops)`). Both
+    counters are optional and independent — either can be None, and a None
+    one is OMITTED from the payload rather than written as 0. A published
+    0 would read as "we scanned nothing today", which is a lie whenever
+    the truth is "the writer didn't pass the number."
 
     Cap precedence: max_candidates_for_publication wins; max_candidates_per_day
     kept as a fallback so older configs / tests still parse.
@@ -417,6 +439,11 @@ def build_payload(
         "carryover_count": carryover_count,
         "domains": domains,
     }
+    # Funnel counters, widest first. Each is written ONLY when the caller
+    # actually supplied it — see the docstring on why a 0 default is worse
+    # than an absent key.
+    if total_drops_scanned is not None:
+        payload["total_drops_scanned"] = int(total_drops_scanned)
     if total_evaluated is not None:
         payload["total_candidates_evaluated"] = int(total_evaluated)
     return payload
@@ -429,13 +456,22 @@ def write_output(
     *,
     generated_at: datetime | None = None,
     total_evaluated: int | None = None,
+    total_drops_scanned: int | None = None,
 ) -> Path:
-    """Build the payload and write it atomically. Returns the written path."""
+    """Build the payload and write it atomically. Returns the written path.
+
+    Both counters are optional end to end: pass None (or omit) and the key
+    simply won't be in the written JSON.
+    """
     target = Path(output_path or config.get("output_path", "src/data/daily-domains.json"))
     target.parent.mkdir(parents=True, exist_ok=True)
 
     payload = build_payload(
-        candidates, config, generated_at=generated_at, total_evaluated=total_evaluated,
+        candidates,
+        config,
+        generated_at=generated_at,
+        total_evaluated=total_evaluated,
+        total_drops_scanned=total_drops_scanned,
     )
 
     fd, tmp_name = tempfile.mkstemp(

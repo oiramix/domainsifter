@@ -17,13 +17,22 @@ Evidence wire-in (2026-09-19) — what the email now says beyond the names:
     non-English. It is control/bidi-stripped, whitespace-collapsed,
     length-capped and HTML-escaped before it reaches the body. A missing
     or corrupt sidecar degrades silently to "no archived titles today".
+    A title that is predominantly non-Latin (see
+    NON_LATIN_SUBSTITUTION_THRESHOLD) is replaced by a description of the
+    SCRIPT we detected — "was a Chinese or Japanese site (Han script)" —
+    because raw CJK/Cyrillic/Thai/Arabic/Hebrew is noise to an English-
+    reading subscriber. We never translate and never name a language the
+    script cannot prove.
   - `src/data/archive-index.json`: which domains have a permanent page at
     {site_url}/d/{name}. Deep-link the name when a page exists; fall back
     to the homepage row anchor when it doesn't.
   - Top-level payload counts (`total_candidates_evaluated`, `domain_count`,
     `today_count`): one credibility line built ONLY from those fields. If
     any of them is missing the whole line is omitted — never estimated,
-    never rounded up (CLAUDE.md hard rule 2).
+    never rounded up (CLAUDE.md hard rule 2). `total_drops_scanned` (added
+    2026-09-19, OPTIONAL) leads that line when present; when it is absent —
+    every pre-2026-09-19 payload — the line falls back to its older,
+    narrower wording rather than guessing the wide number.
 
 Layout: the first `newsletter.featured_n` picks render as rich blocks
 (reason + archived title + signals + registrars); the rest stay in the
@@ -363,6 +372,180 @@ def _excerpt_title(
     return cleaned
 
 
+# --- Non-Latin archived titles ------------------------------------------------
+#
+# Share of a title's LETTERS that must be non-Latin before we replace the raw
+# string with a script description. 0.5 = "at least half the letters are
+# unreadable to an English-reading subscriber".
+#
+# Why 0.5 and not something stricter: a title that is under half non-Latin
+# (e.g. "Acme Trading 有限公司") still carries its meaning in the Latin part,
+# and showing it verbatim is more informative than a label. At half or more
+# the Latin fragment is usually just a brand token or the domain itself, and
+# the informative part is unreadable. The threshold errs toward SHOWING the
+# original — CJK characters pack far more content per character than Latin
+# letters, so a 50%-by-character Han title is well over 50% of the meaning,
+# and anything we keep is at least honest verbatim text.
+NON_LATIN_SUBSTITUTION_THRESHOLD = 0.5
+
+# Unicode blocks, by script. Deliberately a blunt range table rather than a
+# language guess: we report the SCRIPT we can see. Ranges are checked in
+# order; the first containing range wins. Anything alphabetic that matches no
+# range counts as non-Latin-unknown (→ "a non-English site").
+_SCRIPT_RANGES: tuple[tuple[int, int, str], ...] = (
+    # Latin (ASCII letters, Latin-1 letters, Extended-A/B, Vietnamese,
+    # fullwidth forms).
+    (0x0041, 0x005A, "Latin"),
+    (0x0061, 0x007A, "Latin"),
+    (0x00C0, 0x024F, "Latin"),
+    (0x1E00, 0x1EFF, "Latin"),
+    (0xFF21, 0xFF3A, "Latin"),
+    (0xFF41, 0xFF5A, "Latin"),
+    # Greek / Coptic.
+    (0x0370, 0x03FF, "Greek"),
+    (0x1F00, 0x1FFF, "Greek"),
+    # Cyrillic (+ supplement).
+    (0x0400, 0x052F, "Cyrillic"),
+    # Hebrew (+ presentation forms).
+    (0x0590, 0x05FF, "Hebrew"),
+    (0xFB1D, 0xFB4F, "Hebrew"),
+    # Arabic (+ supplement, extended-A, presentation forms A/B).
+    (0x0600, 0x06FF, "Arabic"),
+    (0x0750, 0x077F, "Arabic"),
+    (0x08A0, 0x08FF, "Arabic"),
+    (0xFB50, 0xFDFF, "Arabic"),
+    (0xFE70, 0xFEFF, "Arabic"),
+    # Thai.
+    (0x0E00, 0x0E7F, "Thai"),
+    # Hangul (jamo, compatibility jamo, syllables).
+    (0x1100, 0x11FF, "Hangul"),
+    (0x3130, 0x318F, "Hangul"),
+    (0xAC00, 0xD7AF, "Hangul"),
+    # Kana (hiragana, katakana, katakana extensions, halfwidth katakana).
+    (0x3040, 0x30FF, "Kana"),
+    (0x31F0, 0x31FF, "Kana"),
+    (0xFF66, 0xFF9D, "Kana"),
+    # Han (CJK ideographs: Ext-A, main block, compatibility, Ext-B, compat
+    # supplement). Shared by Chinese and Japanese — never claimed as either
+    # on its own.
+    (0x3400, 0x4DBF, "Han"),
+    (0x4E00, 0x9FFF, "Han"),
+    (0xF900, 0xFAFF, "Han"),
+    (0x20000, 0x2A6DF, "Han"),
+    (0x2F800, 0x2FA1F, "Han"),
+)
+
+# What each detected script is called in the email. Phrased to follow "was "
+# and to precede " site". These name the WRITING SYSTEM, not the language,
+# except where the script is exclusive to one language:
+#   - Kana is used only for Japanese, so Japanese is safe to say.
+#   - Hangul is used only for Korean, so Korean is safe to say.
+#   - Han is shared by Chinese and Japanese; we say so instead of picking.
+#   - Cyrillic / Arabic / Hebrew / Greek / Thai each serve several languages
+#     (or, for Thai, one language but we still have no way to verify the
+#     content), so we name the script and stop there.
+_SCRIPT_PHRASES = {
+    "Han": "a Chinese or Japanese site (Han script)",
+    "Kana": "a Japanese-language site",
+    "Hangul": "a Korean-language site",
+    "Cyrillic": "a Cyrillic-script site",
+    "Greek": "a Greek-script site",
+    "Hebrew": "a Hebrew-script site",
+    "Arabic": "an Arabic-script site",
+    "Thai": "a Thai-script site",
+}
+
+# Used when the title is clearly not English but the script is unrecognised,
+# or when two non-Latin scripts are equally present and picking one would be
+# a guess.
+_UNKNOWN_SCRIPT_PHRASE = "a non-English site"
+
+
+def _char_script(ch: str) -> str | None:
+    """Script name for one character, or None if it isn't a letter.
+
+    Non-letters — spaces, digits, punctuation, symbols, emoji, combining
+    marks — return None and are excluded from the ratio entirely. They say
+    nothing about readability in either direction.
+    """
+    if not ch.isalpha():
+        return None
+    code = ord(ch)
+    for start, end, script in _SCRIPT_RANGES:
+        if start <= code <= end:
+            return script
+    return "Other"
+
+
+def _non_latin_phrase(text: str) -> str | None:
+    """Describe `text` by script when it is predominantly non-Latin.
+
+    Returns a phrase that reads correctly after "was " (e.g. "a Thai-script
+    site"), or None when the text should be shown verbatim — which covers
+    all-Latin text, mostly-Latin mixed text below the threshold, and text
+    with no letters at all (digits, punctuation, emoji-only titles).
+
+    Never translates and never transliterates: we have no translation
+    capability here, and inventing one would be a fabricated claim about
+    third-party content (CLAUDE.md hard rule 2).
+    """
+    counts: dict[str, int] = {}
+    letters = 0
+    for ch in text:
+        script = _char_script(ch)
+        if script is None:
+            continue
+        letters += 1
+        counts[script] = counts.get(script, 0) + 1
+
+    if not letters:
+        return None
+
+    non_latin = {s: n for s, n in counts.items() if s != "Latin"}
+    if not non_latin:
+        return None
+    if sum(non_latin.values()) / letters < NON_LATIN_SUBSTITUTION_THRESHOLD:
+        return None
+
+    # Kana and Hangul are exclusive to one language each, and Japanese text
+    # normally contains more Han than Kana — so their mere PRESENCE decides
+    # the label, before any count comparison.
+    if non_latin.get("Kana"):
+        return _SCRIPT_PHRASES["Kana"]
+    if non_latin.get("Hangul"):
+        return _SCRIPT_PHRASES["Hangul"]
+
+    ranked = sorted(non_latin.items(), key=lambda kv: -kv[1])
+    top_script, top_count = ranked[0]
+    # A tie between two non-Latin scripts means no single script dominates;
+    # naming either would be a coin flip.
+    if len(ranked) > 1 and ranked[1][1] == top_count:
+        return _UNKNOWN_SCRIPT_PHRASE
+    return _SCRIPT_PHRASES.get(top_script, _UNKNOWN_SCRIPT_PHRASE)
+
+
+def _archived_evidence(
+    excerpts: dict[str, Any] | None,
+    name: str,
+    max_chars: int,
+    denylist: frozenset[str] | None = None,
+) -> tuple[str, str] | None:
+    """What to say about a domain's archived page, or None to say nothing.
+
+    Returns ("title", <verbatim cleaned title>) or ("script", <phrase>) —
+    the latter when the title is predominantly non-Latin and the raw string
+    would be unreadable noise to an English-reading subscriber. Callers
+    render the two differently (quoted vs not) but decide nothing else.
+    """
+    title = _excerpt_title(excerpts, name, max_chars, denylist)
+    if title is None:
+        return None
+    phrase = _non_latin_phrase(title)
+    if phrase:
+        return ("script", phrase)
+    return ("title", title)
+
+
 def _resolve_path(raw: str) -> Path:
     """Config paths are repo-relative (run-daily.sh runs from the repo root,
     but a systemd unit or an operator's shell may not be)."""
@@ -472,9 +655,23 @@ def credibility_line(payload: dict, pick_count: int) -> str | None:
     CLAUDE.md hard rule 2: no invented numbers, no estimates, no rounding up.
     Every figure here is either a top-level field of daily-domains.json or
     the length of the list we are actually about to render. If ANY of the
-    three payload fields is missing or isn't a non-negative int, the whole
-    line is dropped — an email with no provenance line is fine, an email
-    with a guessed one is not.
+    three REQUIRED payload fields is missing or isn't a non-negative int, the
+    whole line is dropped — an email with no provenance line is fine, an
+    email with a guessed one is not.
+
+    Two renderings (2026-09-19):
+      - Full funnel, when the payload carries `total_drops_scanned` (the raw
+        zone-diff drop count, ~80x larger than `total_candidates_evaluated`
+        and the number that actually describes the day's work).
+      - Legacy wording, when it doesn't. It is genuinely absent from every
+        payload written before 2026-09-19 and from any run whose writer
+        didn't supply it, so this is the normal path, not an error path. We
+        degrade to the narrower true sentence; we never guess the wide one.
+
+    `total_drops_scanned` is also ignored when it is SMALLER than
+    `total_candidates_evaluated`: the funnel would read backwards, which
+    means one of the two counters is wrong, and a visibly incoherent
+    provenance line is worse for credibility than a shorter one.
 
     `carryover_count` is deliberately unused: the picks are fresh-today only,
     so carryover doesn't belong in a sentence about what's below.
@@ -490,10 +687,31 @@ def credibility_line(payload: dict, pick_count: int) -> str | None:
         return None
     if pick_count <= 0:
         return None
+
+    tail = (
+        f"The {pick_count:,} below are the highest-scoring of those fresh drops."
+    )
+    scanned = _int_or_none(payload.get("total_drops_scanned"))
+    if scanned is not None and scanned < total:
+        logger.warning(
+            "total_drops_scanned (%d) is below total_candidates_evaluated "
+            "(%d); ignoring it and using the narrow credibility line.",
+            scanned, total,
+        )
+        scanned = None
+    if scanned is None:
+        logger.info(
+            "Credibility line: no usable total_drops_scanned; using the "
+            "pre-2026-09-19 wording.",
+        )
+        return (
+            f"Evaluated {total:,} candidates today; {published:,} made the "
+            f"published list, {fresh:,} of them dropped today. {tail}"
+        )
     return (
-        f"Evaluated {total:,} candidates today; {published:,} made the "
-        f"published list, {fresh:,} of them dropped today. The "
-        f"{pick_count:,} below are the highest-scoring of those fresh drops."
+        f"Scanned {scanned:,} dropped domains today; {total:,} passed our "
+        f"filters into per-domain checks; {published:,} made the published "
+        f"list, {fresh:,} of them dropped today. {tail}"
     )
 
 
@@ -549,7 +767,7 @@ def _featured_html(
     v_color, v_bg = _verdict_style(verdict)
     url = _domain_url(name, site_url, archived_names)
     reason = _reason_text(domain, reason_max_chars)
-    archived_title = _excerpt_title(
+    archived = _archived_evidence(
         excerpts, name, excerpt_max_chars, excerpt_denylist,
     )
 
@@ -567,11 +785,18 @@ def _featured_html(
             '<div style="margin-top: 6px; font-size: 14px; line-height: 1.5; '
             f'color: #292524;">{html.escape(reason)}</div>'
         )
-    if archived_title:
+    if archived:
+        kind, value = archived
+        # A non-Latin title gets a description, not quotation marks: the
+        # phrase is ours, the quoted form is the archive's own words.
+        label = "Archived page title: " if kind == "title" else "Archived page: "
+        inner = (
+            f'“{html.escape(value)}”' if kind == "title" else html.escape(value)
+        )
         lines.append(
             '<div style="margin-top: 6px; font-size: 13px; line-height: 1.5; '
-            'color: #57534e;">Archived page title: '
-            f'<span style="color: #1a1a1a;">“{html.escape(archived_title)}”</span>'
+            f'color: #57534e;">{label}'
+            f'<span style="color: #1a1a1a;">{inner}</span>'
             '</div>'
         )
     lines.append(
@@ -641,14 +866,18 @@ def _secondary_line(
     no element at all.
     """
     reason = _reason_text(domain, reason_max_chars)
-    archived_title = _excerpt_title(
+    archived = _archived_evidence(
         excerpts, domain.get("name", ""), excerpt_max_chars, excerpt_denylist,
     )
     parts: list[str] = []
     if reason:
         parts.append(html.escape(reason))
-    if archived_title:
-        parts.append(f'was “{html.escape(archived_title)}”')
+    if archived:
+        kind, value = archived
+        parts.append(
+            f'was “{html.escape(value)}”' if kind == "title"
+            else f'was {html.escape(value)}'
+        )
     return " — ".join(parts)
 
 
@@ -904,11 +1133,15 @@ def _text_featured_block(
     reason = _reason_text(domain, reason_max_chars)
     if reason:
         lines.append(f"   {reason}")
-    archived_title = _excerpt_title(
+    archived = _archived_evidence(
         excerpts, name, excerpt_max_chars, excerpt_denylist,
     )
-    if archived_title:
-        lines.append(f'   Archived page title: "{archived_title}"')
+    if archived:
+        kind, value = archived
+        lines.append(
+            f'   Archived page title: "{value}"' if kind == "title"
+            else f"   Archived page: {value}"
+        )
     lines.append(f"   {_signals_text(domain).replace(' · ', ' | ')}")
     lines.append(f"   {_domain_url(name, site_url, archived_names)}")
     return lines
@@ -981,13 +1214,16 @@ def build_text_body(
                 f"{_signals_text(d).replace(' · ', ' | ')}"
             )
             reason = _reason_text(d, reason_max_chars)
-            archived_title = _excerpt_title(
+            archived = _archived_evidence(
                 excerpts, name, compact_excerpt_max_chars, excerpt_denylist,
             )
-            detail = " — ".join(
-                p for p in (reason, f'was "{archived_title}"' if archived_title else "")
-                if p
-            )
+            archived_part = ""
+            if archived:
+                kind, value = archived
+                archived_part = (
+                    f'was "{value}"' if kind == "title" else f"was {value}"
+                )
+            detail = " — ".join(p for p in (reason, archived_part) if p)
             if detail:
                 out.append(f"   {detail}")
             out.append(f"   {_domain_url(name, site_url, archived_names)}")

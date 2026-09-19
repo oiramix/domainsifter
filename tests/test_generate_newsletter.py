@@ -1937,3 +1937,297 @@ def test_main_dry_run_text_flag_prints_plain_text(tmp_path, capsys):
     assert "<!DOCTYPE html>" not in out
     assert "a.org" in out
     assert "{{ unsubscribe_url }}" in out
+
+
+# ---------------------------------------------------------------------------
+# total_drops_scanned in the credibility line (added 2026-09-19)
+# ---------------------------------------------------------------------------
+
+
+def _funnel_payload(**overrides: Any) -> dict:
+    """A payload from a post-2026-09-19 pipeline run: the full funnel.
+
+    The numbers are the shape of a real day (222,155 drops scanned down to a
+    few hundred published), not a real day's exact figures.
+    """
+    base = _stats_payload(total_drops_scanned=222155, total_candidates_evaluated=2741)
+    base.update(overrides)
+    return base
+
+
+def test_credibility_line_leads_with_drops_scanned_when_present():
+    import re
+
+    line = gn.credibility_line(_funnel_payload(), 20)
+    assert line.startswith("Scanned 222,155 dropped domains today;")
+    assert "2,741 passed our filters" in line
+    assert "270 made the published list" in line
+    assert "56 of them dropped today" in line
+    # Hard rule 2: every digit group is one of the four payload counts or
+    # the length of the list we are actually rendering. Nothing derived,
+    # nothing rounded.
+    numbers = {n.replace(",", "") for n in re.findall(r"\d[\d,]*", line)}
+    assert numbers == {"222155", "2741", "270", "56", "20"}
+
+
+def test_credibility_line_falls_back_to_old_wording_when_scanned_absent():
+    """Every pre-2026-09-19 carryover payload lacks the field. Degrade to
+    the narrower TRUE sentence - never omit the line, never guess a number
+    for it."""
+    payload = _funnel_payload()
+    del payload["total_drops_scanned"]
+    line = gn.credibility_line(payload, 20)
+    assert line.startswith("Evaluated 2,741 candidates today;")
+    assert "Scanned" not in line
+    assert "222,155" not in line
+
+
+@pytest.mark.parametrize("bad", [None, "222155", 222155.0, True, -1])
+def test_credibility_line_falls_back_for_malformed_scanned(bad):
+    """A malformed wide count degrades to the old wording - it must not
+    blank the whole line (the other three counts are still good) and must
+    not be coerced into a rendered number."""
+    line = gn.credibility_line(_funnel_payload(total_drops_scanned=bad), 20)
+    assert line is not None
+    assert line.startswith("Evaluated 2,741 candidates today;")
+    assert "Scanned" not in line
+
+
+def test_credibility_line_ignores_scanned_below_evaluated():
+    """A funnel that reads backwards means one counter is wrong; printing it
+    would undercut the credibility the line exists to build."""
+    line = gn.credibility_line(
+        _funnel_payload(total_drops_scanned=12, total_candidates_evaluated=2741), 20,
+    )
+    assert line.startswith("Evaluated 2,741 candidates today;")
+    assert "12" not in line
+
+
+def test_credibility_line_accepts_scanned_equal_to_evaluated():
+    """A day where nothing was filtered out is coherent, not malformed."""
+    line = gn.credibility_line(
+        _funnel_payload(total_drops_scanned=2741, total_candidates_evaluated=2741), 20,
+    )
+    assert line.startswith("Scanned 2,741 dropped domains today;")
+
+
+@pytest.mark.parametrize(
+    "missing", ["total_candidates_evaluated", "domain_count", "today_count"],
+)
+def test_credibility_line_still_omitted_when_required_field_missing(missing):
+    """total_drops_scanned is additive: it cannot rescue a payload that is
+    missing one of the three REQUIRED counts."""
+    payload = _funnel_payload()
+    del payload[missing]
+    assert gn.credibility_line(payload, 20) is None
+
+
+def test_generate_newsletter_uses_funnel_line_end_to_end():
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    payload = _funnel_payload(domains=[_domain("marketglow.com", 80)])
+    gn.generate_newsletter(
+        _config(), payload,
+        api_key="KEY", today=date(2026, 9, 19), session=session,
+    )
+    assert "Scanned 222,155 dropped domains today;" in captured["body"]
+
+
+# ---------------------------------------------------------------------------
+# Non-Latin archived titles (added 2026-09-19)
+# ---------------------------------------------------------------------------
+
+# Invented non-Latin strings, spelled with chr() so this file stays ASCII.
+HAN_ONLY = CJK_TITLE                                   # 8 Han characters
+KANA = "".join(chr(c) for c in (0x3042, 0x304B, 0x30AB, 0x30CA))
+HANGUL = "".join(chr(c) for c in (0xD55C, 0xAD6D, 0xC5B4))
+CYRILLIC = "".join(chr(c) for c in (0x041D, 0x043E, 0x0432, 0x043E, 0x0441))
+THAI = "".join(chr(c) for c in (0x0E01, 0x0E02, 0x0E04, 0x0E07))
+ARABIC = "".join(chr(c) for c in (0x0627, 0x0644, 0x0639, 0x0631, 0x0628))
+HEBREW = "".join(chr(c) for c in (0x05D0, 0x05D1, 0x05D2, 0x05D3))
+GREEK = "".join(chr(c) for c in (0x03B1, 0x03B2, 0x03B3, 0x03B4))
+DEVANAGARI = "".join(chr(c) for c in (0x0915, 0x0916, 0x0917, 0x0918))
+EMOJI_ONLY = "".join(chr(c) for c in (0x1F600, 0x1F680, 0x2764))
+
+HAN_PHRASE = "a Chinese or Japanese site (Han script)"
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        (HAN_ONLY, HAN_PHRASE),
+        # Kana is exclusive to Japanese, so a Han+Kana mix IS Japanese even
+        # though the Han characters outnumber the kana.
+        (HAN_ONLY + KANA[:1], "a Japanese-language site"),
+        (KANA, "a Japanese-language site"),
+        (HANGUL, "a Korean-language site"),
+        (CYRILLIC, "a Cyrillic-script site"),
+        (THAI, "a Thai-script site"),
+        (ARABIC, "an Arabic-script site"),
+        (HEBREW, "a Hebrew-script site"),
+        (GREEK, "a Greek-script site"),
+        # Recognisably not English, but not a script we have a name for.
+        (DEVANAGARI, "a non-English site"),
+    ],
+)
+def test_non_latin_phrase_names_the_script_it_detected(text, expected):
+    assert gn._non_latin_phrase(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "",
+        "Tide tables and surf reports",
+        "2026 - 2027 (v1.2) !!!",      # digits and punctuation only
+        EMOJI_ONLY,                     # emoji are not letters
+        "Cafe" + chr(0x00E9),           # accented Latin stays Latin
+    ],
+)
+def test_non_latin_phrase_returns_none_for_latin_or_letterless_text(text):
+    assert gn._non_latin_phrase(text) is None
+
+
+def test_non_latin_phrase_ignores_digits_and_punctuation_in_the_ratio():
+    """Only LETTERS count toward the ratio, so a title padded with numbers
+    and separators is still judged on its letters alone."""
+    assert gn._non_latin_phrase("2026 / 2027 - " + HAN_ONLY) == HAN_PHRASE
+
+
+def test_non_latin_phrase_threshold_boundary_is_inclusive():
+    """Exactly half the letters non-Latin -> substitute. The threshold is
+    NON_LATIN_SUBSTITUTION_THRESHOLD = 0.5; this test is its boundary."""
+    assert gn.NON_LATIN_SUBSTITUTION_THRESHOLD == 0.5
+    half = "Shop" + HAN_ONLY[:4]          # 4 Latin letters, 4 Han
+    assert gn._non_latin_phrase(half) == HAN_PHRASE
+
+
+def test_non_latin_phrase_keeps_mostly_latin_mixed_title_verbatim():
+    """Just under the threshold: the Latin part still carries the meaning,
+    so showing the real title beats describing it."""
+    below = "Shops" + HAN_ONLY[:4]        # 5 Latin letters, 4 Han -> 0.444
+    assert gn._non_latin_phrase(below) is None
+
+
+def test_non_latin_phrase_is_non_english_when_two_scripts_tie():
+    """No single script dominates; naming either would be a coin flip."""
+    assert gn._non_latin_phrase(CYRILLIC[:3] + THAI[:3]) == "a non-English site"
+
+
+def test_archived_evidence_tags_titles_and_substitutions_differently():
+    excerpts = {
+        "friscorefrigeratorrepair.com": _excerpt(HAN_ONLY),
+        "tideblock.io": _excerpt("Tide tables and surf reports"),
+        "bare.org": _excerpt(None),
+    }
+    assert gn._archived_evidence(excerpts, "friscorefrigeratorrepair.com", 120) == (
+        ("script", HAN_PHRASE)
+    )
+    assert gn._archived_evidence(excerpts, "tideblock.io", 120) == (
+        ("title", "Tide tables and surf reports")
+    )
+    assert gn._archived_evidence(excerpts, "bare.org", 120) is None
+    assert gn._archived_evidence(excerpts, "absent.org", 120) is None
+
+
+# --- Rendering: HTML part ----------------------------------------------------
+
+
+def test_featured_html_substitutes_script_description_for_non_latin_title():
+    excerpts = {"friscorefrigeratorrepair.com": _excerpt(HAN_ONLY)}
+    body = gn.build_html_body(
+        [_domain("friscorefrigeratorrepair.com", 80)], date(2026, 9, 19), "x",
+        featured_n=1, excerpts=excerpts,
+    )
+    # The label and the phrase are separated by the value's <span>.
+    assert "Archived page: " in body
+    assert HAN_PHRASE in body
+    # The description is ours, so it is NOT presented as a quotation, and the
+    # raw CJK never reaches the subscriber.
+    assert "Archived page title:" not in body
+    assert chr(0x201C) not in body
+    assert HAN_ONLY not in body
+
+
+def test_compact_row_html_substitutes_script_description():
+    excerpts = {"friscorefrigeratorrepair.com": _excerpt(HAN_ONLY)}
+    body = gn.build_html_body(
+        [_domain("friscorefrigeratorrepair.com", 80)], date(2026, 9, 19), "x",
+        excerpts=excerpts,
+    )
+    assert f"was {HAN_PHRASE}" in body
+    assert HAN_ONLY not in body
+    assert chr(0x201C) + HAN_PHRASE not in body      # not curly-quoted
+
+
+def test_html_still_quotes_a_latin_title_verbatim():
+    """Regression guard: the substitution must not touch normal titles."""
+    excerpts = {"tideblock.io": _excerpt("Tide tables and surf reports")}
+    body = gn.build_html_body(
+        [_domain("tideblock.io", 80)], date(2026, 9, 19), "x",
+        featured_n=1, excerpts=excerpts,
+    )
+    assert "Archived page title:" in body
+    assert "Tide tables and surf reports" in body
+    assert "non-English" not in body
+
+
+# --- Rendering: plain-text part ----------------------------------------------
+
+
+def test_featured_text_substitutes_script_description():
+    excerpts = {"friscorefrigeratorrepair.com": _excerpt(HAN_ONLY)}
+    text = gn.build_text_body(
+        [_domain("friscorefrigeratorrepair.com", 80)], date(2026, 9, 19), "Intro.",
+        featured_n=1, excerpts=excerpts,
+    )
+    assert f"   Archived page: {HAN_PHRASE}" in text
+    assert "Archived page title:" not in text
+    assert HAN_ONLY not in text
+
+
+def test_compact_text_row_substitutes_script_description():
+    excerpts = {"friscorefrigeratorrepair.com": _excerpt(CYRILLIC)}
+    text = gn.build_text_body(
+        [_domain("friscorefrigeratorrepair.com", 80)], date(2026, 9, 19), "Intro.",
+        excerpts=excerpts,
+    )
+    assert "was a Cyrillic-script site" in text
+    assert CYRILLIC not in text
+    assert 'was "' not in text
+
+
+def test_text_still_quotes_a_latin_title_verbatim():
+    excerpts = {"tideblock.io": _excerpt("Tide tables and surf reports")}
+    text = gn.build_text_body(
+        [_domain("tideblock.io", 80)], date(2026, 9, 19), "Intro.",
+        excerpts=excerpts,
+    )
+    assert 'was "Tide tables and surf reports"' in text
+
+
+def test_non_latin_title_never_reaches_either_part_end_to_end():
+    """The production path: sidecar -> dry run -> both rendered parts."""
+    excerpts = {"friscorefrigeratorrepair.com": _excerpt(HAN_ONLY)}
+    with patch.object(gn, "_load_sidecar_excerpts", return_value=excerpts):
+        out = gn.generate_newsletter(
+            _config(featured_n=1),
+            {"domains": [_domain("friscorefrigeratorrepair.com", 80)]},
+            api_key="KEY", today=date(2026, 9, 19), dry_run=True,
+        )
+    assert HAN_ONLY not in out["body"]
+    assert HAN_ONLY not in out["text_body"]
+    assert HAN_PHRASE in out["body"]
+    assert HAN_PHRASE in out["text_body"]
