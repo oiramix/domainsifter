@@ -87,6 +87,25 @@ that false-positived 'essex' on 'sex', 'camera' on 'cam'):
                    'pills' catches 'pillsbury' — such names rarely drop.
                    See `_matched_substring_keyword`.
 
+                   Round 2 candidates (measured 2026-09-19, PENDING
+                   application to config.json — the list itself is owned
+                   by the config, this note only records the analysis):
+                   'betting', 'casino', 'gambling', 'viagra', 'escort'.
+                   Motivated by two live misses on the published list —
+                   a `betting…` and a `…viagra` compound apex, neither
+                   reachable by the token matchers. Measured against the
+                   44.5M-name zone snapshots under `sample data from r2/`:
+                   the five stems newly reject ~0.19% of the zone, with
+                   innocent-overlap classes of 0.3% or less per stem
+                   (surname 'Bettinger'/'Bettingen', 'Olivia Gra…' →
+                   'viagra', medical/police 'escort'). Deliberately NOT
+                   proposed: 'cialis' (84% of zone hits are
+                   specialist/socialist/commercialista), 'steroid' (68%
+                   are 'asteroid'), 'opioid' and 'phishing' (public-
+                   health and anti-phishing orgs dominate), and the
+                   sub-5-char stems 'cam'/'tube'/'sex'/'slot', whose
+                   exclusion the 2026-05-17 migration exists to protect.
+
     Soft signals (snake-oil, get-rich-quick, crypto-speculative, listed
     in `soft_signal_keywords`) use substring match too but do NOT reject —
     they're a flag the verdict computation reads to force "Caution" (see

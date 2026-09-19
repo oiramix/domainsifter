@@ -18,8 +18,14 @@ CONFIG = {
         "porn", "hentai", "xtube", "tinbongda", "soap2day", "xxx",
     ],
     "rejected_keyword_substrings": [
+        # Round 1 (2026-05-24)
         "dating", "forex", "hookup", "payday", "pharmacy", "pills",
         "replica", "weightloss",
+        # Round 2 (proposed 2026-09-19) — mirrors the additions proposed
+        # for scripts/config.json after two compound-apex misses reached
+        # the published list. Tests below pin both the new rejections and
+        # the innocent names that must keep passing.
+        "betting", "casino", "gambling", "viagra", "escort",
     ],
     "soft_signal_keywords": [
         "dating", "singles", "pump", "moonshot",
@@ -318,6 +324,196 @@ def test_substring_reject_tolerates_missing_config_key():
     keep, reason = filter_mod.keep(_ok(name="richmendating.net"), cfg)
     assert keep is True
     assert reason is None
+
+
+# --- Substring rejection (Round 2, proposed 2026-09-19) --------------------
+#
+# Same failure mode as Round 1, different vertical. Production published a
+# gambling compound (apex shaped like "betting" + two more words, no
+# separator) and a pharma compound ending in "viagra". Both keywords are in
+# rejected_keywords, but the apex is a SINGLE token, so exact match never
+# fires and neither stem is in rejected_keyword_prefixes.
+#
+# Names below are invented (CLAUDE.md rule #1); they reproduce the shape of
+# the production misses, not the misses themselves.
+
+
+def test_substring_reject_betting_in_compound_apex():
+    """The production miss shape: one token, 'betting' buried at the start
+    of a longer compound. Token model yields {'bettingglowmaster','com'} —
+    no exact hit, no prefix entry. Substring catches it."""
+    keep, reason = filter_mod.keep(_ok(name="bettingglowmaster.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:betting"
+
+
+def test_substring_reject_betting_in_middle_of_apex():
+    keep, reason = filter_mod.keep(_ok(name="sunreefbettinghub.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:betting"
+
+
+def test_substring_reject_casino_in_compound_apex():
+    """'best-CASINO-deal.com' was already rejected via the hyphen tokens;
+    the un-hyphenated compound was not, until Round 2."""
+    keep, reason = filter_mod.keep(_ok(name="lanterncasinohub.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:casino"
+
+
+def test_substring_reject_gambling_in_compound_apex():
+    keep, reason = filter_mod.keep(_ok(name="tideblockgamblingclub.org"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:gambling"
+
+
+def test_substring_reject_viagra_at_end_of_apex():
+    """Second production miss shape: pharma stem trailing a geo/qualifier
+    compound. Nothing splits it, so only substring reaches it."""
+    keep, reason = filter_mod.keep(_ok(name="coppernestcanadaviagra.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:viagra"
+
+
+def test_substring_reject_escort_in_compound_apex():
+    keep, reason = filter_mod.keep(_ok(name="tideblockescortagency.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:escort"
+
+
+def test_round2_substring_reject_is_case_insensitive():
+    keep, reason = filter_mod.keep(_ok(name="BettingGlowMaster.COM"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:betting"
+
+
+def test_round2_substring_reject_ignores_tld_label():
+    """.casino is a real TLD — a clean apex on it must not be flagged just
+    because the TLD characters contain the keyword (same contract as
+    siteshop.pharmacy in Round 1)."""
+    keep, reason = filter_mod.keep(_ok(name="marketglow.casino"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_exact_token_still_wins_over_substring():
+    """When both matchers could fire, the hard-keyword matcher runs first
+    and the reason string is unchanged — log aggregation stays stable."""
+    keep, reason = filter_mod.keep(_ok(name="best-CASINO-deal.com"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:casino"
+
+
+# --- Round 2 regression: innocent letter sequences must still be KEPT ------
+#
+# Each name below contains a near-miss of a Round 2 stem. They are the
+# reason the curation rule demands >=5 chars and compound-specific stems:
+# a shorter stem ('bet', 'cas', 'sort', 'gamble') would eat all of these.
+
+
+def test_round2_keeps_better_not_betting():
+    """'better' shares 'bet' with 'betting' but not the full stem."""
+    keep, reason = filter_mod.keep(_ok(name="betterhomesglow.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_alphabet_compound():
+    keep, reason = filter_mod.keep(_ok(name="alphabetstorehouse.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_showcasing_not_casino():
+    """'showcasing' contains 'casin'… but ends 'ing', not 'o'."""
+    keep, reason = filter_mod.keep(_ok(name="showcasingcrafts.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_gamble_surname_not_gambling():
+    """'gamble' / 'gambler' are not 'gambling' — the stem is deliberately
+    the -ing form, which is what the abuse vertical actually uses."""
+    keep, reason = filter_mod.keep(_ok(name="gamblefarmstead.org"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_resort_not_escort():
+    """'resort' ends in 'esort', one letter short of 'escort'."""
+    keep, reason = filter_mod.keep(_ok(name="lakesideresortgroup.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_olive_grove_not_viagra():
+    keep, reason = filter_mod.keep(_ok(name="olivegrovemarket.com"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_specialist_not_cialis():
+    """'specialist' CONTAINS 'cialis' (spe-CIALIS-t), and so does
+    'socialist'. That is exactly why 'cialis' was measured and then
+    rejected as a substring candidate — 84% of its zone hits are
+    specialist/socialist/commercialista names. This test fails loudly if
+    anyone ever adds it."""
+    keep, reason = filter_mod.keep(_ok(name="kidneyspecialistgroup.org"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_asteroid_not_steroid():
+    """'asteroid' contains 'steroid'. 68% of zone hits for 'steroid' are
+    asteroid names, so 'steroid' stays off the substring list."""
+    keep, reason = filter_mod.keep(_ok(name="asteroidbeltclub.org"), CONFIG)
+    assert keep is True
+    assert reason is None
+
+
+def test_round2_keeps_short_stems_unmatched():
+    """The 2026-05-17 migration deliberately keeps 'cam', 'tube', 'sex',
+    'slot' out of prefix/substring matching. Round 2 does NOT undo that:
+    these compounds must still pass even though the short stems are in
+    rejected_keywords."""
+    cfg = {
+        **CONFIG,
+        "rejected_keywords": [*CONFIG["rejected_keywords"], "cam", "tube", "slot"],
+    }
+    for name in (
+        "camshaftpartsglow.com",
+        "tubefittingsdepot.com",
+        "slotcarcollectors.org",
+        "essexvillagetrust.org",
+    ):
+        keep, reason = filter_mod.keep(_ok(name=name), cfg)
+        assert keep is True, f"{name} should be kept, got {reason}"
+
+
+def test_round2_known_false_positive_is_documented():
+    """Accepted cost, in the same spirit as 'dating' catching 'updating':
+    a personal-brand name of the form 'Olivia Gra…' contains 'viagra'
+    (oli-VIAGRA-…) and WILL be rejected. Measured frequency in the
+    44.5M-name zone snapshots: 21 names, 1.6% of all 'viagra' hits. This
+    test documents the behaviour rather than claiming it is correct."""
+    keep, reason = filter_mod.keep(_ok(name="oliviagravelstudio.net"), CONFIG)
+    assert keep is False
+    assert reason == "keyword:viagra"
+
+
+def test_round2_curation_rule_holds_in_live_config():
+    """Guardrail on scripts/config.json itself: every substring entry must
+    be >=5 chars and lowercase, per the curation rule in
+    `_keyword_lists_doc`. Short stems in this list are how the 2026-05-17
+    false-positive class comes back."""
+    import json
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parent.parent
+    live = json.loads((repo_root / "scripts" / "config.json").read_text(encoding="utf-8"))
+    for entry in live.get("rejected_keyword_substrings", []):
+        assert len(entry) >= 5, f"{entry!r} is shorter than the 5-char minimum"
+        assert entry == entry.lower(), f"{entry!r} must be lowercase"
 
 
 def test_tokenize_produces_expected_token_sets():

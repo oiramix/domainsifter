@@ -520,6 +520,146 @@ def test_system_prompt_handles_non_english_excerpts(has_excerpt):
     assert "untranslated" in sys_prompt
 
 
+# --- anti-speculation, after the 2026-09-19 measured leak -------------------
+#
+# A live rehearsal produced "The domain's name suggests a connection to a
+# filmmaker or entertainment project, but the excerpt itself provides no
+# content evidence of what the site actually was" for a domain whose only
+# archived capture was a registrar parking placeholder. A parked capture is
+# content, so that generation took the GROUNDED path — the one mode whose
+# block never restated the ban.
+#
+# NOTHING BELOW TESTS MODEL BEHAVIOUR. A prompt cannot be proven obeyed
+# without a live run; these assert that the prompt SAYS the right thing, in
+# both modes, in the structural positions the fix depends on.
+
+
+def _mode_block(has_excerpt: bool) -> str:
+    """Just the mode-specific tail, with the shared preamble removed.
+
+    Lets a test distinguish 'the rule is somewhere in the prompt' from 'the
+    rule is restated inside the branch the model is actually drafting under',
+    which is the distinction the leak turned on.
+    """
+    full = ag.build_system_prompt(has_excerpt)
+    assert full.startswith(ag._SYSTEM_PROMPT_COMMON)
+    return full[len(ag._SYSTEM_PROMPT_COMMON):]
+
+
+@pytest.mark.parametrize("has_excerpt", [True, False])
+def test_evidence_rule_is_stated_positively_not_only_as_a_banned_list(has_excerpt):
+    """Root cause (b): a phrase blacklist is satisfiable by paraphrase. The
+    rule has to name the MOVE — sourcing a claim — not just the wording."""
+    sys_prompt = ag.build_system_prompt(has_excerpt)
+    assert "THE EVIDENCE RULE" in sys_prompt
+    assert "traceable to one named field of `wayback_excerpt`" in sys_prompt
+    assert "the sentence does not go on the page" in sys_prompt
+
+
+@pytest.mark.parametrize("has_excerpt", [True, False])
+def test_banned_phrase_list_is_present_in_both_modes(has_excerpt):
+    """The exact phrase that leaked, plus its neighbours, named verbatim."""
+    sys_prompt = ag.build_system_prompt(has_excerpt)
+    for banned in (
+        "the name suggests",
+        "based on the name structure",
+        "the linguistic composition suggests",
+        "likely operated as",
+        "may have served",
+        "could have been used for",
+        "points to a connection with",
+        "hints at",
+        "appears to have been",
+    ):
+        assert banned in sys_prompt, f"prompt must name-and-ban {banned!r}"
+    assert "in either mode" in sys_prompt
+
+
+@pytest.mark.parametrize("has_excerpt", [True, False])
+def test_self_qualified_guess_is_explicitly_still_a_violation(has_excerpt):
+    """Root cause (c): the leaked sentence disclaimed itself in the same
+    breath, which reads as compliance. It isn't — the guess is published
+    either way."""
+    sys_prompt = ag.build_system_prompt(has_excerpt)
+    assert "A hedge does not rescue a guess." in sys_prompt
+    assert "is a full violation" in sys_prompt
+    # The shape of the observed failure, quoted back as the example.
+    assert "but the excerpt provides no content evidence" in sys_prompt
+
+
+@pytest.mark.parametrize("has_excerpt", [True, False])
+def test_parked_placeholder_capture_is_addressed_explicitly(has_excerpt):
+    """Root cause (d): a parking page IS an excerpt, so it routes to the
+    grounded branch, where having *some* evidence felt like licence to fill
+    in around it. Say what a placeholder is evidence OF, and what it isn't."""
+    sys_prompt = ag.build_system_prompt(has_excerpt)
+    assert "PLACEHOLDER AND PARKED CAPTURES" in sys_prompt
+    assert "parking page" in sys_prompt
+    assert "domain-for-sale notice" in sys_prompt
+    assert "unrecorded is unknown" in sys_prompt
+    assert "NOT a licence to reconstruct the site that came before it" in sys_prompt
+
+
+def test_grounded_mode_block_itself_repeats_the_ban():
+    """The specific hole: the ban lived only in the shared preamble and in
+    the NO-EXCERPT block. The GROUNDED block — the one that leaked — now
+    carries its own restatement, at the point of maximum pressure (the
+    `### Historical use` section) and again at the end."""
+    block = _mode_block(has_excerpt=True)
+    assert "PLACEHOLDER CAPTURES" in block
+    assert "The name is still not evidence." in block
+    assert "holding some evidence is never a licence to fill in around it" in block
+
+
+def test_no_excerpt_mode_block_itself_repeats_the_ban():
+    block = _mode_block(has_excerpt=False)
+    assert "the name is not evidence" in block
+    assert "must not fill the gap with a guess" in block
+
+
+@pytest.mark.parametrize("has_excerpt", [True, False])
+def test_each_mode_block_ends_with_a_sourcing_recheck(has_excerpt):
+    """Root cause (a): the rule was stated once, early, then buried under six
+    numbered drafting sections. Recency now cuts the other way — the last
+    instruction before drafting is 'source every claim or delete it'."""
+    block = _mode_block(has_excerpt)
+    marker = "BEFORE YOU RETURN THE PAGE"
+    assert marker in block
+    # It is genuinely last: nothing but the recheck follows it in the block.
+    assert block.index(marker) > block.index("Closing line")
+    assert "with or without a hedge attached" in block
+    assert "echoes the words inside the domain name" in block
+
+
+@pytest.mark.parametrize(
+    ("has_excerpt", "target"), [(True, "250-400 words"), (False, "120-200 words")],
+)
+def test_word_targets_are_unchanged_but_are_not_quotas(has_excerpt, target):
+    """The targets stay exactly as they were — but a length target the
+    evidence cannot fill is precisely the pressure that produced the leak,
+    so each block now says which way to resolve that conflict."""
+    block = _mode_block(has_excerpt)
+    assert target in block
+    assert "ceiling on padding, not a quota to fill" in block
+
+
+def test_grounded_mode_still_demands_at_least_four_name_mentions():
+    """Regression guard on the other quota left intact: the fix relaxes how
+    LONG the page must be, never the requirement to name the domain."""
+    assert "at least 4 times" in _mode_block(has_excerpt=True)
+    assert "at least 3 times" in _mode_block(has_excerpt=False)
+
+
+def test_build_user_message_grounded_header_also_forbids_speculation():
+    """The user turn's mode line is the last thing before the record. The
+    no-excerpt header always carried 'Do not speculate'; the grounded one
+    did not, so the reminder nearest the data was mode-dependent."""
+    msg = ag._build_user_message(_domain("coppernest.org"), _excerpt())
+    assert ag.MODE_MARKER_GROUNDED in msg
+    assert "Do not speculate from the domain name." in msg
+    assert "parked or placeholder capture" in msg
+
+
 @pytest.mark.parametrize("has_excerpt", [True, False])
 def test_system_prompt_never_asks_for_frontmatter(has_excerpt):
     """The script owns the YAML block; a model-written one would drift from

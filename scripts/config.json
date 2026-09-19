@@ -34,7 +34,7 @@
     "domain_length": 0.1,
     "cc_source_domain_count": 0.3
   },
-  "_keyword_lists_doc": "Keyword blocklist with three REJECT categories plus one SOFT-SIGNAL category. (1) rejected_keywords: exact-match against tokens split on dots/hyphens/digit-letter boundaries. (2) rejected_keyword_prefixes: startswith() against coarse tokens (curated subset of unambiguous abuse stems — 'cam'/'tube'/'sex'/'slot'/'poker'/'pirate' are intentionally NOT here because their English-word overlap was the 2026-05-17 migration's whole motivation). (3) rejected_keyword_substrings (added 2026-05-24, Round 1): substring match on the apex label, for scam-vertical stems where real-world spam concatenates the keyword into a longer compound name with no separator and no digit boundary (richmendating, miraclepills, onlinepharmacy) — none of those reach the token matchers. Curation rule for this list: entries MUST be ≥5 chars and compound-specific enough that incidental English-word overlap is rare. Known minor FPs: 'dating' catches 'updating', 'pills' catches 'pillsbury' — accepted because such names rarely drop. (4) soft_signal_keywords: do NOT reject — output.py reads them to force a 'Caution' verdict on dating/snake-oil/get-rich-quick/crypto-speculative names; 'dating' and 'hookup' are dead entries here as of 2026-05-24 (the substring reject fires first) but kept to avoid scope creep.",
+  "_keyword_lists_doc": "Keyword blocklist with three REJECT categories plus one SOFT-SIGNAL category. (1) rejected_keywords: exact-match against tokens split on dots/hyphens/digit-letter boundaries. (2) rejected_keyword_prefixes: startswith() against coarse tokens (curated subset of unambiguous abuse stems — 'cam'/'tube'/'sex'/'slot'/'poker'/'pirate' are intentionally NOT here because their English-word overlap was the 2026-05-17 migration's whole motivation). (3) rejected_keyword_substrings (added 2026-05-24, Round 1): substring match on the apex label, for scam-vertical stems where real-world spam concatenates the keyword into a longer compound name with no separator and no digit boundary (richmendating, miraclepills, onlinepharmacy) — none of those reach the token matchers. Curation rule for this list: entries MUST be ≥5 chars and compound-specific enough that incidental English-word overlap is rare. Known minor FPs: 'dating' catches 'updating', 'pills' catches 'pillsbury' — accepted because such names rarely drop. ROUND 2 (2026-09-19): added betting, casino, gambling, viagra, escort after TWO compound-apex misses reached the LIVE published list — bettingmastertechnic.com and onlinecanadaviagra.net. Both stems were already in rejected_keywords, but that matcher is token-exact and a single-token apex never fires it. Candidates were measured against 44.5M real apex names from the zone snapshots, counting matches the existing matchers do not already reject: betting 5,490 new rejects / 0.3% false-positive (Bettinger, Bettingen surnames); casino 63,925 / 0.008% (Casino NSW businesses); escort 8,468 / 0.3% (medical and oversize-load escort firms); viagra 1,037 / 1.6% — the FP class is 'Olivia Gra...' (oliviagrace, oliviagraham all contain oli-VIAGRA-m), accepted as roughly the same cost as the known dating/updating FP; gambling 6,149 / 4.1%, where the FPs are gambling-harm NONPROFITS (problemgamblingcouncil.org). Gambling is the judgement call: it is already an exact-token reject, so problem-gambling.org is rejected TODAY and the substring only makes that policy consistent — drop this one entry to publish such names again, the other four stand alone. REJECTED after measurement, do not re-add: cialis (84% FP — speCIALISt, soCIALISt), steroid (68% FP — ASTEROID), opioid (public-health sites), phishing (25% anti-phishing orgs), webcam (tourism/wildlife cams). Tests pin cialis and steroid as forbidden additions. (4) soft_signal_keywords: do NOT reject — output.py reads them to force a 'Caution' verdict on dating/snake-oil/get-rich-quick/crypto-speculative names; 'dating' and 'hookup' are dead entries here as of 2026-05-24 (the substring reject fires first) but kept to avoid scope creep.",
   "rejected_keywords": [
     "sex", "sexy", "sexo", "sexe", "porn", "porno", "nude", "naked",
     "dildo", "fetish", "hentai", "milf", "tube", "webcam", "camgirl",
@@ -63,7 +63,8 @@
   ],
   "rejected_keyword_substrings": [
     "dating", "forex", "hookup", "payday", "pharmacy", "pills",
-    "replica", "weightloss"
+    "replica", "weightloss",
+    "betting", "casino", "gambling", "viagra", "escort"
   ],
   "soft_signal_keywords": [
     "dating", "hookup", "singles", "tinder", "romance",
@@ -107,6 +108,14 @@
     "top_n": 20,
     "subject_template": "DomainSifter daily picks — {date}",
     "intro_text": "Today's top expired domain picks, sorted by score. Backlinks counts come from Common Crawl's last 3 months of crawl data. All domains were available at last check — verify at registrar before buying.",
+    "_evidence_doc": "Added 2026-09-19 for the first-ever send. featured_n picks render as rich blocks (reason + archived page title + signals) and the rest stay compact: a flat list of 20 equal rows gets skimmed and closed. The archived title comes from the wayback sidecar and is the differentiating content no competitor list has. excerpt_title_denylist suppresses boilerplate titles (Page not found, Home, Untitled) because showing those on a featured pick reads as filler and implies we checked something we did not; set it to [] to show every title. plaintext_api_field is OFF until the Buttondown field name for a caller-supplied text/plain part is confirmed - a wrong name is retried once without it, so a bad guess cannot cost the draft.",
+    "featured_n": 3,
+    "sidecar_excerpts_path": "src/data/wayback_excerpts.json",
+    "archive_index_path": "src/data/archive-index.json",
+    "reason_max_chars": 120,
+    "excerpt_max_chars": 120,
+    "compact_excerpt_max_chars": 70,
+    "plaintext_api_field": "",
     "site_url": "https://domainsifter.com"
   },
   "max_candidates_for_publication": 300,

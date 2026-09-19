@@ -36,7 +36,11 @@ Writes:
    historical content could not be retrieved. Speculation from the domain
    name ("the name suggests possible connections to fitness, productivity,
    entertainment, or educational content") is forbidden in both modes —
-   under hard rule 2 a guess presented as fact is an invented fact.
+   under hard rule 2 a guess presented as fact is an invented fact. A live
+   rehearsal the same day leaked the banned phrase anyway, on the GROUNDED
+   path, for a domain whose only capture was a parking placeholder; the
+   prompt was restructured in response. See the revision comment above
+   `MODE_MARKER_GROUNDED` for the diagnosis and the four fixes.
 
 3. EVIDENCE IN FRONTMATTER. The ranker's `phase2_reason`, the classifier's
    `snapshot_category`, and the archived page's title / meta description /
@@ -207,6 +211,44 @@ def _sidecar_path_from_config(config: dict | None) -> Path:
 # when ungrounded, which readers experienced as an unexplained gap; and its
 # earlier ancestor invited "the name suggests…" speculation, which is what
 # produced the 4minutes.net page this rewrite exists to replace.
+#
+# 2026-09-19, second revision — MEASURED LEAK. A live rehearsal produced
+# "The domain's name suggests a connection to a filmmaker … but the excerpt
+# itself provides no content evidence" on a domain whose only capture was a
+# registrar parking placeholder. Diagnosis, and what each part of the fix
+# answers:
+#
+#   a) The ban lived in _SYSTEM_PROMPT_COMMON as bullet 2 of 7 under
+#      ABSOLUTE PROHIBITIONS, stated once and then buried under six numbered
+#      sections of positive drafting instructions. NO-EXCERPT restated it
+#      three times in its own block; GROUNDED restated it zero times. The
+#      leaking generation was GROUNDED. → The rule is now its own named
+#      section (THE EVIDENCE RULE) at the END of the common block, and BOTH
+#      mode blocks close with a BEFORE YOU RETURN THE PAGE recheck, so the
+#      last thing read before drafting is the rule, in either mode.
+#
+#   b) The rule was negative only — a list of banned phrases. A phrase list
+#      is satisfiable by paraphrase, and the underlying MOVE (inferring
+#      purpose from the name) was never named as the thing forbidden. → The
+#      rule now leads with the positive form: every claim about what the
+#      site was must be traceable to a named `wayback_excerpt` field.
+#
+#   c) The observed sentence hedged itself in the same breath, which reads
+#      as compliance. → The rule now says outright that a hedge does not
+#      rescue a guess, quoting the shape of the observed failure.
+#
+#   d) A placeholder capture routes to GROUNDED (it IS content), where the
+#      250-400 word target, the "at least 4 mentions" quota and a mandatory
+#      "### Historical use" section demand more prose than the evidence can
+#      supply — structural pressure to backfill from the only other string
+#      available, the name. → PLACEHOLDER AND PARKED CAPTURES states that a
+#      parking page is evidence the domain was PARKED and nothing more, and
+#      both mode blocks now say the word target is a ceiling on padding
+#      rather than a quota, so the correct way out of that conflict is a
+#      shorter page.
+#
+# Word targets, section order, frontmatter emission and every other
+# prohibition are unchanged.
 
 MODE_MARKER_GROUNDED = "MODE: GROUNDED"
 MODE_MARKER_NO_EXCERPT = "MODE: NO-EXCERPT"
@@ -214,7 +256,7 @@ MODE_MARKER_NO_EXCERPT = "MODE: NO-EXCERPT"
 _SYSTEM_PROMPT_COMMON = """You are writing reference pages for DomainSifter, a domain-research service that publishes daily evaluations of recently-dropped (expired) domains. Each page documents one specific domain at the moment it became available for re-registration: what the site was, what authority signals it carries, and DomainSifter's verdict.
 
 INPUT
-The user turn contains one JSON record for a single domain. Its `wayback_excerpt` field, when present, holds text scraped from the last archived snapshot of the site: `title`, `meta_description`, `h1` (a list) and `h2` (a list). That excerpt is the ONLY evidence available about what the site was. The name is not evidence: nothing about the site's purpose, audience or content may be inferred from the domain name itself.
+The user turn contains one JSON record for a single domain. Its `wayback_excerpt` field, when present, holds text scraped from the last archived snapshot of the site: `title`, `meta_description`, `h1` (a list) and `h2` (a list). That excerpt is the ONLY evidence available about what the site was. When it is absent there is no evidence at all. Either way, THE EVIDENCE RULE below governs every sentence you write about the site.
 
 OUTPUT FORMAT
 Return only the Markdown body, starting with the `##` heading. No frontmatter, no preamble, no meta-commentary, no closing question. The generator script adds the frontmatter.
@@ -224,8 +266,6 @@ Neutral, factual, encyclopedic. It should read like a reference entry, not like 
 
 ABSOLUTE PROHIBITIONS — a page that breaks any of these is unpublishable
 - Never invent a fact. When a field is missing, null or zero, say so plainly or leave it out.
-- Never speculate about what the site was, might have been, probably was, or appears to have been, based on the domain name, its word structure, or its TLD. The phrases "the name suggests", "based on the name structure", "the linguistic composition suggests", "likely operated as", "may have served", "could have been used for" and anything equivalent are forbidden anywhere on the page.
-- Never offer several possibilities at once. "Possible connections to fitness, productivity, entertainment, or educational content" is four guesses in one sentence and is exactly what this instruction forbids.
 - Never write marketing or promotional claims: no "great investment", "strong potential", "perfect for", "unlock", "imagine", no calls to action beyond the closing verification line.
 - Never state or imply traffic figures, visitor numbers, revenue, resale price, appraisal or valuation of any kind. None of that is in the record.
 - Never invent testimonials, reviews, endorsements, rankings, awards or any other social proof.
@@ -238,7 +278,17 @@ Excerpts are frequently not in English — Chinese, German, Russian and Japanese
 - The script a site was written in is not itself a signal of quality, legitimacy or abuse. Do not treat it as one.
 
 DOMAIN NAME USAGE
-Always write the domain with its TLD ("example.net", not "example"). The first sentence must contain the full domain name exactly as a buyer would search it.
+Always write the domain with its TLD ("example.net", not "example"). The first sentence must contain the full domain name exactly as a buyer would search it. Printing the name is not the same as reasoning from it — see the next section.
+
+THE EVIDENCE RULE — the rule that actually gets broken, so it is stated last and in full
+Positively: every statement on the page about what the site WAS, hosted, sold, covered, offered or served must be traceable to one named field of `wayback_excerpt` — the title, the meta_description, an h1 or an h2. Before writing such a sentence, name to yourself the field it comes from. If you cannot name one, the sentence does not go on the page.
+Negatively: the domain is a string, not a source. The name is not evidence. Nothing about the site's purpose, audience, industry, tone or content may be inferred from the name, from the words or fragments inside it, from its word structure, or from its TLD. The phrases "the name suggests", "based on the name structure", "the linguistic composition suggests", "likely operated as", "may have served", "could have been used for", "points to a connection with", "hints at", "presumably", "appears to have been" and anything equivalent to them are forbidden anywhere on the page, in either mode.
+A hedge does not rescue a guess. "The name suggests a connection to a filmmaker, but the excerpt provides no content evidence of what the site actually was" is a full violation, not a careful sentence: the guess has been published and the qualifier merely records that you knew it was one. Delete the guess and keep the disclaimer.
+Never offer several possibilities at once. "Possible connections to fitness, productivity, entertainment, or educational content" is four guesses in one sentence and breaks this rule four times over.
+
+PLACEHOLDER AND PARKED CAPTURES
+A parking page, a domain-for-sale notice, a registrar or web-host default page, a "coming soon" splash and an error page are all genuine findings — and each is a finding about exactly one thing: the state of the domain at the moment of that capture. Report that and stop ("the final capture showed a parked-page placeholder rather than active content").
+Such a capture says nothing whatsoever about whatever the site may have been before it. What preceded a placeholder is unrecorded, and unrecorded is unknown. Holding a placeholder excerpt is NOT a licence to reconstruct the site that came before it, and it is not a lesser standard of evidence: THE EVIDENCE RULE applies to a placeholder capture exactly as it applies to a missing one. A page whose only evidence is a placeholder is a short page, and a short page is the correct output.
 """
 
 _SYSTEM_PROMPT_GROUNDED = """
@@ -247,7 +297,7 @@ A Wayback excerpt with real content is attached to this record. Write the FULL p
 
 1. `## ` heading: the domain name as plain text, nothing else. This is the H2.
 
-2. Lead paragraph (40-60 words): what the domain is, when it became available, one clause saying what the site was according to the excerpt, and DomainSifter's verdict.
+2. Lead paragraph (40-60 words): what the domain is, when it became available, one clause saying what the site was according to the excerpt, and DomainSifter's verdict. When the excerpt is a placeholder, that clause says the capture was a placeholder — it does not reach past it.
 
 3. `### Authority and historical presence`
    2-3 short paragraphs interpreting the Wayback snapshot count, the OpenPageRank score and the Common Crawl source-domain count in plain language, tying each number to what it means for someone considering registering this domain. Mix prose with the numbers rather than listing them. Keep the description of the site's content out of this subsection — it belongs in the next one.
@@ -256,14 +306,17 @@ A Wayback excerpt with real content is attached to this record. Write the FULL p
    1-2 paragraphs describing what the site WAS, grounded ONLY in the excerpt's title, meta_description, h1 and h2:
    - State the subject of the site directly, in the past tense, citing the title and meta description. Quote them where quoting is clearer than paraphrase.
    - Say what the h1 and h2 headings reveal about the site's structure or topical focus.
-   - When the title or meta description shows a parked page, a domain-for-sale notice, a generic placeholder or an error page, report that as the finding ("the final snapshot showed a parked-page placeholder rather than active content") and do not dress it up.
    - Do not extrapolate past the excerpt. If it shows a recipe index, the site had a recipe index; it does not follow that the site "also offered meal planning".
    - Note the date of the snapshot the excerpt came from, so a reader knows how current the description is.
+   - PLACEHOLDER CAPTURES. When the title or meta description shows a parked page, a domain-for-sale notice, a generic placeholder or an error page, that IS the whole of the finding: report it, date it, do not dress it up, and stop there. You have an excerpt but you do not have a site, and holding some evidence is never a licence to fill in around it. The name is still not evidence. Two or three sentences is the correct length for this section in that case.
 
 5. `### Why we labeled this {verdict}`
    2-3 sentences explaining the verdict in terms a domain buyer cares about, referencing the actual quantitative signals. For Clean, name the positive signals that justified the highest confidence. For Promising, name both the strengths and the limitations.
 
 6. Closing line: one sentence noting that the evaluation reflects the state on the dropped date, that availability changes quickly, and that the reader should verify the current status with a registrar.
+
+BEFORE YOU RETURN THE PAGE
+Reread sections 2 and 4. For every clause that states what the site was, name the excerpt field it came from. Any clause you cannot source comes out — with or without a hedge attached — and most especially one that echoes the words inside the domain name back at the reader. The 250-400 word target is a ceiling on padding, not a quota to fill: a page grounded in a thin or placeholder excerpt is correctly shorter, and shortening it is always the right way to resolve the conflict.
 """
 
 _SYSTEM_PROMPT_NO_EXCERPT = """
@@ -286,6 +339,9 @@ Write a SHORTER, purely factual page: 120-200 words of clean Markdown, sections 
    2 sentences grounding the verdict in the quantitative signals only, and acknowledging that the absence of retrievable content is itself a limitation on the evaluation.
 
 6. Closing line: one sentence noting that the evaluation reflects the state on the dropped date, that availability changes quickly, and that the reader should verify the current status with a registrar.
+
+BEFORE YOU RETURN THE PAGE
+Reread it for any clause that states, implies or hints at what the site was. There is no excerpt field any such clause could be sourced from, so every one of them comes out — with or without a hedge attached, and most especially one that echoes the words inside the domain name back at the reader. The 120-200 word target is a ceiling on padding, not a quota to fill: this page is allowed to be short, and it is allowed to say plainly that we do not know.
 """
 
 
@@ -395,7 +451,9 @@ def _build_user_message(record: dict, excerpt: dict | None = None) -> str:
     if grounded is not None:
         header = (
             f"{MODE_MARKER_GROUNDED} — this record has a Wayback excerpt. "
-            f"Describe what the site was using only that excerpt."
+            f"Describe what the site was using only that excerpt; if the "
+            f"excerpt is a parked or placeholder capture, that is the whole "
+            f"finding. Do not speculate from the domain name."
         )
     else:
         header = (

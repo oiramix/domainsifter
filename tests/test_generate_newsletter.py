@@ -19,7 +19,7 @@ from datetime import date
 from io import StringIO
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -64,7 +64,12 @@ def _domain(
 
 
 def _config(**overrides: Any) -> dict:
-    """Default-enabled newsletter config (override per-test)."""
+    """Default-enabled newsletter config (override per-test).
+
+    The two sidecar paths point at files that do not exist so unit tests
+    never read the repo's real src/data/*.json. Tests that want evidence
+    wired in write their own fixtures to tmp_path and override these keys.
+    """
     base = {
         "newsletter": {
             "enabled": True,
@@ -72,6 +77,8 @@ def _config(**overrides: Any) -> dict:
             "subject_template": "DomainSifter daily picks — {date}",
             "intro_text": "Intro text for testing.",
             "site_url": "https://domainsifter.com",
+            "sidecar_excerpts_path": "tests/__no_such_sidecar__.json",
+            "archive_index_path": "tests/__no_such_archive_index__.json",
         },
     }
     if overrides:
@@ -1112,3 +1119,821 @@ def test_main_returns_0_when_disabled(monkeypatch, tmp_path):
     monkeypatch.delenv("BUTTONDOWN_API_KEY", raising=False)
     rc = gn.main(["--config", str(cfg_path), "--input", str(input_path)])
     assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Evidence rendering (2026-09-19): phase2_reason, archived titles, deep
+# links, credibility line, featured/compact split, plain-text part.
+# ---------------------------------------------------------------------------
+
+
+# Hostile characters, spelled with chr() so this source file stays plain
+# ASCII — a literal bidi override in a test file is exactly the trap these
+# tests exist to guard against.
+BIDI_OVERRIDE = chr(0x202E)     # RIGHT-TO-LEFT OVERRIDE
+ISOLATE_START = chr(0x2066)     # LEFT-TO-RIGHT ISOLATE
+ISOLATE_END = chr(0x2069)       # POP DIRECTIONAL ISOLATE
+BELL = chr(0x07)                # C0 control
+NUL = chr(0x00)
+SOH = chr(0x01)
+ELLIPSIS = chr(0x2026)
+# "Tide tables and surf forecast", zh-CN — non-Latin archived titles are
+# common in the sidecar and must survive cleaning intact.
+CJK_TITLE = "".join(chr(c) for c in (0x6F6E, 0x6C50, 0x8868, 0x4E0E, 0x51B2,
+                                     0x6D6A, 0x9884, 0x62A5))
+
+
+def _excerpt(title: str | None, **extra: Any) -> dict:
+    """One wayback_excerpts.json sidecar entry."""
+    return {
+        "snapshot_timestamp": "20260309025947",
+        "snapshot_url": "http://web.archive.org/web/20260309025947/http://x/",
+        "title": title,
+        "meta_description": None,
+        "h1": [],
+        "h2": [],
+        **extra,
+    }
+
+
+# --- Untrusted text cleaning -------------------------------------------------
+
+
+def test_clean_untrusted_text_collapses_whitespace_and_newlines():
+    assert gn._clean_untrusted_text("  Tide   tables\n\nand surf  ", 100) == (
+        "Tide tables and surf"
+    )
+
+
+def test_clean_untrusted_text_strips_control_and_bidi_characters():
+    """Bidi overrides silently reorder the text printed AROUND them - in an
+    email that means an archived title could visually rewrite the domain
+    name beside it. Controls and the bidi family become spaces."""
+    hostile = f"safe{BIDI_OVERRIDE}txt.exe{BELL} title{ISOLATE_START}x{ISOLATE_END}"
+    out = gn._clean_untrusted_text(hostile, 200)
+    assert BIDI_OVERRIDE not in out
+    assert ISOLATE_START not in out
+    assert ISOLATE_END not in out
+    assert BELL not in out
+    assert "safe" in out and "title" in out
+
+
+def test_clean_untrusted_text_caps_length_including_ellipsis():
+    out = gn._clean_untrusted_text("x" * 5000, 120)
+    assert len(out) == 120
+    assert out.endswith(ELLIPSIS)
+
+
+def test_clean_untrusted_text_preserves_non_latin_scripts():
+    """Chinese/Thai/German titles are common in the sidecar and are real
+    content - cleaning must not mangle them."""
+    assert gn._clean_untrusted_text(CJK_TITLE, 100) == CJK_TITLE
+    assert gn._clean_untrusted_text("Größe Straße", 100) == (
+        "Größe Straße"
+    )
+
+
+def test_clean_untrusted_text_returns_none_for_junk():
+    assert gn._clean_untrusted_text(None, 100) is None
+    assert gn._clean_untrusted_text(123, 100) is None
+    assert gn._clean_untrusted_text("   ", 100) is None
+    assert gn._clean_untrusted_text(NUL + SOH, 100) is None
+
+
+# --- phase2_reason -----------------------------------------------------------
+
+
+def test_reason_text_returns_cleaned_reason():
+    d = _domain("a.org", 80)
+    d["phase2_reason"] = "clear compound word, brandable"
+    assert gn._reason_text(d) == "clear compound word, brandable"
+
+
+def test_reason_text_none_on_missing_null_and_junk():
+    """Null on mechanical-fallback days and pre-2026-09-19 carryover; the
+    render side does one None check for all of these."""
+    assert gn._reason_text(_domain("a.org", 80)) is None            # absent
+    assert gn._reason_text({"phase2_reason": None}) is None          # explicit null
+    assert gn._reason_text({"phase2_reason": "   "}) is None         # blank
+    assert gn._reason_text({"phase2_reason": 42}) is None            # junk type
+
+
+def test_reason_text_drops_ranker_placeholder():
+    """'missing from response' is a pipeline marker, not a justification."""
+    assert gn._reason_text({"phase2_reason": "missing from response"}) is None
+    assert gn._reason_text({"phase2_reason": "Missing From Response"}) is None
+
+
+def test_build_html_body_renders_reason_under_featured_pick():
+    d = _domain("marketglow.com", 80)
+    d["phase2_reason"] = "clear compound word, brandable and memorable"
+    body = gn.build_html_body([d], date(2026, 9, 19), "x", featured_n=1)
+    assert "clear compound word, brandable and memorable" in body
+
+
+def test_build_html_body_renders_reason_in_compact_row():
+    d = _domain("tideblock.io", 60)
+    d["phase2_reason"] = "short two-syllable tech name"
+    body = gn.build_html_body([d], date(2026, 9, 19), "x")  # featured_n=0
+    assert "short two-syllable tech name" in body
+
+
+def test_build_html_body_omits_reason_element_entirely_when_null():
+    """Missing reason must leave NO element behind - not an empty padded
+    div, not a dash. The row is simply one line shorter."""
+    with_reason = _domain("withreason.org", 80)
+    with_reason["phase2_reason"] = "brandable compound"
+    without = _domain("noreason.org", 80)
+    body_with = gn.build_html_body([with_reason], date(2026, 9, 19), "x")
+    body_without = gn.build_html_body([without], date(2026, 9, 19), "x")
+    # The secondary-line div only exists in the with-reason render.
+    assert "margin-top: 3px; font-size: 11px" in body_with
+    assert "margin-top: 3px; font-size: 11px" not in body_without
+
+
+def test_build_html_body_escapes_hostile_reason():
+    """phase2_reason is model output - treat it as untrusted too."""
+    d = _domain("a.org", 80)
+    d["phase2_reason"] = "<script>alert(1)</script>"
+    body = gn.build_html_body([d], date(2026, 9, 19), "x", featured_n=1)
+    assert "<script>" not in body
+    assert "&lt;script&gt;" in body
+
+
+# --- Wayback excerpt sidecar -------------------------------------------------
+
+
+def test_excerpt_title_returns_cleaned_title():
+    excerpts = {"marketglow.com": _excerpt("Celebrity net worth tracker")}
+    assert gn._excerpt_title(excerpts, "marketglow.com", 120) == (
+        "Celebrity net worth tracker"
+    )
+
+
+def test_excerpt_title_none_for_absent_null_entry_and_null_title():
+    """Three sidecar states, all rendering nothing: key absent, key present
+    but null (we looked, Wayback had nothing), title null/blank."""
+    excerpts = {"nulled.org": None, "notitle.org": _excerpt(None)}
+    assert gn._excerpt_title(excerpts, "absent.org", 120) is None
+    assert gn._excerpt_title(excerpts, "nulled.org", 120) is None
+    assert gn._excerpt_title(excerpts, "notitle.org", 120) is None
+    assert gn._excerpt_title(None, "anything.org", 120) is None
+
+
+def test_excerpt_title_ignores_corrupt_entry_type():
+    assert gn._excerpt_title({"a.org": "just a string"}, "a.org", 120) is None
+
+
+@pytest.mark.parametrize(
+    "junk",
+    ["Page not found", "404 Not Found", "Home", "Untitled", "Coming Soon",
+     "Welcome to nginx!", "page not found."],
+)
+def test_excerpt_title_drops_boilerplate_titles(junk):
+    """A capture that landed on a 404 or a parking page tells the reader
+    nothing about what the site WAS, and 'Archived page title: Page not
+    found' reads as filler on the one line that is supposed to be evidence."""
+    assert gn._excerpt_title({"a.org": _excerpt(junk)}, "a.org", 120) is None
+
+
+def test_excerpt_title_drops_title_that_is_just_the_domain():
+    assert gn._excerpt_title(
+        {"marketglow.com": _excerpt("marketglow.com")}, "marketglow.com", 120,
+    ) is None
+    assert gn._excerpt_title(
+        {"marketglow.com": _excerpt("MarketGlow")}, "marketglow.com", 120,
+    ) is None
+
+
+def test_excerpt_title_denylist_is_overridable():
+    """An empty denylist shows every title — the knob Mario can flip if the
+    built-in list ever eats something real."""
+    excerpts = {"a.org": _excerpt("Home")}
+    assert gn._excerpt_title(excerpts, "a.org", 120, frozenset()) == "Home"
+
+
+def test_generate_newsletter_honours_config_denylist_override():
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    # Config says "deny nothing" → the boilerplate title ships.
+    cfg = _config(excerpt_title_denylist=[])
+    monkey_excerpts = {"a.org": _excerpt("Home")}
+    with patch.object(gn, "_load_sidecar_excerpts", return_value=monkey_excerpts):
+        gn.generate_newsletter(
+            cfg, {"domains": [_domain("a.org", 80)]},
+            api_key="KEY", today=date(2026, 9, 19), session=session,
+        )
+    assert "Archived page title:" in captured["body"]
+    assert "Home" in captured["body"]
+
+
+def test_build_html_body_renders_archived_title_for_featured_pick():
+    excerpts = {"marketglow.com": _excerpt("Celebrity Net Worth Tracker")}
+    body = gn.build_html_body(
+        [_domain("marketglow.com", 80)], date(2026, 9, 19), "x",
+        featured_n=1, excerpts=excerpts,
+    )
+    assert "Archived page title:" in body
+    assert "Celebrity Net Worth Tracker" in body
+
+
+def test_build_html_body_renders_archived_title_in_compact_row():
+    excerpts = {"tideblock.io": _excerpt("Tide tables and surf reports")}
+    body = gn.build_html_body(
+        [_domain("tideblock.io", 60)], date(2026, 9, 19), "x", excerpts=excerpts,
+    )
+    assert "Tide tables and surf reports" in body
+    assert "was" in body
+
+
+def test_build_html_body_no_excerpt_section_when_sidecar_empty():
+    body = gn.build_html_body(
+        [_domain("a.org", 80)], date(2026, 9, 19), "x", featured_n=1, excerpts={},
+    )
+    assert "Archived page title" not in body
+
+
+def test_build_html_body_escapes_hostile_excerpt_title():
+    """Archived titles are third-party spam as often as real content:
+    script tags, quotes and attribute-breaking characters must not survive
+    as markup, and a 5000-char title must not blow out the layout."""
+    hostile = (
+        '<script>alert("x")</script>" style="display:none" '
+        + CJK_TITLE + f" {BIDI_OVERRIDE}evil " + "A" * 5000
+    )
+    excerpts = {"a.org": _excerpt(hostile)}
+    body = gn.build_html_body(
+        [_domain("a.org", 80)], date(2026, 9, 19), "x",
+        featured_n=1, excerpts=excerpts, excerpt_max_chars=120,
+    )
+    assert "<script>" not in body
+    assert "&lt;script&gt;" in body
+    # No raw double quote escapes the span; html.escape turns it into &quot;.
+    assert '" style="display:none"' not in body
+    # Bidi override stripped, CJK preserved, length capped.
+    assert BIDI_OVERRIDE not in body
+    assert CJK_TITLE in body
+    assert "A" * 200 not in body
+
+
+def test_build_html_body_caps_compact_excerpt_shorter_than_featured():
+    """Compact rows share one line with the reason, so their archived title
+    is cut shorter than a featured block's."""
+    excerpts = {"a.org": _excerpt("B" * 400)}
+    body = gn.build_html_body(
+        [_domain("a.org", 80)], date(2026, 9, 19), "x",
+        excerpts=excerpts, compact_excerpt_max_chars=40,
+    )
+    assert "B" * 39 in body
+    assert "B" * 41 not in body
+
+
+def test_load_sidecar_excerpts_missing_file_returns_empty(tmp_path):
+    assert gn._load_sidecar_excerpts(tmp_path / "nope.json") == {}
+
+
+def test_load_sidecar_excerpts_corrupt_json_returns_empty(tmp_path):
+    p = tmp_path / "excerpts.json"
+    p.write_text("{not json", encoding="utf-8")
+    assert gn._load_sidecar_excerpts(p) == {}
+
+
+def test_load_sidecar_excerpts_non_dict_returns_empty(tmp_path):
+    p = tmp_path / "excerpts.json"
+    p.write_text('["a.org"]', encoding="utf-8")
+    assert gn._load_sidecar_excerpts(p) == {}
+
+
+def test_load_sidecar_excerpts_reads_map(tmp_path):
+    p = tmp_path / "excerpts.json"
+    p.write_text(
+        json.dumps({"a.org": _excerpt("Some title"), "b.org": None}),
+        encoding="utf-8",
+    )
+    out = gn._load_sidecar_excerpts(p)
+    assert out["a.org"]["title"] == "Some title"
+    assert out["b.org"] is None
+
+
+# --- Deep links to per-domain pages ------------------------------------------
+
+
+def test_domain_url_deep_links_when_archived():
+    url = gn._domain_url(
+        "marketglow.com", "https://domainsifter.com", {"marketglow.com"},
+    )
+    assert url == "https://domainsifter.com/d/marketglow.com"
+
+
+def test_domain_url_falls_back_to_homepage_anchor_when_not_archived():
+    url = gn._domain_url(
+        "tideblock.io", "https://domainsifter.com", {"marketglow.com"},
+    )
+    assert url == "https://domainsifter.com/#drop-tideblock.io"
+
+
+def test_domain_url_falls_back_when_index_empty_or_none():
+    assert gn._domain_url("a.org", "https://s", set()).endswith("/#drop-a.org")
+    assert gn._domain_url("a.org", "https://s", None).endswith("/#drop-a.org")
+
+
+def test_domain_url_refuses_unsafe_name_even_if_in_index():
+    """Defence-in-depth: a name with characters that don't belong in a URL
+    path never becomes a deep link, even if the index lists it."""
+    bad = "evil<script>.org"
+    assert gn._domain_url(bad, "https://s", {bad}).startswith("https://s/#drop-")
+
+
+def test_build_html_body_uses_deep_link_only_for_archived_domains():
+    body = gn.build_html_body(
+        [_domain("marketglow.com", 80), _domain("tideblock.io", 70)],
+        date(2026, 9, 19), "x", archived_names={"marketglow.com"},
+    )
+    assert 'href="https://domainsifter.com/d/marketglow.com"' in body
+    assert 'href="https://domainsifter.com/#drop-tideblock.io"' in body
+    assert "/d/tideblock.io" not in body
+
+
+def test_load_archive_names_missing_file_returns_empty_set(tmp_path):
+    assert gn._load_archive_names(tmp_path / "nope.json") == set()
+
+
+def test_load_archive_names_reads_entry_names(tmp_path):
+    p = tmp_path / "archive-index.json"
+    p.write_text(
+        json.dumps({
+            "generated_at": "2026-09-19T00:00:00Z",
+            "entries": [
+                {"name": "marketglow.com", "score": 70},
+                {"name": "coppernest.org", "score": 65},
+                {"score": 60},            # nameless entry ignored
+                "junk",                   # non-dict ignored
+            ],
+        }),
+        encoding="utf-8",
+    )
+    assert gn._load_archive_names(p) == {"marketglow.com", "coppernest.org"}
+
+
+def test_load_archive_names_corrupt_or_shapeless_returns_empty(tmp_path):
+    bad_json = tmp_path / "a.json"
+    bad_json.write_text("{nope", encoding="utf-8")
+    assert gn._load_archive_names(bad_json) == set()
+    shapeless = tmp_path / "b.json"
+    shapeless.write_text(json.dumps({"generated_at": "x"}), encoding="utf-8")
+    assert gn._load_archive_names(shapeless) == set()
+
+
+# --- Featured / compact split ------------------------------------------------
+
+
+def test_build_html_body_splits_featured_and_compact():
+    domains = [_domain(f"d{i:02d}.org", 100 - i) for i in range(20)]
+    body = gn.build_html_body(domains, date(2026, 9, 19), "x", featured_n=3)
+    assert "Today's top 3" in body
+    assert "The rest of today's picks" in body
+    # 17 compact rows (one ds-register-cell <td> each) + 1 <th> header.
+    assert body.count('td class="ds-register-cell"') == 17
+    assert body.count('th class="ds-register-cell"') == 1
+    # Featured picks render their own logo strips: 3 blocks x 3 logos.
+    assert body.count("registrar-logos/") == 20 * 3
+
+
+def test_build_html_body_featured_zero_keeps_plain_table():
+    """The renderer's default is the old table - production passes
+    config.newsletter.featured_n explicitly."""
+    domains = [_domain(f"d{i}.org", 100 - i) for i in range(5)]
+    body = gn.build_html_body(domains, date(2026, 9, 19), "x")
+    assert "Today's top" not in body
+    assert body.count('td class="ds-register-cell"') == 5
+
+
+def test_build_html_body_all_featured_drops_empty_table():
+    """featured_n >= len(domains) - no lone table header floating below."""
+    domains = [_domain("a.org", 80), _domain("b.org", 70)]
+    body = gn.build_html_body(domains, date(2026, 9, 19), "x", featured_n=3)
+    assert "Today's top 2" in body
+    assert "<th " not in body
+    assert "a.org" in body and "b.org" in body
+
+
+def test_build_html_body_featured_block_shows_signals():
+    body = gn.build_html_body(
+        [_domain("a.org", 80, wayback=766, opr=1.42, backlinks=3818)],
+        date(2026, 9, 19), "x", featured_n=1,
+    )
+    assert "Wayback 766" in body
+    assert "OPR 1.4" in body
+    assert "Backlinks 3,818" in body
+    assert "Score 80" in body
+
+
+def test_build_html_body_under_gmail_clip_limit_with_featured_and_evidence():
+    """Byte-budget regression with the richest realistic payload: 20 domains,
+    3 featured, a reason on every pick and a long archived title on every
+    pick. Gmail clips over ~102 KB."""
+    domains = []
+    excerpts = {}
+    for i in range(20):
+        d = _domain(f"sample{i:02d}.org", 80 - i)
+        d["phase2_reason"] = "clear compound word, brandable and memorable"
+        domains.append(d)
+        excerpts[d["name"]] = _excerpt(
+            "An archived page title of realistic length " * 3
+        )
+    body = gn.build_html_body(
+        domains, date(2026, 9, 19), "Intro paragraph for the byte budget test.",
+        featured_n=3, excerpts=excerpts,
+        archived_names={d["name"] for d in domains},
+        provenance="Evaluated 222,155 candidates today; 270 made the published "
+                   "list, 56 of them dropped today. The 20 below are the "
+                   "highest-scoring of those fresh drops.",
+    )
+    size = len(body.encode("utf-8"))
+    assert size < 90_000, f"Body is {size} bytes; the ceiling is 90 KB."
+
+
+# --- Credibility line --------------------------------------------------------
+
+
+def _stats_payload(**overrides: Any) -> dict:
+    base = {
+        "total_candidates_evaluated": 222155,
+        "domain_count": 270,
+        "today_count": 56,
+        "carryover_count": 214,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_credibility_line_uses_only_payload_numbers():
+    import re
+
+    line = gn.credibility_line(_stats_payload(), 20)
+    assert "222,155" in line
+    assert "270" in line
+    assert "56" in line
+    assert "20" in line
+    # Nothing invented: every digit group in the sentence is one of the four.
+    numbers = {n.replace(",", "") for n in re.findall(r"\d[\d,]*", line)}
+    assert numbers == {"222155", "270", "56", "20"}
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["total_candidates_evaluated", "domain_count", "today_count"],
+)
+def test_credibility_line_omitted_when_any_field_missing(missing):
+    """Hard rule 2: an email with no provenance line is fine; an email with
+    a guessed one is not."""
+    payload = _stats_payload()
+    del payload[missing]
+    assert gn.credibility_line(payload, 20) is None
+
+
+@pytest.mark.parametrize("bad", [None, "1000", 12.5, True, -5])
+def test_credibility_line_omitted_for_non_integer_counts(bad):
+    assert gn.credibility_line(_stats_payload(domain_count=bad), 20) is None
+
+
+def test_credibility_line_omitted_when_no_picks():
+    assert gn.credibility_line(_stats_payload(), 0) is None
+
+
+def test_build_html_body_renders_provenance_line_when_given():
+    body = gn.build_html_body(
+        [_domain("a.org", 80)], date(2026, 9, 19), "x",
+        provenance="Evaluated 222,155 candidates today.",
+    )
+    assert "Evaluated 222,155 candidates today." in body
+
+
+def test_build_html_body_omits_provenance_paragraph_when_none():
+    body = gn.build_html_body([_domain("a.org", 80)], date(2026, 9, 19), "x")
+    assert "Evaluated" not in body
+
+
+def test_generate_newsletter_omits_credibility_line_when_payload_lacks_counts():
+    """End-to-end: a payload with domains but no top-level counts (sample
+    data, legacy JSON) ships without the line rather than with a guess."""
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    gn.generate_newsletter(
+        _config(), {"domains": [_domain("a.org", 80)]},
+        api_key="KEY", today=date(2026, 9, 19), session=session,
+    )
+    assert "Evaluated" not in captured["body"]
+    assert "made the published list" not in captured["body"]
+
+
+def test_generate_newsletter_includes_credibility_line_with_real_counts():
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    payload = _stats_payload()
+    payload["domains"] = [_domain("a.org", 80), _domain("b.org", 70)]
+    gn.generate_newsletter(
+        _config(), payload,
+        api_key="KEY", today=date(2026, 9, 19), session=session,
+    )
+    assert "Evaluated 222,155 candidates today" in captured["body"]
+    assert "270 made the published list" in captured["body"]
+    assert "56 of them dropped today" in captured["body"]
+    assert "The 2 below" in captured["body"]
+
+
+# --- Plain-text alternative part ---------------------------------------------
+
+
+def test_build_text_body_contains_every_pick():
+    domains = [_domain(f"d{i:02d}.org", 100 - i) for i in range(20)]
+    text = gn.build_text_body(domains, date(2026, 9, 19), "Intro.", featured_n=3)
+    for d in domains:
+        assert d["name"] in text
+    assert "<" not in text and ">" not in text  # not stripped HTML
+
+
+def test_build_text_body_carries_evidence_and_unsubscribe():
+    d = _domain("marketglow.com", 80)
+    d["phase2_reason"] = "clear compound word, brandable"
+    text = gn.build_text_body(
+        [d], date(2026, 9, 19), "Intro.",
+        featured_n=1,
+        excerpts={"marketglow.com": _excerpt("Celebrity Net Worth Tracker")},
+        archived_names={"marketglow.com"},
+        provenance="Evaluated 222,155 candidates today.",
+    )
+    assert "DomainSifter daily picks" in text
+    assert "September 19, 2026" in text
+    assert "Evaluated 222,155 candidates today." in text
+    assert "clear compound word, brandable" in text
+    assert 'Archived page title: "Celebrity Net Worth Tracker"' in text
+    assert "https://domainsifter.com/d/marketglow.com" in text
+    assert "{{ unsubscribe_url }}" in text
+
+
+def test_build_text_body_cleans_hostile_excerpt():
+    """Same untrusted-text handling as the HTML part: capped, control and
+    bidi characters gone, and never a newline that could fake a new pick."""
+    hostile = f"line1\nline2{BIDI_OVERRIDE} " + "C" * 5000
+    text = gn.build_text_body(
+        [_domain("a.org", 80)], date(2026, 9, 19), "Intro.",
+        featured_n=1, excerpts={"a.org": _excerpt(hostile)},
+        excerpt_max_chars=100,
+    )
+    title_lines = [l for l in text.splitlines() if "Archived page title" in l]
+    assert len(title_lines) == 1
+    assert BIDI_OVERRIDE not in title_lines[0]
+    assert len(title_lines[0]) < 160
+    assert "line1 line2" in title_lines[0]
+
+
+def test_build_text_body_has_no_registrar_tracking_urls():
+    """The text part deliberately carries no affiliate URLs - 60 tracking
+    links would dominate it and raise URL-density spam signals."""
+    text = gn.build_text_body(
+        [_domain("a.org", 80)], date(2026, 9, 19), "Intro.", featured_n=1,
+    )
+    assert "utm_source" not in text
+    assert "namecheap" not in text.lower()
+
+
+def test_build_text_body_omits_missing_reason_and_title_lines():
+    text = gn.build_text_body(
+        [_domain("bare.org", 80)], date(2026, 9, 19), "Intro.", featured_n=1,
+    )
+    assert "Archived page title" not in text
+    body_section = text.split("TODAY'S TOP")[1].split("Full daily list")[0]
+    assert "—" not in body_section
+
+
+def test_generate_newsletter_returns_text_body_in_dry_run():
+    out = gn.generate_newsletter(
+        _config(), {"domains": [_domain("a.org", 80)]},
+        api_key="KEY", today=date(2026, 9, 19), dry_run=True,
+    )
+    assert out["status"] == "dry_run"
+    assert "a.org" in out["text_body"]
+    assert out["text_chars"] > 0
+
+
+def test_create_draft_omits_plaintext_field_by_default():
+    """Unconfigured - byte-identical payload to the pre-2026-09-19 one."""
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["json"] = json
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "x"}
+        return resp
+
+    session = MagicMock()
+    session.post.side_effect = post_capture
+    gn._create_draft("KEY", "S", "<html>", text_body="plain text", session=session)
+    assert set(captured["json"]) == {"subject", "body", "status"}
+
+
+def test_create_draft_sends_plaintext_field_when_configured():
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["json"] = json
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "x"}
+        return resp
+
+    session = MagicMock()
+    session.post.side_effect = post_capture
+    gn._create_draft(
+        "KEY", "S", "<html>",
+        text_body="plain text", plaintext_field="body_plaintext",
+        session=session,
+    )
+    assert captured["json"]["body_plaintext"] == "plain text"
+
+
+def test_create_draft_retries_without_plaintext_field_on_4xx():
+    """A wrong field name must degrade to the old payload, not cost the
+    draft - the send is the point, the text part is the bonus."""
+    calls: list[dict] = []
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        calls.append(dict(json))  # copy: the retry mutates the same dict
+        resp = MagicMock()
+        if len(calls) == 1:
+            resp.status_code = 422
+            resp.text = "unknown field"
+        else:
+            resp.status_code = 201
+            resp.json.return_value = {"id": "recovered"}
+        return resp
+
+    session = MagicMock()
+    session.post.side_effect = post_capture
+    out = gn._create_draft(
+        "KEY", "S", "<html>",
+        text_body="plain text", plaintext_field="wrong_field",
+        session=session,
+    )
+    assert out["id"] == "recovered"
+    assert "wrong_field" in calls[0]
+    assert "wrong_field" not in calls[1]
+
+
+def test_create_draft_does_not_retry_on_5xx():
+    """A server error is not a payload problem; retrying without the field
+    would just double the load on a struggling API."""
+    session = _fake_session([
+        {"method": "POST", "status": 500, "json": None, "text": "boom"},
+    ])
+    with pytest.raises(gn.ButtondownError, match="HTTP 500"):
+        gn._create_draft(
+            "KEY", "S", "<html>",
+            text_body="plain", plaintext_field="body_plaintext",
+            session=session,
+        )
+
+
+# --- End-to-end evidence wiring ---------------------------------------------
+
+
+def test_generate_newsletter_wires_sidecars_from_config(tmp_path):
+    """Config-supplied sidecar paths are read, and their content reaches the
+    draft body: archived title + deep link for the domain that has both."""
+    excerpts_path = tmp_path / "wayback_excerpts.json"
+    excerpts_path.write_text(
+        json.dumps({"marketglow.com": _excerpt("Celebrity Net Worth Tracker")}),
+        encoding="utf-8",
+    )
+    index_path = tmp_path / "archive-index.json"
+    index_path.write_text(
+        json.dumps({"entries": [{"name": "marketglow.com"}]}), encoding="utf-8",
+    )
+
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+
+    cfg = _config(
+        featured_n=1,
+        sidecar_excerpts_path=str(excerpts_path),
+        archive_index_path=str(index_path),
+    )
+    first = _domain("marketglow.com", 90)
+    first["phase2_reason"] = "clear compound word, brandable"
+    out = gn.generate_newsletter(
+        cfg, {"domains": [first, _domain("tideblock.io", 70)]},
+        api_key="KEY", today=date(2026, 9, 19), session=session,
+    )
+    assert out["status"] == "created"
+    assert "Celebrity Net Worth Tracker" in captured["body"]
+    assert "clear compound word, brandable" in captured["body"]
+    assert 'href="https://domainsifter.com/d/marketglow.com"' in captured["body"]
+    assert "/d/tideblock.io" not in captured["body"]
+
+
+def test_generate_newsletter_survives_missing_sidecars(tmp_path):
+    """Both sidecars absent - draft still created, just without archived
+    titles and deep links. Evidence is never worth losing a send over."""
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+        {"method": "POST", "status": 201, "json": {"id": "id", "subject": "s"}},
+    ])
+    cfg = _config(
+        sidecar_excerpts_path=str(tmp_path / "missing_excerpts.json"),
+        archive_index_path=str(tmp_path / "missing_index.json"),
+    )
+    out = gn.generate_newsletter(
+        cfg, {"domains": [_domain("a.org", 80)]},
+        api_key="KEY", today=date(2026, 9, 19), session=session,
+    )
+    assert out["status"] == "created"
+
+
+def test_generate_newsletter_idempotency_unaffected_by_evidence(tmp_path):
+    """The 2026-09-19 evidence work must not touch the same-day skip: a
+    matching subject still short-circuits before any POST."""
+    excerpts_path = tmp_path / "wayback_excerpts.json"
+    excerpts_path.write_text(
+        json.dumps({"a.org": _excerpt("Some archived title")}), encoding="utf-8",
+    )
+    subject = "DomainSifter daily picks — September 19, 2026"
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {
+            "results": [{"id": "existing", "subject": subject}], "next": None,
+        }},
+    ])
+    cfg = _config(featured_n=3, sidecar_excerpts_path=str(excerpts_path))
+    out = gn.generate_newsletter(
+        cfg, {"domains": [_domain("a.org", 80)]},
+        api_key="KEY", today=date(2026, 9, 19), session=session,
+    )
+    assert out["status"] == "skipped_duplicate"
+    assert out["id"] == "existing"
+    session.post.assert_not_called()
+
+
+def test_main_dry_run_text_flag_prints_plain_text(tmp_path, capsys):
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(_config(featured_n=1)), encoding="utf-8")
+    input_path = tmp_path / "daily.json"
+    input_path.write_text(
+        json.dumps({"domains": [_domain("a.org", 80)]}), encoding="utf-8",
+    )
+    rc = gn.main([
+        "--config", str(cfg_path), "--input", str(input_path),
+        "--dry-run", "--text",
+    ])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "<!DOCTYPE html>" not in out
+    assert "a.org" in out
+    assert "{{ unsubscribe_url }}" in out
