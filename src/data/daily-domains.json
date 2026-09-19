@@ -1,83 +1,9 @@
 {
   "generated_at": "2026-09-19T14:07:53Z",
-  "domain_count": 270,
-  "today_count": 56,
+  "domain_count": 268,
+  "today_count": 54,
   "carryover_count": 214,
   "domains": [
-    {
-      "name": "languageidentifier.com",
-      "tld": "com",
-      "dropped_date": "2026-09-19",
-      "wayback_snapshots": 766,
-      "wayback_last_snapshot": "2026-06-21",
-      "open_page_rank": 1.42,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 66,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlanguageidentifier.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=languageidentifier.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=languageidentifier.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-19T10:08:49Z",
-      "first_seen_date": "2026-09-19",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 0,
-      "cc_source_domain_count": 3818,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v2"
-    },
-    {
-      "name": "thegreenseason.org",
-      "tld": "org",
-      "dropped_date": "2026-09-19",
-      "wayback_snapshots": 2165,
-      "wayback_last_snapshot": "2024-07-18",
-      "open_page_rank": 1.37,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 61,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dthegreenseason.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=thegreenseason.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=thegreenseason.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-19T10:10:20Z",
-      "first_seen_date": "2026-09-19",
-      "last_validated_date": "2026-09-19",
-      "days_listed": 0,
-      "cc_source_domain_count": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v2"
-    },
     {
       "name": "ondansetronzofran.com",
       "tld": "com",
