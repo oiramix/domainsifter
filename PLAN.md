@@ -261,6 +261,11 @@ The Astro site reads src/data/daily-domains.json. The pipeline writes that file.
 "previous_registrar": "GoDaddy",
 "score": 78,
 "cc_source_domain_count": 247,
+"cc_backlink_history": [
+  {"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 247},
+  {"release": "cc-main-2026-may-jun-jul", "source_domain_count": 310},
+  {"release": "cc-main-2026-apr-may-jun", "source_domain_count": null}
+],
 "affiliate_link": "https://..."
 }
 ]
@@ -274,6 +279,9 @@ Field additions are append-only — any new key that the pipeline starts emittin
 - 2026-04-28 evening: added top-level `total_candidates_evaluated`.
 - 2026-04-30: added `first_seen_date` / `last_validated_date` / `days_listed` plus top-level `today_count` / `carryover_count` for the 14-day persistent rolling list.
 - 2026-05-14: added per-domain `cc_source_domain_count` (Common Crawl backlinks). Integer = count of distinct source domains observed linking to this apex in the latest CC release; null = the apex isn't in that release's graph. Older payloads and the preview/sample fallback may omit the key entirely.
+- 2026-09-20: added per-domain `cc_backlink_history`. A list, **newest release first**, of `{"release": str, "source_domain_count": int | null}` — one entry per monthly Common Crawl release we hold a derived SQLite for. `source_domain_count: null` means the apex is not in THAT release's graph at all, and stays deliberately distinct from `0` (in the graph, zero inbound source domains) — the same three-state design as `cc_source_domain_count`. The whole field is null when the feature is off, when the enricher failed, for carryover rows written before this date, or when the enricher returns a shape that does not validate (validation is all-or-nothing — never a partially built list). Consumers treat null as "no history available" and render nothing; it is NEVER backfilled with invented numbers (hard rule 2).
+  **Display-only, and that is a load-bearing property**: the field feeds no filter, no score and no verdict, and `cc_source_domain_count` keeps its exact prior meaning (the value from `latest_release`) and its 0.30 scoring weight. Adding history to a candidate leaves its score, verdict and published position byte-identical — pinned by regression tests in `tests/test_output.py`. Scoring on backlink decay is a separate, later decision that wants observed history to calibrate against.
+  Caveat any consumer must respect: Common Crawl releases are **rolling 3-month windows** published monthly, so consecutive entries share two of their three months and are NOT independent observations. Render the shape of the data, not a confident trend statistic. See STRATEGIC_NOTES.md `Common Crawl backlink history`.
 
 ### Principle 6: Spam check is named generically
 

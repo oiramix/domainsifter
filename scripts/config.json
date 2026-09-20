@@ -126,7 +126,15 @@
     "staleness_warn_days": 45,
     "result_path": "scripts/state/cc_refresh_result.json"
   },
-    "r2_raw_key_template_vertices": "cc/raw/{release}/vertices.txt.gz",
+    "history": {
+    "_doc": "Multi-release backlink history, added 2026-09-20. Answers the question Strategy A could not: what did this domain look like across the LAST SEVERAL Common Crawl releases, not just the newest one. Before this, R2 accumulated one derived SQLite per month forever and the pipeline read exactly one of them, so the archive was inert. DISPLAY ONLY at this stage - the history is emitted into daily-domains.json and rendered on the site, and it deliberately does NOT feed scoring. cc_source_domain_count keeps its existing meaning and weight (0.30) and its value is taken from latest_release exactly as before, so this change CANNOT move the published list or its ordering. Adding a decay signal to scoring_weights is a separate, later decision that wants real observed history to calibrate against - per the STRATEGIC_NOTES.md principle of proving the cheap thing before building the expensive thing around it.",
+    "enabled": true,
+    "_doc_window": "Releases are AUTO-DISCOVERED by listing cc/derived/ in R2 and sorting newest-first, then truncated to max_releases. There is deliberately no hand-maintained list of releases here: a manual list is exactly the kind of step that went four months un-updated and caused this whole work item. A newly-installed release therefore joins the history window on its own with no config edit. max_releases is the single lever that bounds LOCAL DISK: each cached derived SQLite is ~6 GB, so 6 releases is ~36 GB against the 467 GB volume, and the window grows by one release (~6 GB) per month until it hits this cap. Raise it deliberately, after checking free space. IMPORTANT for anyone reading a trend off this: consecutive monthly releases are ROLLING 3-MONTH WINDOWS and share two of their three months, so adjacent entries are NOT independent observations - at max_releases 6 there are only about two independent 3-month samples. Fine to display; do not fit a confident decay line to it. See STRATEGIC_NOTES.md `Common Crawl backlink history`.",
+    "max_releases": 6,
+    "_doc_prewarm": "Each release in the window must be present in the local cache BEFORE the 09:00 UTC pipeline needs it, or the first run after a new release lands would download ~6 GB inline during enrichment. The refresh path pre-warms the whole window right after a successful install (the same trick the in-R2 verification already uses for the active release), and `python -m scripts.cc_refresh --prewarm-history` does it on demand. Pre-warming is also why prune_local_cache must keep the WHOLE window and not just latest_release - pruning to the active release alone would delete the archive cache on every install and force a 30 GB re-download on the next run.",
+    "prewarm_on_refresh": true
+  },
+  "r2_raw_key_template_vertices": "cc/raw/{release}/vertices.txt.gz",
     "r2_raw_key_template_edges": "cc/raw/{release}/edges.txt.gz",
     "r2_derived_key_template": "cc/derived/{release}.sqlite",
     "source_url_template": "https://data.commoncrawl.org/projects/hyperlinkgraph/{release}/domain/{release}-domain-{file}.txt.gz"

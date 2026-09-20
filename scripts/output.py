@@ -24,6 +24,22 @@ PLAN.md Principle 5 with three schema migrations applied:
     writer didn't know the count: every pre-2026-09-19 carryover file, any
     caller that omits it, sample data. Consumers must treat absence as
     "unknown" and say nothing rather than render a zero.
+  - 2026-09-20: added `cc_backlink_history` per-domain field — a list,
+    NEWEST RELEASE FIRST, of {"release": str, "source_domain_count":
+    int | None} for each monthly Common Crawl release we hold a derived
+    SQLite for. R2 has held several releases for months but the pipeline
+    only ever read the newest one, so the archive was inert; this exposes
+    it. `source_domain_count: null` means "the apex is not in THAT
+    release's graph at all" and stays deliberately distinct from `0`
+    ("in the graph, zero inbound source domains") — the same three-state
+    design as `cc_source_domain_count`. The field is DISPLAY-ONLY: it
+    feeds no filter, no score and no verdict, and `cc_source_domain_count`
+    keeps its exact prior meaning (latest release) and 0.30 scoring
+    weight. Null whenever the feature is off, the enricher failed, or the
+    entry is pre-2026-09-20 carryover; also null (never partially built)
+    when the enricher hands us a shape that doesn't validate. Consumers
+    must treat null as "no history available" and render nothing — it is
+    never backfilled with invented numbers.
   - 2026-05-17: added `verdict` per-domain field ("Clean"/"Promising"/
     "Caution"). Previously computed client-side from score alone in
     DomainTable.astro and generate_newsletter.py; the new tightened
@@ -48,6 +64,12 @@ Output shape:
                 "open_page_rank": 3.7, "cert_history": true,
                 "previous_registrar": "GoDaddy", "score": 78,
                 "cc_source_domain_count": 247, "verdict": "Clean",
+                "cc_backlink_history": [                  # OPTIONAL, newest first
+                    {"release": "cc-main-2026-jun-jul-aug",
+                     "source_domain_count": 247},
+                    {"release": "cc-main-2026-may-jun-jul",
+                     "source_domain_count": null}    # not in that graph
+                ],
                 "registrars": [{"name": "Namecheap", "url": "https://..."}, ...]
             }
         ]
@@ -122,6 +144,13 @@ CONTRACT_FIELDS = (
     # NOT added to _ENRICHMENT_FIELDS_FOR_COMPLETENESS — absence from the CC
     # graph is informational, not a quality deficit.
     "cc_source_domain_count",
+    # Common Crawl backlink history (added 2026-09-20). Newest-release-first
+    # list of {"release": str, "source_domain_count": int | None} across the
+    # monthly CC releases we hold; null when unavailable. DISPLAY ONLY — no
+    # filter, score or verdict reads it. Like cc_source_domain_count it is
+    # deliberately NOT in _ENRICHMENT_FIELDS_FOR_COMPLETENESS: a domain that
+    # predates our CC archive isn't a lower-quality domain.
+    "cc_backlink_history",
     # Server-computed verdict (added 2026-05-17). See `_compute_verdict`.
     "verdict",
     # Wayback-unknown flag + carryover age counter (added 2026-05-17).
@@ -267,6 +296,74 @@ def _phase2_reason(candidate: dict) -> str | None:
     return text
 
 
+def _cc_backlink_history(candidate: dict) -> list[dict] | None:
+    """Return a validated, JSON-safe backlink history, or None.
+
+    The enricher (scripts/enrichment/cc_backlinks.py) fails soft, so what
+    lands here can be anything: absent, None, a truncated list, junk from a
+    half-written cache. This coerces to exactly the documented shape —
+    a list of {"release": <non-empty str>, "source_domain_count": <int|None>},
+    newest first, order preserved — and returns None if ANY part of it does
+    not fit.
+
+    All-or-nothing on purpose: a partially-built history would let the site
+    render "247 → (gap) → 310" as if the gap were a missing month rather
+    than our own parse failure. None means "no history available", which the
+    frontend already has to handle (feature disabled, enricher down,
+    pre-2026-09-20 carryover). It is never backfilled with invented values.
+
+    `source_domain_count: None` ("apex absent from that release's graph") is
+    preserved as None and never coerced to 0 ("in the graph, no inbound
+    edges") — the three-state distinction is the whole point of the field.
+
+    Because the returned values are only str / int / None, the projected
+    field cannot make json.dump fail (hard rule 17: invalid JSON output is
+    a crash-worthy error, so the safe failure mode is to omit the field).
+    """
+    raw = candidate.get("cc_backlink_history")
+    if raw is None:
+        return None
+
+    def _reject(reason: str) -> None:
+        # One line per candidate, not per entry — a broken enricher would
+        # otherwise flood the Actions log with hundreds of identical warnings.
+        logger.warning(
+            "Dropping malformed cc_backlink_history for %s: %s",
+            candidate.get("name", "<unnamed>"),
+            reason,
+        )
+
+    if not isinstance(raw, list):
+        _reject(f"expected list, got {type(raw).__name__}")
+        return None
+
+    cleaned: list[dict] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            _reject(f"entry is {type(entry).__name__}, not a dict")
+            return None
+        release = entry.get("release")
+        if not isinstance(release, str) or not release.strip():
+            _reject("entry has a missing or non-string 'release'")
+            return None
+        count = entry.get("source_domain_count")
+        # bool is an int subclass; True/False is never a domain count.
+        if count is not None and (isinstance(count, bool) or not isinstance(count, int)):
+            _reject(
+                "entry %r has a non-integer 'source_domain_count' (%s)"
+                % (release, type(count).__name__)
+            )
+            return None
+        if count is not None and count < 0:
+            _reject(f"entry {release!r} has a negative 'source_domain_count'")
+            return None
+        cleaned.append({"release": release.strip(), "source_domain_count": count})
+
+    # An empty list carries no more information than "no history" and would
+    # make the frontend render an empty chart, so normalise it to None.
+    return cleaned or None
+
+
 def _project(candidate: dict, registrars_config: list[dict], config: dict) -> dict:
     name = candidate.get("name", "")
     return {
@@ -290,6 +387,8 @@ def _project(candidate: dict, registrars_config: list[dict], config: dict) -> di
         "last_validated_date": candidate.get("last_validated_date"),
         "days_listed": candidate.get("days_listed", 0),
         "cc_source_domain_count": candidate.get("cc_source_domain_count"),
+        # Display-only history; deliberately NOT an input to anything below.
+        "cc_backlink_history": _cc_backlink_history(candidate),
         "verdict": _compute_verdict(candidate, config),
         "wayback_unknown": bool(candidate.get("wayback_unknown")) or None,
         "wayback_unknown_attempts": (

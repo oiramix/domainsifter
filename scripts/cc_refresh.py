@@ -33,9 +33,39 @@ rebuild the derived SQLite, is free to re-download from
 data.commoncrawl.org, and is never read by the pipeline. The derived
 SQLite is NEVER deleted by this code at any config value: it is the
 durable asset and the only way a future multi-release strategy or a
-backlink-trend signal could look backwards. The local
-~/.cache/domainsifter/cc/ copy is pruned to the active release because
-6.6 GB per monthly release fills the box otherwise.
+backlink-trend signal could look backwards.
+
+LOCAL CACHE RETENTION, REVISED (2026-09-20, same day): the local
+~/.cache/domainsifter/cc/ copy is pruned to the active release PLUS the
+whole `cc_backlinks.history` window, not to the active release alone.
+The original rule predated the history window and became actively
+harmful the moment the pipeline started reading more than one release:
+every install would have deleted the entire archive cache and the next
+09:00 run would have re-downloaded the whole window inline during
+enrichment. When `history.enabled` is false the rule collapses back to
+"keep the active release only", so turning the feature off also reclaims
+the disk. If the window cannot be computed for ANY reason — R2 listing
+error, the enricher not importable, an empty answer — the pruner keeps
+EVERY cached file and logs a warning. The asymmetry is deliberate: a
+wrong deletion costs a ~6 GB (or, on a cold window, ~30 GB) re-download
+inside the daily run, a skipped deletion costs some disk on a 467 GB
+volume.
+
+PRE-WARM (2026-09-20): after a successful install — verification passed,
+config swapped — `--auto` calls `cc_backlinks.ensure_history_cached` so
+every release in the window is on local disk BEFORE the 09:00 pipeline
+asks for it, gated on `history.prewarm_on_refresh`. This is the same
+trick in-R2 verification already plays for the active release. Pre-warm
+runs BEFORE the local-cache prune, so the prune sees the files the window
+wants and cannot race the download. A pre-warm failure is NON-FATAL and
+never undoes the install: the release is verified and installed by that
+point, and a cold cache only costs time on the next run. The result file
+records `prewarmed_releases`. `--prewarm-history` does the same warming
+on demand and nothing else.
+
+    Disk arithmetic: ~6 GB per cached derived release, so the default
+    `history.max_releases: 6` is ~36 GB of local cache, and the window
+    grows ~6 GB/month as new releases land until it hits that cap.
 
 CLI usage:
 
@@ -60,8 +90,14 @@ CLI usage:
     # What does CC have right now? (two HEADs; no R2 credentials needed.)
     python -m scripts.cc_refresh --discover-only
 
-    # The automated path: discover → build → verify → swap config → prune.
+    # The automated path: discover → build → verify → swap config →
+    # pre-warm the history window → prune.
     python -m scripts.cc_refresh --auto
+
+    # Download the whole history window into the local cache and exit.
+    # No discovery, no build, no config change, no git. Use it to warm a
+    # cold box by hand before the next 09:00 run.
+    python -m scripts.cc_refresh --prewarm-history
 
 `--auto` exit codes — the shell wrapper and the systemd unit depend on
 these, so they are part of the contract:
@@ -340,6 +376,15 @@ def _cc_config(config: dict) -> dict:
 
 def _refresh_config(config: dict) -> dict:
     return _cc_config(config).get("refresh", {}) or {}
+
+
+def _history_config(config: dict) -> dict:
+    """The `cc_backlinks.history` block — display-only multi-release window.
+
+    Absent block means the feature is off, which is why every read of it
+    defaults to False/0 rather than to a built-in window size.
+    """
+    return _cc_config(config).get("history", {}) or {}
 
 
 def _load_config(config_path: str | Path | None = None) -> dict:
@@ -1314,15 +1359,126 @@ def prune_raw_releases(
     return deleted
 
 
-def prune_local_cache(config: dict, keep_release: str) -> list[str]:
-    """Delete every cached *.sqlite except `keep_release`'s.
+def _history_window(
+    config: dict,
+    *,
+    s3_client=None,
+    bucket: str | None = None,
+) -> list[str] | None:
+    """The releases the pipeline wants cached, newest first.
+
+    Returns None when the window CANNOT be determined — history disabled,
+    the enricher not importable, an R2 listing error, or an empty answer.
+    None means "we do not know", and every caller must treat that as a
+    reason to keep data rather than to delete it.
+
+    The import is lazy (like the `from scripts import diff` imports
+    elsewhere in this module) so a circular import between the refresh tool
+    and the enricher can never bite at module load time.
+    """
+    if not _history_config(config).get("enabled", False):
+        return None
+    try:
+        from scripts.enrichment import cc_backlinks
+
+        window = cc_backlinks.history_window_releases(
+            config, s3_client=s3_client, bucket=bucket,
+        )
+    except Exception as exc:
+        logger.warning("Could not compute the CC history window: %s", exc)
+        return None
+    names = [str(r) for r in (window or []) if r]
+    if not names:
+        logger.warning("The CC history window came back empty")
+        return None
+    return names
+
+
+def _local_cache_keep_set(
+    config: dict,
+    keep_release: str,
+    *,
+    s3_client=None,
+    bucket: str | None = None,
+) -> set[str] | None:
+    """Release names whose cached SQLite must survive a local prune.
+
+    None means "keep everything" — returned whenever the history window is
+    enabled but unknowable. When `history.enabled` is false the answer
+    collapses to just `keep_release`, so disabling the feature also
+    reclaims the ~6 GB per archived release.
+    """
+    history = _history_config(config)
+    keep = {keep_release} if keep_release else set()
+    if not history.get("enabled", False):
+        logger.info(
+            "History window disabled; local cache keeps only %s",
+            keep_release or "(nothing)",
+        )
+        return keep
+
+    window = _history_window(config, s3_client=s3_client, bucket=bucket)
+    if window is None:
+        return None
+
+    # `history_window_releases` is itself fail-soft: its documented fallback
+    # on an R2 listing error is `[latest_release]`, which is byte-identical
+    # to a healthy window on a bucket that holds exactly one derived
+    # release. Retention cannot tell those apart, so when config asks for
+    # more than one release and we are handed exactly one, we assume the
+    # degraded case and delete nothing. Cost of being wrong this way: some
+    # disk until the next release lands. Cost of being wrong the other way:
+    # the whole archive cache, re-downloaded inline during the 09:00 run.
+    try:
+        max_releases = int(history.get("max_releases", 1))
+    except (TypeError, ValueError):
+        max_releases = 1
+    if max_releases > 1 and len(window) <= 1:
+        logger.warning(
+            "History window came back as %s while max_releases is %d — that is "
+            "what the enricher returns when its R2 listing fails, so retention "
+            "treats it as unknown", window, max_releases,
+        )
+        return None
+
+    keep.update(window)
+    return keep
+
+
+def prune_local_cache(
+    config: dict,
+    keep_release: str,
+    *,
+    s3_client=None,
+    bucket: str | None = None,
+) -> list[str]:
+    """Delete cached *.sqlite files that neither `keep_release` nor the
+    history window wants.
 
     The cache lives in whatever directory cc_backlinks resolves, so the
     pipeline and this pruner can never disagree about which files matter.
-    6.6 GB per monthly release fills a box quickly. Fails soft.
+    ~6 GB per monthly release fills a box quickly — but the pipeline now
+    reads a WINDOW of releases for the display-only backlink history, so
+    pruning to the active release alone would delete the archive cache on
+    every install and force the next daily run to re-download it inline.
+
+    Fails in the safe direction: if the window cannot be computed, nothing
+    is deleted. Fails soft: a prune problem is logged and never fails the
+    run.
     """
     if not _refresh_config(config).get("prune_local_cache", False):
         logger.info("Local cache pruning disabled")
+        return []
+
+    keep = _local_cache_keep_set(
+        config, keep_release, s3_client=s3_client, bucket=bucket,
+    )
+    if keep is None:
+        logger.warning(
+            "Keeping every cached CC SQLite: the history window is enabled but "
+            "could not be determined, and deleting on uncertain information "
+            "would cost the next daily run a multi-GB inline re-download",
+        )
         return []
 
     from scripts.enrichment import cc_backlinks
@@ -1332,8 +1488,14 @@ def prune_local_cache(config: dict, keep_release: str) -> list[str]:
         cache_dir = cc_backlinks._resolve_cache_dir()
         if not cache_dir.exists():
             return removed
-        for path in sorted(cache_dir.glob("*.sqlite")):
-            if path.stem == keep_release:
+        cached = sorted(cache_dir.glob("*.sqlite"))
+        logger.info(
+            "Local cache retention: keeping %s; deleting %s",
+            sorted(keep),
+            [p.stem for p in cached if p.stem not in keep] or "(nothing)",
+        )
+        for path in cached:
+            if path.stem in keep:
                 continue
             logger.info("Deleting stale local CC cache file %s", path)
             path.unlink()
@@ -1341,6 +1503,128 @@ def prune_local_cache(config: dict, keep_release: str) -> list[str]:
     except Exception as exc:
         logger.warning("Local cache prune failed: %s", exc)
     return removed
+
+
+# ---------------------------------------------------------------------------
+# Pre-warm — get the history window on disk before the pipeline needs it
+# ---------------------------------------------------------------------------
+
+
+def prewarm_history_window(
+    config: dict,
+    *,
+    s3_client=None,
+    bucket: str | None = None,
+) -> list[str]:
+    """Download every release in the history window into the local cache.
+
+    Returns the releases that are cached as a result. NEVER raises: by the
+    time this runs the new release is verified and installed, and a cold
+    cache only costs the next pipeline run some time. Per-release failures
+    are the enricher's business (`ensure_history_cached` fails soft on
+    each); this wrapper additionally absorbs a total failure of that call.
+    """
+    try:
+        from scripts.enrichment import cc_backlinks
+
+        cached = cc_backlinks.ensure_history_cached(
+            config, s3_client=s3_client, bucket=bucket,
+        )
+    except Exception as exc:
+        logger.warning(
+            "CC history pre-warm failed (%s) — the install stands; the next "
+            "pipeline run will download what it needs inline", exc,
+        )
+        return []
+    names = [str(r) for r in (cached or []) if r]
+    logger.info(
+        "Pre-warmed %d CC history release(s) into the local cache: %s",
+        len(names), ", ".join(names) or "(none)",
+    )
+    return names
+
+
+def _reset_history_window_cache() -> None:
+    """Drop the enricher's per-process history-window cache.
+
+    Called immediately after the config swap. The enricher caches the window
+    keyed on the config's `latest_release`, and our in-memory config dict
+    still holds the OLD value at that point (install_release rewrites the
+    file on disk, deliberately without mutating the dict). The new release
+    does sort into a recomputed window regardless — the window is discovered
+    by listing R2 — but if anything computed a window EARLIER in this
+    process, before the new derived object was uploaded, that cached answer
+    predates the artifact and would leave the new release out of the
+    pre-warm and out of the retention keep-set. Dropping the cache here
+    costs one R2 listing and removes the ordering hazard entirely.
+
+    The call also clears the enricher's warn-once ledger. That is harmless
+    here: at worst a release that is missing locally is warned about once
+    more in this process, and the pre-warm on the next line is about to
+    fetch it anyway.
+
+    Never raises: this is bookkeeping, and the install has already happened.
+    """
+    try:
+        from scripts.enrichment import cc_backlinks
+
+        cc_backlinks.reset_history_caches()
+        logger.debug("Reset the CC history window cache after the config swap")
+    except Exception as exc:
+        logger.warning(
+            "Could not reset the CC history window cache (%s) — the install "
+            "stands; a stale window only costs the next run a download", exc,
+        )
+
+
+def _sync_installed_release(config: dict, release: str) -> None:
+    """Make the in-memory config — and the enricher's caches — agree with the
+    config.json we just wrote.
+
+    `install_release` edits the file on disk; the dict this process is holding
+    still carries the OLD `latest_release`. Everything that runs after the
+    swap reads the history window, and that window is both KEYED on
+    `latest_release` and forced to put it at the head. Left stale, a small
+    `history.max_releases` would pre-warm the release we just superseded and
+    hand the pruner a keep-set that protects it while allowing deletion of one
+    the window actually wants — silent, config-dependent, and invisible at the
+    default cap of 6 where the window holds everything either way.
+
+    Dropping the enricher's cache (below) is necessary but NOT sufficient on
+    its own: a recomputed window would simply be recomputed under the same
+    stale head. The dict update has to come first, and both have to happen
+    before anything reads the window.
+
+    Both halves are non-fatal: by this point the release is verified and
+    installed, and neither an unexpected config shape nor a missing reset
+    helper is a reason to fail an install that already succeeded.
+    """
+    try:
+        config.setdefault("cc_backlinks", {})["latest_release"] = release
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning(
+            "Could not update the in-memory latest_release to %s: %s", release, exc,
+        )
+    else:
+        logger.info("In-memory config now reports latest_release=%s", release)
+    _reset_history_window_cache()
+
+
+def _prewarm_after_install(
+    config: dict,
+    *,
+    s3_client=None,
+    bucket: str | None = None,
+) -> list[str]:
+    """Pre-warm the window after an install, if config asks for it."""
+    history = _history_config(config)
+    if not history.get("enabled", False):
+        logger.info("CC history disabled; not pre-warming")
+        return []
+    if not history.get("prewarm_on_refresh", False):
+        logger.info("CC history pre-warm disabled (prewarm_on_refresh is false)")
+        return []
+    return prewarm_history_window(config, s3_client=s3_client, bucket=bucket)
 
 
 # ---------------------------------------------------------------------------
@@ -1402,25 +1686,37 @@ def _verify_install_prune(
     s3,
     bucket: str,
 ) -> dict:
-    """Verify → swap config → prune, in that order and no other.
+    """Verify → swap config → resync → pre-warm → prune, in that order and no
+    other.
 
     The order is the whole point: nothing is installed before the artifact
-    in R2 has been proven readable and sane, and nothing is pruned before
-    the new release is the installed one.
+    in R2 has been proven readable and sane, nothing is pruned before the
+    new release is the installed one, and the history window is pre-warmed
+    BEFORE the local-cache prune so the prune sees the files the window
+    wants instead of racing the download. Between the swap and the pre-warm
+    the in-memory config is pointed at the new release and the window cache
+    is dropped, so both of those steps — and the retention keep-set behind
+    them — see a window computed after the new derived object exists in R2
+    and headed by the release we just installed.
     """
     measured = verify_derived_release(
         release, config, s3_client=s3, bucket=bucket,
     )
     previous = install_release(release, config_path)
+    _sync_installed_release(config, release)
+    prewarmed = _prewarm_after_install(config, s3_client=s3, bucket=bucket)
     pruned_raw = prune_raw_releases(
         config, s3_client=s3, bucket=bucket, keep_release=release,
     )
-    pruned_local = prune_local_cache(config, release)
+    pruned_local = prune_local_cache(
+        config, release, s3_client=s3, bucket=bucket,
+    )
     return {
         "release": release,
         "previous_release": previous,
         "rows": measured["rows"],
         "canaries": measured["canaries"],
+        "prewarmed_releases": prewarmed,
         "pruned_raw_releases": pruned_raw,
         "pruned_local_cache": pruned_local,
     }
@@ -1527,6 +1823,51 @@ def _run_auto(
     return 0
 
 
+def _run_prewarm_history(
+    *,
+    config: dict,
+    s3_factory: Callable[[], tuple],
+) -> int:
+    """`--prewarm-history`: cache the window and exit. Nothing else.
+
+    No discovery, no build, no config edit, no git — this exists to warm a
+    cold box by hand before the next 09:00 run. Exits 1 only when NOTHING
+    could be cached, so a window where one release is missing from R2 still
+    counts as a useful warm-up.
+    """
+    if not _history_config(config).get("enabled", False):
+        logger.error(
+            "cc_backlinks.history.enabled is false — there is no window to "
+            "pre-warm. Enable it in config first.",
+        )
+        return 1
+
+    s3, bucket = s3_factory()
+    window = _history_window(config, s3_client=s3, bucket=bucket)
+    cached = prewarm_history_window(config, s3_client=s3, bucket=bucket)
+
+    if window is None:
+        logger.warning(
+            "Could not list the intended window, so 'skipped' cannot be "
+            "reported; cached %d release(s)", len(cached),
+        )
+        skipped: list[str] = []
+    else:
+        skipped = [r for r in window if r not in cached]
+        logger.info("Intended history window (%d): %s", len(window), ", ".join(window))
+
+    logger.info("Cached (%d): %s", len(cached), ", ".join(cached) or "(none)")
+    logger.info("Skipped (%d): %s", len(skipped), ", ".join(skipped) or "(none)")
+
+    if not cached:
+        logger.error(
+            "Pre-warm cached nothing at all — the next pipeline run will pay "
+            "for the whole window inline.",
+        )
+        return 1
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # CLI entry point
 # ---------------------------------------------------------------------------
@@ -1585,6 +1926,13 @@ def main(argv: list[str] | None = None) -> int:
              "needed. Exits 1 if nothing is available.",
     )
     parser.add_argument(
+        "--prewarm-history",
+        action="store_true",
+        help="Download every release in the cc_backlinks.history window into "
+             "the local cache and exit. No discovery, no build, no config "
+             "change, no git. Exits 1 only if nothing could be cached.",
+    )
+    parser.add_argument(
         "--config",
         default=None,
         help=f"Path to config.json. Default: {_DEFAULT_CONFIG_PATH}",
@@ -1593,6 +1941,22 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.download_only and args.build_only:
         parser.error("--download-only and --build-only are mutually exclusive")
+    if args.prewarm_history:
+        # --prewarm-history does exactly one thing. Combining it with a build,
+        # an install or a discovery would make its "cache and exit" contract
+        # (and the exit code that goes with it) a lie.
+        for flag, value in (
+            ("--auto", args.auto),
+            ("--release", args.release),
+            ("--download-only", args.download_only),
+            ("--build-only", args.build_only),
+            ("--install", args.install),
+            ("--discover-only", args.discover_only),
+        ):
+            if value:
+                parser.error(
+                    f"--prewarm-history and {flag} are mutually exclusive"
+                )
     if args.auto:
         # --auto owns release selection and runs both phases; combining it
         # with a manual release or a half-run would make the result file lie.
@@ -1606,8 +1970,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.install and args.download_only:
         # Nothing to verify: --download-only never builds the derived SQLite.
         parser.error("--install and --download-only are mutually exclusive")
-    if not args.release and not (args.auto or args.discover_only):
-        parser.error("--release is required unless --auto or --discover-only")
+    if not args.release and not (
+        args.auto or args.discover_only or args.prewarm_history
+    ):
+        parser.error(
+            "--release is required unless --auto, --discover-only or "
+            "--prewarm-history"
+        )
 
     logging.basicConfig(
         level=logging.INFO,
@@ -1643,6 +2012,9 @@ def main(argv: list[str] | None = None) -> int:
         if missing:
             raise env_check.MissingEnvVarsError(missing)
         return diff._r2_client(), diff._bucket()
+
+    if args.prewarm_history:
+        return _run_prewarm_history(config=config, s3_factory=_r2)
 
     if args.auto:
         return _run_auto(

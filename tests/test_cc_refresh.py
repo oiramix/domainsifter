@@ -1998,3 +1998,733 @@ def test_install_is_rejected_with_download_only(auto_env):
             "--config", str(auto_env["config_path"]),
         ])
     assert excinfo.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# History window: local-cache retention and pre-warming
+#
+# `history_window_releases` and `ensure_history_cached` live in
+# scripts/enrichment/cc_backlinks.py and are MOCKED here (raising=False, so
+# these tests describe the contract rather than the implementation). The
+# cache directory is always redirected to tmp_path via the env var
+# cc_backlinks._resolve_cache_dir honours — never the operator's real
+# ~/.cache/domainsifter/cc/.
+# ---------------------------------------------------------------------------
+
+
+_WINDOW = [
+    "cc-main-2026-jun-jul-aug",
+    "cc-main-2026-may-jun-jul",
+    "cc-main-2026-apr-may-jun",
+]
+
+
+def _history_enabled_config(**history_overrides) -> dict:
+    """_refresh_config() plus an enabled cc_backlinks.history block."""
+    config = _refresh_config()
+    history = {"enabled": True, "max_releases": 6, "prewarm_on_refresh": True}
+    history.update(history_overrides)
+    config["cc_backlinks"]["history"] = history
+    return config
+
+
+def _seed_cache(tmp_path: Path, monkeypatch, *releases: str) -> Path:
+    """A fake local cache directory holding one *.sqlite per release."""
+    cache = tmp_path / "cc"
+    cache.mkdir(exist_ok=True)
+    for release in releases:
+        (cache / f"{release}.sqlite").write_bytes(b"x")
+    monkeypatch.setenv("CC_BACKLINKS_CACHE_DIR", str(cache))
+    return cache
+
+
+def _patch_window(monkeypatch, window):
+    """Mock cc_backlinks.history_window_releases. `window` may be a list or a
+    callable (use a raising callable to simulate a lookup failure)."""
+    from scripts.enrichment import cc_backlinks
+
+    calls: list[dict] = []
+
+    def fake(config, *, s3_client=None, bucket=None):
+        calls.append({"s3_client": s3_client, "bucket": bucket})
+        if callable(window):
+            return window()
+        return list(window)
+
+    monkeypatch.setattr(
+        cc_backlinks, "history_window_releases", fake, raising=False,
+    )
+    return calls
+
+
+def _patch_ensure_cached(monkeypatch, cached):
+    """Mock cc_backlinks.ensure_history_cached. `cached` may be a list or a
+    callable (raise from it to simulate a total pre-warm failure)."""
+    from scripts.enrichment import cc_backlinks
+
+    calls: list[dict] = []
+
+    def fake(config, *, s3_client=None, bucket=None):
+        calls.append({"s3_client": s3_client, "bucket": bucket})
+        if callable(cached):
+            return cached()
+        return list(cached)
+
+    monkeypatch.setattr(
+        cc_backlinks, "ensure_history_cached", fake, raising=False,
+    )
+    return calls
+
+
+def test_prune_local_cache_keeps_the_whole_history_window(tmp_path, monkeypatch):
+    """The latent bug this fixes: pruning to the active release alone would
+    delete the archive cache on every install and force a ~30 GB re-download
+    inside the next daily run."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch,
+        *_WINDOW, "cc-main-2026-feb-mar-apr", "cc-main-2026-jan-feb-mar",
+    )
+    _patch_window(monkeypatch, _WINDOW)
+
+    removed = cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jun-jul-aug",
+    )
+
+    assert sorted(removed) == [
+        "cc-main-2026-feb-mar-apr.sqlite", "cc-main-2026-jan-feb-mar.sqlite",
+    ]
+    for release in _WINDOW:
+        assert (cache / f"{release}.sqlite").exists()
+
+
+def test_prune_local_cache_keeps_the_active_release_even_if_the_window_omits_it(
+    tmp_path, monkeypatch,
+):
+    """keep_release is protected independently of the window — a window that
+    has not yet noticed the new release must not get it deleted."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch, "cc-main-2026-jul-aug-sep", *_WINDOW,
+    )
+    _patch_window(monkeypatch, _WINDOW)
+
+    removed = cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jul-aug-sep",
+    )
+
+    assert removed == []
+    assert (cache / "cc-main-2026-jul-aug-sep.sqlite").exists()
+
+
+def test_prune_local_cache_keeps_everything_when_the_window_lookup_raises(
+    tmp_path, monkeypatch, caplog,
+):
+    """Fail in the SAFE direction: a wrong deletion costs a multi-GB inline
+    re-download, a skipped deletion costs some disk."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch,
+        "cc-main-2026-jun-jul-aug", "cc-main-2026-jan-feb-mar",
+    )
+
+    def boom():
+        raise RuntimeError("R2 ListObjectsV2 timed out")
+
+    _patch_window(monkeypatch, boom)
+
+    caplog.set_level("WARNING")
+    removed = cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jun-jul-aug",
+    )
+
+    assert removed == []
+    assert (cache / "cc-main-2026-jan-feb-mar.sqlite").exists()
+    assert "history window" in caplog.text.lower()
+
+
+def test_prune_local_cache_keeps_everything_when_the_window_is_empty(
+    tmp_path, monkeypatch,
+):
+    """An empty window is 'we do not know', not 'delete the archive'."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch,
+        "cc-main-2026-jun-jul-aug", "cc-main-2026-jan-feb-mar",
+    )
+    _patch_window(monkeypatch, [])
+
+    assert cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jun-jul-aug",
+    ) == []
+    assert (cache / "cc-main-2026-jan-feb-mar.sqlite").exists()
+
+
+def test_prune_local_cache_keeps_everything_when_the_enricher_has_no_window_fn(
+    tmp_path, monkeypatch,
+):
+    """If the history helper is missing entirely (an older enricher), the
+    pruner still must not delete the archive."""
+    from scripts.enrichment import cc_backlinks
+
+    cache = _seed_cache(
+        tmp_path, monkeypatch,
+        "cc-main-2026-jun-jul-aug", "cc-main-2026-jan-feb-mar",
+    )
+    monkeypatch.delattr(cc_backlinks, "history_window_releases", raising=False)
+
+    assert cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jun-jul-aug",
+    ) == []
+    assert (cache / "cc-main-2026-jan-feb-mar.sqlite").exists()
+
+
+def test_prune_local_cache_collapses_to_active_release_when_history_disabled(
+    tmp_path, monkeypatch,
+):
+    """Turning the feature off must also reclaim the disk — and must not even
+    ask for the window."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch, *_WINDOW, "cc-main-2026-jan-feb-mar",
+    )
+
+    def must_not_ask():
+        raise AssertionError("asked for the window despite history.enabled=false")
+
+    _patch_window(monkeypatch, must_not_ask)
+
+    removed = cc_refresh.prune_local_cache(
+        _history_enabled_config(enabled=False), "cc-main-2026-jun-jul-aug",
+    )
+
+    assert sorted(removed) == [
+        "cc-main-2026-apr-may-jun.sqlite",
+        "cc-main-2026-jan-feb-mar.sqlite",
+        "cc-main-2026-may-jun-jul.sqlite",
+    ]
+    assert (cache / "cc-main-2026-jun-jul-aug.sqlite").exists()
+
+
+def test_prune_local_cache_still_respects_the_prune_flag_with_history_on(
+    tmp_path, monkeypatch,
+):
+    cache = _seed_cache(tmp_path, monkeypatch, "cc-main-2026-jan-feb-mar")
+    config = _history_enabled_config()
+    config["cc_backlinks"]["refresh"]["prune_local_cache"] = False
+    _patch_window(monkeypatch, _WINDOW)
+
+    assert cc_refresh.prune_local_cache(
+        config, "cc-main-2026-jun-jul-aug",
+    ) == []
+    assert (cache / "cc-main-2026-jan-feb-mar.sqlite").exists()
+
+
+def test_prune_local_cache_forwards_the_injected_r2_client_to_the_window(
+    tmp_path, monkeypatch,
+):
+    """One client for the whole post-install sequence — the pruner must not
+    build a second one behind our back."""
+    _seed_cache(tmp_path, monkeypatch, "cc-main-2026-jun-jul-aug")
+    calls = _patch_window(monkeypatch, _WINDOW)
+    sentinel = object()
+
+    cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jun-jul-aug",
+        s3_client=sentinel, bucket="test-bucket",
+    )
+
+    assert calls == [{"s3_client": sentinel, "bucket": "test-bucket"}]
+
+
+def test_prune_local_cache_only_touches_sqlite_files(tmp_path, monkeypatch):
+    cache = _seed_cache(tmp_path, monkeypatch, "cc-main-2026-jan-feb-mar")
+    (cache / "notes.txt").write_bytes(b"x")
+    _patch_window(monkeypatch, _WINDOW)
+
+    removed = cc_refresh.prune_local_cache(
+        _history_enabled_config(), "cc-main-2026-jun-jul-aug",
+    )
+    assert removed == ["cc-main-2026-jan-feb-mar.sqlite"]
+    assert (cache / "notes.txt").exists()
+
+
+def test_prune_local_cache_distrusts_a_single_release_window(tmp_path, monkeypatch):
+    """`history_window_releases` returns [latest_release] when its own R2
+    listing fails — indistinguishable from a healthy one-release window. With
+    max_releases > 1 that has to count as 'unknown', or one transient listing
+    error costs the whole archive cache."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch, "cc-main-2026-jun-jul-aug", *_WINDOW[1:],
+    )
+    _patch_window(monkeypatch, ["cc-main-2026-jun-jul-aug"])
+
+    assert cc_refresh.prune_local_cache(
+        _history_enabled_config(max_releases=6), "cc-main-2026-jun-jul-aug",
+    ) == []
+    for release in _WINDOW:
+        assert (cache / f"{release}.sqlite").exists()
+
+
+def test_prune_local_cache_trusts_a_single_release_window_when_that_is_the_cap(
+    tmp_path, monkeypatch,
+):
+    """max_releases == 1 means one release really is the whole window, so the
+    prune goes ahead and reclaims the disk."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch, "cc-main-2026-jun-jul-aug", "cc-main-2026-jan-feb-mar",
+    )
+    _patch_window(monkeypatch, ["cc-main-2026-jun-jul-aug"])
+
+    assert cc_refresh.prune_local_cache(
+        _history_enabled_config(max_releases=1), "cc-main-2026-jun-jul-aug",
+    ) == ["cc-main-2026-jan-feb-mar.sqlite"]
+    assert (cache / "cc-main-2026-jun-jul-aug.sqlite").exists()
+
+
+def test_prune_local_cache_trusts_a_short_but_plural_window(tmp_path, monkeypatch):
+    """A window shorter than the cap is normal while R2 is still filling up —
+    only the degenerate one-entry case is treated as a failure signal."""
+    cache = _seed_cache(
+        tmp_path, monkeypatch, *_WINDOW[:2], "cc-main-2026-jan-feb-mar",
+    )
+    _patch_window(monkeypatch, _WINDOW[:2])
+
+    assert cc_refresh.prune_local_cache(
+        _history_enabled_config(max_releases=6), "cc-main-2026-jun-jul-aug",
+    ) == ["cc-main-2026-jan-feb-mar.sqlite"]
+    assert (cache / "cc-main-2026-may-jun-jul.sqlite").exists()
+
+
+# ---------------------------------------------------------------------------
+# prewarm_history_window — the fail-soft wrapper
+# ---------------------------------------------------------------------------
+
+
+def test_prewarm_history_window_returns_what_was_cached(monkeypatch):
+    calls = _patch_ensure_cached(monkeypatch, _WINDOW)
+    assert cc_refresh.prewarm_history_window(
+        _history_enabled_config(), s3_client="s3", bucket="b",
+    ) == _WINDOW
+    assert calls == [{"s3_client": "s3", "bucket": "b"}]
+
+
+def test_prewarm_history_window_never_raises(monkeypatch, caplog):
+    def boom():
+        raise RuntimeError("R2 refused the connection")
+
+    _patch_ensure_cached(monkeypatch, boom)
+    caplog.set_level("WARNING")
+    assert cc_refresh.prewarm_history_window(_history_enabled_config()) == []
+    assert "pre-warm failed" in caplog.text.lower()
+
+
+def test_prewarm_after_install_is_gated_on_prewarm_on_refresh(monkeypatch):
+    def must_not_run():
+        raise AssertionError("pre-warmed despite prewarm_on_refresh=false")
+
+    _patch_ensure_cached(monkeypatch, must_not_run)
+    assert cc_refresh._prewarm_after_install(
+        _history_enabled_config(prewarm_on_refresh=False),
+    ) == []
+
+
+def test_prewarm_after_install_is_gated_on_history_enabled(monkeypatch):
+    def must_not_run():
+        raise AssertionError("pre-warmed despite history.enabled=false")
+
+    _patch_ensure_cached(monkeypatch, must_not_run)
+    assert cc_refresh._prewarm_after_install(
+        _history_enabled_config(enabled=False),
+    ) == []
+
+
+def test_prewarm_after_install_runs_when_both_flags_are_on(monkeypatch):
+    _patch_ensure_cached(monkeypatch, _WINDOW)
+    assert cc_refresh._prewarm_after_install(
+        _history_enabled_config(), s3_client="s3", bucket="b",
+    ) == _WINDOW
+
+
+# ---------------------------------------------------------------------------
+# --auto: the install sequence now pre-warms before it prunes
+# ---------------------------------------------------------------------------
+
+
+def _enable_history_in_config_file(config_path: Path, **overrides) -> None:
+    """Add a cc_backlinks.history block to the on-disk config the CLI reads."""
+    import json as _json
+
+    data = _json.loads(config_path.read_text(encoding="utf-8"))
+    history = {"enabled": True, "max_releases": 6, "prewarm_on_refresh": True}
+    history.update(overrides)
+    data["cc_backlinks"]["history"] = history
+    with open(config_path, "w", encoding="utf-8", newline="") as fh:
+        _json.dump(data, fh, indent=2)
+        fh.write("\n")
+
+
+def _stub_install_path(monkeypatch, new_release: str) -> None:
+    """Discovery + verification stubbed so --auto reaches the install."""
+    monkeypatch.setattr(
+        cc_refresh, "discover_latest_release", lambda *_a, **_kw: new_release,
+    )
+    monkeypatch.setattr(
+        cc_refresh, "verify_derived_release",
+        lambda release, config, **_kw: {
+            "release": release, "rows": 119_722_885,
+            "canaries": {"marketglow.com": 16_365_926}, "meta": {},
+        },
+    )
+    monkeypatch.setattr(cc_refresh, "prune_raw_releases", lambda *_a, **_kw: [])
+
+
+def test_auto_prewarms_the_window_after_a_successful_install(
+    auto_env, monkeypatch,
+):
+    new_release = "cc-main-2026-jun-jul-aug"
+    _enable_history_in_config_file(auto_env["config_path"])
+    _stub_install_path(monkeypatch, new_release)
+    _patch_ensure_cached(monkeypatch, _WINDOW)
+    monkeypatch.setattr(cc_refresh, "prune_local_cache", lambda *_a, **_kw: [])
+
+    rc = cc_refresh.main(["--auto", "--config", str(auto_env["config_path"])])
+    assert rc == 0
+
+    payload = _read_result(auto_env["result_path"])
+    assert payload["action"] == "installed"
+    assert payload["prewarmed_releases"] == _WINDOW
+    # The keys run-cc-refresh.sh and send_report.py parse are untouched.
+    for key in ("action", "release", "previous_release", "rows",
+                "pruned_raw_releases", "pruned_local_cache"):
+        assert key in payload
+
+
+def test_auto_does_not_prewarm_when_prewarm_on_refresh_is_false(
+    auto_env, monkeypatch,
+):
+    new_release = "cc-main-2026-jun-jul-aug"
+    _enable_history_in_config_file(auto_env["config_path"], prewarm_on_refresh=False)
+    _stub_install_path(monkeypatch, new_release)
+
+    def must_not_run():
+        raise AssertionError("pre-warmed despite prewarm_on_refresh=false")
+
+    _patch_ensure_cached(monkeypatch, must_not_run)
+    monkeypatch.setattr(cc_refresh, "prune_local_cache", lambda *_a, **_kw: [])
+
+    rc = cc_refresh.main(["--auto", "--config", str(auto_env["config_path"])])
+    assert rc == 0
+    assert _read_result(auto_env["result_path"])["prewarmed_releases"] == []
+
+
+def test_auto_prewarm_failure_leaves_the_install_successful(auto_env, monkeypatch):
+    """The release is verified and installed by then; a cold cache only costs
+    time on the next run, so the exit code stays 0 and the swap stands."""
+    import json as _json
+
+    new_release = "cc-main-2026-jun-jul-aug"
+    _enable_history_in_config_file(auto_env["config_path"])
+    _stub_install_path(monkeypatch, new_release)
+
+    def boom():
+        raise RuntimeError("R2 download died at byte 12")
+
+    _patch_ensure_cached(monkeypatch, boom)
+    monkeypatch.setattr(cc_refresh, "prune_local_cache", lambda *_a, **_kw: [])
+
+    rc = cc_refresh.main(["--auto", "--config", str(auto_env["config_path"])])
+    assert rc == 0
+
+    payload = _read_result(auto_env["result_path"])
+    assert payload["action"] == "installed"
+    assert payload["prewarmed_releases"] == []
+    installed = _json.loads(auto_env["config_path"].read_text(encoding="utf-8"))
+    assert installed["cc_backlinks"]["latest_release"] == new_release
+
+
+def test_auto_prewarms_before_it_prunes_the_local_cache(auto_env, monkeypatch):
+    """Order is load-bearing: prune must see the files the window just
+    downloaded rather than racing the download."""
+    order: list[str] = []
+    new_release = "cc-main-2026-jun-jul-aug"
+    _enable_history_in_config_file(auto_env["config_path"])
+    _stub_install_path(monkeypatch, new_release)
+
+    _patch_ensure_cached(monkeypatch, lambda: order.append("prewarm") or list(_WINDOW))
+    monkeypatch.setattr(
+        cc_refresh, "prune_local_cache",
+        lambda *_a, **_kw: order.append("prune") or [],
+    )
+
+    assert cc_refresh.main(
+        ["--auto", "--config", str(auto_env["config_path"])]
+    ) == 0
+    assert order == ["prewarm", "prune"]
+
+
+# ---------------------------------------------------------------------------
+# --prewarm-history: cache the window and exit, nothing else
+# ---------------------------------------------------------------------------
+
+
+def test_prewarm_history_flag_caches_the_window_and_exits_zero(
+    auto_env, monkeypatch, caplog,
+):
+    _enable_history_in_config_file(auto_env["config_path"])
+    _patch_window(monkeypatch, _WINDOW)
+    _patch_ensure_cached(monkeypatch, _WINDOW[:2])
+
+    caplog.set_level("INFO")
+    rc = cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    )
+    assert rc == 0
+    # Reports what it cached and what it skipped.
+    assert "cc-main-2026-jun-jul-aug" in caplog.text
+    assert "Skipped (1): cc-main-2026-apr-may-jun" in caplog.text
+
+
+def test_prewarm_history_flag_does_no_discovery_build_or_config_write(
+    auto_env, monkeypatch,
+):
+    before = auto_env["config_path"].read_bytes()
+    _enable_history_in_config_file(auto_env["config_path"])
+    after_enable = auto_env["config_path"].read_bytes()
+    assert before != after_enable  # sanity: the helper really wrote something
+
+    def must_not_run(*_a, **_kw):
+        raise AssertionError("--prewarm-history did more than pre-warm")
+
+    monkeypatch.setattr(cc_refresh, "discover_latest_release", must_not_run)
+    monkeypatch.setattr(cc_refresh, "_phase_download_and_upload_raw", must_not_run)
+    monkeypatch.setattr(cc_refresh, "_phase_build_and_upload_derived", must_not_run)
+    monkeypatch.setattr(cc_refresh, "install_release", must_not_run)
+    monkeypatch.setattr(cc_refresh, "prune_raw_releases", must_not_run)
+    monkeypatch.setattr(cc_refresh, "prune_local_cache", must_not_run)
+    monkeypatch.setattr(cc_refresh, "write_result", must_not_run)
+    _patch_window(monkeypatch, _WINDOW)
+    _patch_ensure_cached(monkeypatch, _WINDOW)
+
+    assert cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    ) == 0
+    assert auto_env["config_path"].read_bytes() == after_enable
+    assert auto_env["phases"] == []
+
+
+def test_prewarm_history_flag_exits_one_when_it_could_cache_nothing(
+    auto_env, monkeypatch,
+):
+    _enable_history_in_config_file(auto_env["config_path"])
+    _patch_window(monkeypatch, _WINDOW)
+    _patch_ensure_cached(monkeypatch, [])
+
+    assert cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    ) == 1
+
+
+def test_prewarm_history_flag_exits_zero_on_a_partial_window(auto_env, monkeypatch):
+    """One missing release still leaves the box warmer than it was."""
+    _enable_history_in_config_file(auto_env["config_path"])
+    _patch_window(monkeypatch, _WINDOW)
+    _patch_ensure_cached(monkeypatch, [_WINDOW[0]])
+
+    assert cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    ) == 0
+
+
+def test_prewarm_history_flag_exits_one_when_history_is_disabled(
+    auto_env, monkeypatch,
+):
+    _enable_history_in_config_file(auto_env["config_path"], enabled=False)
+
+    def must_not_run():
+        raise AssertionError("pre-warmed despite history.enabled=false")
+
+    _patch_ensure_cached(monkeypatch, must_not_run)
+
+    assert cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    ) == 1
+
+
+def test_prewarm_history_flag_exits_one_when_the_enricher_blows_up(
+    auto_env, monkeypatch,
+):
+    _enable_history_in_config_file(auto_env["config_path"])
+    _patch_window(monkeypatch, _WINDOW)
+
+    def boom():
+        raise RuntimeError("R2 credentials rejected")
+
+    _patch_ensure_cached(monkeypatch, boom)
+
+    assert cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    ) == 1
+
+
+def test_prewarm_history_flag_still_caches_when_the_window_is_unknowable(
+    auto_env, monkeypatch,
+):
+    """A failed window listing must not stop the pre-warm itself — the
+    enricher's own answer is what counts."""
+    _enable_history_in_config_file(auto_env["config_path"])
+
+    def boom():
+        raise RuntimeError("ListObjectsV2 timed out")
+
+    _patch_window(monkeypatch, boom)
+    _patch_ensure_cached(monkeypatch, _WINDOW)
+
+    assert cc_refresh.main(
+        ["--prewarm-history", "--config", str(auto_env["config_path"])]
+    ) == 0
+
+
+@pytest.mark.parametrize("extra", [
+    ["--auto"],
+    ["--release", "cc-main-2026-jun-jul-aug"],
+    ["--download-only", "--release", "cc-main-2026-jun-jul-aug"],
+    ["--build-only", "--release", "cc-main-2026-jun-jul-aug"],
+    ["--install", "--release", "cc-main-2026-jun-jul-aug"],
+    ["--discover-only"],
+])
+def test_prewarm_history_is_mutually_exclusive_with_every_other_mode(
+    auto_env, extra,
+):
+    with pytest.raises(SystemExit) as excinfo:
+        cc_refresh.main(
+            ["--prewarm-history", "--config", str(auto_env["config_path"])] + extra
+        )
+    assert excinfo.value.code == 2
+
+
+def test_install_drops_the_history_window_cache_before_prewarming(
+    auto_env, monkeypatch,
+):
+    """The enricher caches the window keyed on config's latest_release, and
+    our in-memory config still holds the OLD value after the swap. Dropping
+    the cache between the swap and the pre-warm guarantees that any window
+    computed earlier in this process — possibly before the new derived object
+    reached R2 — cannot decide what gets pre-warmed or kept."""
+    from scripts.enrichment import cc_backlinks
+
+    order: list[str] = []
+    new_release = "cc-main-2026-jun-jul-aug"
+
+    monkeypatch.setattr(
+        cc_backlinks, "reset_history_caches",
+        lambda: order.append("reset"), raising=False,
+    )
+    monkeypatch.setattr(
+        cc_refresh, "discover_latest_release", lambda *_a, **_kw: new_release,
+    )
+    monkeypatch.setattr(
+        cc_refresh, "verify_derived_release",
+        lambda release, config, **_kw: {
+            "release": release, "rows": 1, "canaries": {}, "meta": {},
+        },
+    )
+    monkeypatch.setattr(
+        cc_refresh, "install_release",
+        lambda *_a, **_kw: order.append("install") or "cc-main-2026-feb-mar-apr",
+    )
+    monkeypatch.setattr(
+        cc_refresh, "_prewarm_after_install",
+        lambda *_a, **_kw: order.append("prewarm") or [],
+    )
+    monkeypatch.setattr(cc_refresh, "prune_raw_releases", lambda *_a, **_kw: [])
+    monkeypatch.setattr(cc_refresh, "prune_local_cache", lambda *_a, **_kw: [])
+
+    assert cc_refresh.main(
+        ["--auto", "--config", str(auto_env["config_path"])]
+    ) == 0
+    assert order == ["install", "reset", "prewarm"]
+
+
+def test_a_failing_history_cache_reset_never_breaks_the_install(monkeypatch):
+    """Bookkeeping after the swap must not be able to undo a good install."""
+    from scripts.enrichment import cc_backlinks
+
+    def boom():
+        raise RuntimeError("synthetic")
+
+    monkeypatch.setattr(
+        cc_backlinks, "reset_history_caches", boom, raising=False,
+    )
+    cc_refresh._reset_history_window_cache()  # must not raise
+
+
+def test_install_points_the_in_memory_config_at_the_new_release(monkeypatch):
+    """Dropping the window cache is necessary but not sufficient: a window
+    recomputed under a stale `latest_release` is still headed by the release
+    we just superseded."""
+    from scripts.enrichment import cc_backlinks
+
+    monkeypatch.setattr(
+        cc_backlinks, "reset_history_caches", lambda: None, raising=False,
+    )
+    config = _history_enabled_config()
+    assert config["cc_backlinks"]["latest_release"] == "cc-main-2026-feb-mar-apr"
+
+    cc_refresh._sync_installed_release(config, "cc-main-2026-jun-jul-aug")
+
+    assert config["cc_backlinks"]["latest_release"] == "cc-main-2026-jun-jul-aug"
+
+
+def test_auto_prewarms_and_prunes_against_the_newly_installed_window_head(
+    auto_env, monkeypatch, tmp_path,
+):
+    """The case that actually distinguishes right from wrong: max_releases 2
+    with three releases discoverable. Under the stale-config bug the window
+    would be [feb-mar-apr (superseded), jun-jul-aug], so the pre-warm would
+    fetch the wrong file and the keep-set would protect the release we just
+    replaced while deleting one the window wants. At the default cap of 6 the
+    window holds everything either way and proves nothing."""
+    from scripts.enrichment import cc_backlinks
+
+    new_release = "cc-main-2026-jun-jul-aug"
+    second = "cc-main-2026-may-jun-jul"
+    superseded = "cc-main-2026-feb-mar-apr"
+    discovered = [new_release, second, superseded]
+
+    _enable_history_in_config_file(auto_env["config_path"], max_releases=2)
+    _stub_install_path(monkeypatch, new_release)
+    cache = _seed_cache(tmp_path, monkeypatch, *discovered)
+
+    order: list[str] = []
+
+    def fake_window(config, *, s3_client=None, bucket=None):
+        """Mirrors the enricher's contract: latest_release is always the head,
+        then the rest newest-first, truncated to max_releases."""
+        cc = config["cc_backlinks"]
+        latest = cc["latest_release"]
+        rest = [r for r in discovered if r != latest]
+        return ([latest] + rest)[: int(cc["history"]["max_releases"])]
+
+    def fake_ensure(config, *, s3_client=None, bucket=None):
+        order.append("prewarm")
+        return fake_window(config, s3_client=s3_client, bucket=bucket)
+
+    monkeypatch.setattr(
+        cc_backlinks, "history_window_releases", fake_window, raising=False,
+    )
+    monkeypatch.setattr(
+        cc_backlinks, "ensure_history_cached", fake_ensure, raising=False,
+    )
+    monkeypatch.setattr(
+        cc_backlinks, "reset_history_caches",
+        lambda: order.append("reset"), raising=False,
+    )
+
+    assert cc_refresh.main(
+        ["--auto", "--config", str(auto_env["config_path"])]
+    ) == 0
+
+    payload = _read_result(auto_env["result_path"])
+    assert payload["prewarmed_releases"] == [new_release, second]
+    assert payload["pruned_local_cache"] == [f"{superseded}.sqlite"]
+    assert (cache / f"{new_release}.sqlite").exists()
+    assert (cache / f"{second}.sqlite").exists()
+    assert not (cache / f"{superseded}.sqlite").exists()
+    # The cache drop happens before anything reads the window.
+    assert order[0] == "reset"

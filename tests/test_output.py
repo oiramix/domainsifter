@@ -877,3 +877,257 @@ def test_phase2_reason_round_trips_through_write_output(tmp_path):
     )
     payload = json.loads(target.read_text(encoding="utf-8"))
     assert payload["domains"][0]["phase2_reason"] == "clear commercial intent"
+
+
+# --- cc_backlink_history (added 2026-09-20, DISPLAY ONLY) --------------------
+#
+# The enricher returns, newest release first:
+#   [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 247}, ...]
+# with source_domain_count=None meaning "apex absent from that release's
+# graph" — distinct from 0 ("in the graph, no inbound source domains").
+# Everything below also pins the load-bearing safety property: this field
+# cannot influence which domains publish, their score, or their verdict.
+
+HISTORY = [
+    {"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 247},
+    {"release": "cc-main-2026-may-jun-jul", "source_domain_count": 310},
+    {"release": "cc-main-2026-apr-may-jun", "source_domain_count": None},
+]
+
+
+def _history_of(payload: dict) -> list[dict] | None:
+    return payload["domains"][0]["cc_backlink_history"]
+
+
+def test_cc_backlink_history_in_contract_fields():
+    """Architectural assertion: the field is part of the locked schema."""
+    assert "cc_backlink_history" in output.CONTRACT_FIELDS
+
+
+def test_cc_backlink_history_passes_through_newest_first():
+    """Order is meaningful (newest release first) and must be preserved
+    exactly as the enricher produced it — the site renders a trend."""
+    cand = _cand("marketglow.com", 80, cc_backlink_history=HISTORY)
+    assert _history_of(output.build_payload([cand], CONFIG)) == HISTORY
+
+
+def test_cc_backlink_history_preserves_none_counts_distinctly_from_zero():
+    """The three-state design: None = not in that release's graph,
+    0 = in the graph with no inbound edges. Coercing None to 0 would
+    fabricate data (hard rule 2)."""
+    history = [
+        {"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 0},
+        {"release": "cc-main-2026-may-jun-jul", "source_domain_count": None},
+    ]
+    got = _history_of(
+        output.build_payload(
+            [_cand("tideblock.io", 70, cc_backlink_history=history)], CONFIG
+        )
+    )
+    assert got[0]["source_domain_count"] == 0
+    assert got[1]["source_domain_count"] is None
+
+
+def test_cc_backlink_history_null_when_key_absent_on_candidate():
+    """Feature disabled, enricher failed, or pre-2026-09-20 carryover: the
+    key is simply not on the candidate. Publish null, never a crash and
+    never a fabricated history."""
+    cand = _cand("coppernest.org", 65)
+    assert "cc_backlink_history" not in cand
+    payload = output.build_payload([cand], CONFIG)
+    assert _history_of(payload) is None
+    # Shape stays uniform — the key is present (as null), like every other
+    # optional contract field.
+    assert set(payload["domains"][0].keys()) == set(output.CONTRACT_FIELDS)
+
+
+def test_cc_backlink_history_null_when_explicitly_none():
+    cand = _cand("amberkite.org", 65, cc_backlink_history=None)
+    assert _history_of(output.build_payload([cand], CONFIG)) is None
+
+
+def test_cc_backlink_history_empty_list_normalises_to_null():
+    """An empty history carries no more information than no history at all,
+    and an empty array would make the frontend draw an empty chart."""
+    cand = _cand("emptyhist.com", 65, cc_backlink_history=[])
+    assert _history_of(output.build_payload([cand], CONFIG)) is None
+
+
+MALFORMED_HISTORIES = [
+    "cc-main-2026-jun-jul-aug",                        # string, not a list
+    ["cc-main-2026-jun-jul-aug", "cc-main-2026-may"],  # list of strings
+    [{"source_domain_count": 247}],                    # entry missing 'release'
+    [{"release": "", "source_domain_count": 247}],      # blank release
+    [{"release": None, "source_domain_count": 247}],    # non-string release
+    [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": "247"}],
+    [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 1.5}],
+    [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": True}],
+    [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": -1}],
+    [{"release": "cc-main-2026-jun-jul-aug",
+      "source_domain_count": {"nested": {"deeply": [1, 2, {"x": "y"}]}}}],
+    {"cc-main-2026-jun-jul-aug": 247},                 # dict, not a list
+    42,
+    # One good entry plus one bad one — all-or-nothing, so the whole field
+    # goes. A partial history would read as a genuine gap in the archive.
+    [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 247},
+     {"release": "cc-main-2026-may-jun-jul", "source_domain_count": []}],
+]
+
+
+@pytest.mark.parametrize("junk", MALFORMED_HISTORIES)
+def test_cc_backlink_history_malformed_is_dropped_without_raising(junk):
+    """The enricher fails soft, so junk can arrive. _project must never
+    raise for a cosmetic field — that would take down the whole run."""
+    cand = _cand("junkhist.com", 70, cc_backlink_history=junk)
+    payload = output.build_payload([cand], CONFIG)
+    assert _history_of(payload) is None, f"junk {junk!r} leaked into the payload"
+    assert payload["domain_count"] == 1, "the row itself must still publish"
+
+
+@pytest.mark.parametrize("junk", MALFORMED_HISTORIES)
+def test_cc_backlink_history_malformed_still_writes_valid_json(junk, tmp_path):
+    """Hard rule 17: invalid JSON output IS crash-worthy, so the correct
+    behaviour is valid JSON with the field dropped — never broken JSON."""
+    target = tmp_path / "daily.json"
+    output.write_output(
+        [_cand("junkhist.com", 70, cc_backlink_history=junk)],
+        CONFIG,
+        output_path=target,
+    )
+    payload = json.loads(target.read_text(encoding="utf-8"))  # raises if invalid
+    assert payload["domains"][0]["cc_backlink_history"] is None
+
+
+def test_cc_backlink_history_malformed_logs_once_per_candidate(caplog):
+    """A broken enricher must not flood the Actions log: one warning per
+    candidate, not one per entry."""
+    bad = [
+        {"release": "cc-main-2026-jun-jul-aug", "source_domain_count": "247"},
+        {"release": "cc-main-2026-may-jun-jul", "source_domain_count": "310"},
+        {"no_release": True},
+    ]
+    with caplog.at_level("WARNING", logger=output.logger.name):
+        output.build_payload([_cand("noisy.com", 70, cc_backlink_history=bad)], CONFIG)
+    warnings = [r for r in caplog.records if "cc_backlink_history" in r.getMessage()]
+    assert len(warnings) == 1
+    assert "noisy.com" in warnings[0].getMessage()
+
+
+def test_cc_backlink_history_releases_are_whitespace_stripped():
+    history = [{"release": "  cc-main-2026-jun-jul-aug \n", "source_domain_count": 5}]
+    got = _history_of(
+        output.build_payload(
+            [_cand("trimhist.com", 70, cc_backlink_history=history)], CONFIG
+        )
+    )
+    assert got == [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 5}]
+
+
+def test_cc_backlink_history_entries_projected_to_exactly_two_keys():
+    """Extra keys from a future enricher version are not passed through —
+    the site is handed the documented shape and nothing else."""
+    history = [{
+        "release": "cc-main-2026-jun-jul-aug",
+        "source_domain_count": 247,
+        "internal_debug_blob": {"sqlite_path": "/tmp/whatever.db"},
+    }]
+    got = _history_of(
+        output.build_payload(
+            [_cand("extrakeys.com", 70, cc_backlink_history=history)], CONFIG
+        )
+    )
+    assert got == [{"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 247}]
+
+
+def test_cc_backlink_history_not_in_completeness_fields():
+    """Same stance as cc_source_domain_count: absence of CC history is
+    informational, not a quality deficit."""
+    assert "cc_backlink_history" not in output._ENRICHMENT_FIELDS_FOR_COMPLETENESS
+
+
+def test_cc_backlink_history_absence_does_not_fail_completeness_gate():
+    cfg = {**CONFIG, "publish_min_enrichment_completeness": 0.99}
+    cand = _cand("fullenrich.com", 80)  # 5/5 traditional fields, no CC history
+    assert output.build_payload([cand], cfg)["domain_count"] == 1
+
+
+def test_cc_backlink_history_presence_does_not_change_completeness():
+    """Completeness is computed over a fixed field tuple, so adding history
+    must not move the ratio in either direction."""
+    without = _cand("samecase.com", 70, wayback_last_snapshot=None)
+    with_hist = {**without, "cc_backlink_history": HISTORY}
+    assert output._enrichment_completeness(without) == (
+        output._enrichment_completeness(with_hist)
+    )
+
+
+# The load-bearing safety property: display-only means structurally
+# incapable of altering which domains publish, or in what order.
+
+@pytest.mark.parametrize("history", [HISTORY, [], None] + MALFORMED_HISTORIES)
+def test_cc_backlink_history_leaves_verdict_and_score_byte_identical(history):
+    """Regression guard for the whole change: the projected row with a
+    history must equal the row without it in EVERY other key — including
+    score and verdict — for good, empty and malformed histories alike."""
+    cfg = {**VERDICT_CFG, "publish_min_score": 30,
+           "publish_min_enrichment_completeness": 0.50}
+    without = _cand("samecase.com", 75, wayback_snapshots=2000,
+                    open_page_rank=3.0, cc_source_domain_count=200)
+    with_hist = {**without, "cc_backlink_history": history}
+    a = output.build_payload([without], cfg)["domains"][0]
+    b = output.build_payload([with_hist], cfg)["domains"][0]
+    assert a["verdict"] == b["verdict"] == "Clean"
+    assert a["score"] == b["score"] == 75
+    assert {k: v for k, v in a.items() if k != "cc_backlink_history"} == {
+        k: v for k, v in b.items() if k != "cc_backlink_history"
+    }
+
+
+def test_cc_backlink_history_does_not_rescue_a_promising_boundary_candidate():
+    """A candidate one notch below the Promising gate (OPR and CC both too
+    low) must stay Caution no matter how strong its history is. This is the
+    test that would fail if history ever leaked into _compute_verdict."""
+    base = _cand("boundary.com", 50, wayback_snapshots=2000,
+                 open_page_rank=0.1, cc_source_domain_count=1)
+    rich_history = [
+        {"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 99999},
+        {"release": "cc-main-2026-may-jun-jul", "source_domain_count": 99999},
+    ]
+    assert _verdict_of(output.build_payload([base], VERDICT_CFG)) == "Caution"
+    with_hist = {**base, "cc_backlink_history": rich_history}
+    assert _verdict_of(output.build_payload([with_hist], VERDICT_CFG)) == "Caution"
+
+
+def test_cc_backlink_history_does_not_change_publication_order():
+    """Sorting is by score only. Give the LOWEST-scoring candidate the
+    richest history and confirm the published order is untouched."""
+    cfg = {**CONFIG, "max_candidates_for_publication": 3}
+    plain = [_cand("highest.com", 90), _cand("middle.com", 70),
+             _cand("lowest.com", 50)]
+    salted = [
+        {**plain[0]},
+        {**plain[1]},
+        {**plain[2], "cc_backlink_history": [
+            {"release": "cc-main-2026-jun-jul-aug", "source_domain_count": 99999}]},
+    ]
+    names_plain = [d["name"] for d in output.build_payload(plain, cfg)["domains"]]
+    names_salted = [d["name"] for d in output.build_payload(salted, cfg)["domains"]]
+    assert names_plain == names_salted == ["highest.com", "middle.com", "lowest.com"]
+
+
+def test_cc_backlink_history_round_trips_through_write_output(tmp_path):
+    """Carryover correctness depends on this: tomorrow's run reads this file
+    back in via carryover.load_existing, keeps whole rows, and re-projects
+    them — so the history survives all 14 days without any carryover change."""
+    target = tmp_path / "daily.json"
+    output.write_output(
+        [_cand("marketglow.com", 80, cc_backlink_history=HISTORY,
+               first_seen_date="2026-09-15", days_listed=5)],
+        CONFIG,
+        output_path=target,
+    )
+    reloaded = json.loads(target.read_text(encoding="utf-8"))["domains"][0]
+    assert reloaded["cc_backlink_history"] == HISTORY
+    # Second pass: the reloaded row is what carryover feeds back in.
+    again = output.build_payload([reloaded], CONFIG)["domains"][0]
+    assert again["cc_backlink_history"] == HISTORY
