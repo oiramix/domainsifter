@@ -9,6 +9,7 @@ Index of decisions:
 - [Free vs paid tier model (2026-05-13, pending)](#free-vs-paid-tier-model-2026-05-13-pending)
 - [Daily publication count cap (2026-05-13, pending)](#daily-publication-count-cap-2026-05-13-pending)
 - [Common Crawl refresh cadence — manual vs automated (2026-05-13 — RESOLVED 2026-09-20: automated, weekly)](#common-crawl-refresh-cadence--manual-vs-automated-2026-05-13-pending)
+- [Common Crawl backlink history — how to actually get it (2026-09-20, planned not built)](#common-crawl-backlink-history--how-to-actually-get-it-2026-09-20-planned-not-built)
 
 ---
 
@@ -300,3 +301,56 @@ Then either: build Option Cron with retry/backoff/alerting, or build Option Hybr
 - Trigger: Mario notices the new release via CC's `https://commoncrawl.org/web-graphs` index, or watches the index manually
 - Action: `python -m scripts.cc_refresh --release cc-main-2026-mar-apr-may`, then a small commit bumping `config.json[cc_backlinks].latest_release`
 - Failure mode if missed: pipeline keeps querying the previous month's release; signal degrades from "latest month's view" to "previous month's view" — graceful, no crash
+---
+
+## Common Crawl backlink history — how to actually get it (2026-09-20, planned not built)
+
+### The question this answers
+
+With the refresh automated (weekly tick, installs monthly), R2 now accumulates one derived SQLite per Common Crawl release, forever. The natural expectation is that this is "growing our own database" of backlink history. **It is not, yet** — and the gap is worth writing down before someone builds the expensive version of it.
+
+What we have is an **archive of monthly snapshots**. What a history capability needs is the ability to answer *"what did THIS domain's inbound source-domain count look like over the last N releases?"* Strategy A queries only `latest_release`, so nothing reads across snapshots today.
+
+### Why the obvious implementation is the wrong one
+
+Each derived SQLite holds **all ~120M apexes** (119,722,885 in `cc-main-2026-jun-jul-aug`) and weighs **6.4 GB**. Keeping them forever and querying across them means:
+
+- **Storage**: 12 releases/year x 6.4 GB = ~77 GB/year, ~384 GB and ~$5.80/mo at the 5-year mark.
+- **Query cost**: answering the decay question for one domain across 12 releases means touching 12 separate 6.4 GB files. Even as indexed point-lookups that is 77 GB of cold object storage to pull or keep resident.
+
+And it is almost entirely waste, because **we only ever evaluate a few thousand domains a day**. The domains we care about are a vanishing fraction of 120M. Building history over the full graph to serve a few thousand lookups is the wrong shape.
+
+### The two capabilities are different, and one of them is nearly free
+
+Separating them is the whole insight:
+
+**(a) Forward history — cheap, compounding, start-anytime.**
+`cc_backlinks.enrich()` already fetches `cc_source_domain_count` for every candidate it evaluates, every single day. Recording `(apex_domain, release, source_domain_count, observed_date)` at that moment costs **one extra append per candidate** and no extra reads. At ~2,500 candidates/day that is a few hundred KB/day — megabytes per year, not hundreds of gigabytes.
+
+The idiom already exists in this repo: `scripts/domain_archive.py` appends event-shaped records to private R2 at `state/domain_archive/YYYY-MM.jsonl`, append-only, monthly partitions, never aged out, chained as a non-fatal step so it cannot break a run. A backlink-history writer should be the same shape and should reuse that pattern rather than invent one.
+
+The catch worth being honest about: forward history only accrues from the day it is switched on. It compounds, so the value of starting is monotonically decreasing in how long we wait — which is the argument for doing it sooner rather than when a product need appears.
+
+**(b) Backward history — expensive, batch-only, genuinely deferred.**
+"This domain dropped today; what did it look like a year ago" requires reading historical derived SQLites, which is the 6.4-GB-per-release cost above. But it has a property that makes it tractable: it is **batchable**. One pass over one historical SQLite can answer thousands of domains at once. So the right shape is an offline batch job over a candidate set, never a per-domain lookup on the daily hot path — and certainly never inside `enrich()`, which must stay a sub-ms point lookup.
+
+This is what keeping the derived SQLites buys us, and it is why the 2026-09-20 retention decision keeps derived forever while pruning raw.
+
+### Coverage we actually hold, and the overlap trap
+
+As of 2026-09-20, after backfilling the three releases missed during the stale period, R2 holds derived SQLites for `feb-mar-apr`, `mar-apr-may`, `apr-may-jun`, `may-jun-jul` and `jun-jul-aug` 2026 — unbroken monthly coverage Feb-Aug 2026.
+
+**But monthly releases are not independent observations.** Each is a rolling 3-month window, so consecutive releases share **two of their three months**. `feb-mar-apr` and `jun-jul-aug` share none; `feb-mar-apr` and `mar-apr-may` share two thirds. Any decay calculation must account for this or it will read autocorrelation as signal. Practically: for a decay slope, prefer samples **three or more releases apart** (non-overlapping windows); use adjacent releases only for smoothing, never as independent points.
+
+This is also why the four-month stale gap cost less information than it appeared to — we were left with two *fully non-overlapping* snapshots, which is the useful configuration anyway.
+
+### What it would take to score on it
+
+Out of current phase scope, and noting the blast radius so nobody underestimates it: a decay signal is a **new scoring input**, which means `scoring_weights` changes, `score.py` changes, and the output JSON contract in PLAN.md Principle 5 changes on **both** the pipeline and site sides. It also needs a null-handling story at least as careful as the existing one (`cc_source_domain_count=null` is excluded from the average and deliberately not counted toward `publish_min_enrichment_completeness`), because "no history yet" will be the common case for a long time after forward history is switched on.
+
+### Recommendation
+
+1. **Do (a) when there is appetite for one small commit**: an append-only forward-history writer modelled on `domain_archive.py`, disabled-by-default config flag, non-fatal, no scoring change. It is cheap, it cannot break a run, and every day it is not on is a day of history not accumulated.
+2. **Leave (b) deferred.** It is an offline batch capability whose inputs we are already preserving. Nothing is lost by waiting, because the derived SQLites are kept.
+3. **Do not merge snapshots into one big table.** Keep per-release files as the durable artifact and derive whatever compact view is needed; a merged 120M-row-by-N-release table is the expensive version of a problem we do not have.
+4. **If storage ever becomes the binding constraint**, the first lever is compacting *old* derived SQLites to drop the `source_domain_count = 0` rows (14.9M of 119.7M in `jun-jul-aug`, ~12%) — but note that loses the three-state "in graph with zero inbound" vs "not in graph" distinction the schema was deliberately built to preserve, so it is a real trade, not free housekeeping.
