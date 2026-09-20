@@ -14,6 +14,7 @@ calls; no real `daily-domains.json` reads (synthetic payloads). Tests cover:
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from datetime import date
 from io import StringIO
@@ -2231,3 +2232,150 @@ def test_non_latin_title_never_reaches_either_part_end_to_end():
     assert HAN_ONLY not in out["text_body"]
     assert HAN_PHRASE in out["body"]
     assert HAN_PHRASE in out["text_body"]
+
+
+# --- Intro text: {cc_release} substitution ------------------------------------
+#
+# The intro names the Common Crawl release the backlink counts came from. The
+# release string lives ONLY in config["cc_backlinks"]["latest_release"] (bumped
+# by cc_refresh.py); the copy carries a {cc_release} placeholder so a refresh
+# can never leave the newsletter describing data it no longer ships.
+
+CC_INTRO = (
+    "Today's top expired domain picks, sorted by score. Backlinks counts come "
+    "from the Common Crawl domain-level hyperlink graph (release {cc_release}). "
+    "All domains were available at last check — verify at registrar before buying."
+)
+CC_RELEASE = "cc-main-2026-jun-jul-aug"
+
+
+def test_resolve_intro_text_substitutes_release_from_config():
+    out = gn._resolve_intro_text(
+        {"intro_text": CC_INTRO},
+        {"cc_backlinks": {"latest_release": CC_RELEASE}},
+    )
+    assert f"(release {CC_RELEASE})" in out
+    assert "{cc_release}" not in out
+
+
+def test_resolve_intro_text_leaves_text_without_placeholder_unchanged(caplog):
+    """An intro that never mentions the release is a legitimate choice — it must
+    pass through byte-identical and must not warn."""
+    plain = "Today's top expired domain picks, sorted by score."
+    with caplog.at_level(logging.WARNING, logger=gn.logger.name):
+        out = gn._resolve_intro_text({"intro_text": plain}, {})
+    assert out == plain
+    assert caplog.records == []
+
+
+def test_resolve_intro_text_keeps_other_braces_in_prose_untouched():
+    """Regression guard for the .format() trap: operator prose may contain
+    braces of its own, and .format() would raise KeyError on them."""
+    intro = "Release {cc_release} — and a {weird} note, plus {0} and {}."
+    out = gn._resolve_intro_text(
+        {"intro_text": intro},
+        {"cc_backlinks": {"latest_release": CC_RELEASE}},
+    )
+    assert out == f"Release {CC_RELEASE} — and a {{weird}} note, plus {{0}} and {{}}."
+
+
+def test_resolve_intro_text_keeps_other_braces_when_release_missing():
+    intro = "Graph (release {cc_release}). Keep this {weird} note."
+    out = gn._resolve_intro_text({"intro_text": intro}, {})
+    assert out == "Graph. Keep this {weird} note."
+
+
+@pytest.mark.parametrize("cfg", [
+    {},
+    {"cc_backlinks": {}},
+    {"cc_backlinks": None},
+    {"cc_backlinks": {"latest_release": ""}},
+    {"cc_backlinks": {"latest_release": None}},
+    {"cc_backlinks": {"latest_release": "   "}},
+    {"cc_backlinks": "cc-main-2026-jun-jul-aug"},  # wrong shape, not an object
+])
+def test_resolve_intro_text_drops_parenthetical_when_release_unknown(cfg, caplog):
+    """Documented soft degradation: the whole "(release ...)" aside is dropped,
+    leaving a true, grammatical sentence. Never "(release )", never a raw
+    placeholder, never an exception (hard rule 17)."""
+    with caplog.at_level(logging.WARNING, logger=gn.logger.name):
+        out = gn._resolve_intro_text({"intro_text": CC_INTRO}, cfg)
+    assert "hyperlink graph. All domains were available" in out
+    assert "{cc_release}" not in out
+    assert "release" not in out.split("hyperlink graph.")[1]
+    assert "(" not in out and ")" not in out
+    assert any("latest_release" in r.getMessage() for r in caplog.records)
+
+
+def test_resolve_intro_text_filler_when_placeholder_outside_parentheses(caplog):
+    """No parenthetical to drop — the placeholder still must not survive."""
+    intro = "Backlinks come from Common Crawl release {cc_release}, checked today."
+    with caplog.at_level(logging.WARNING, logger=gn.logger.name):
+        out = gn._resolve_intro_text({"intro_text": intro}, {})
+    assert out == (
+        f"Backlinks come from Common Crawl release "
+        f"{gn.CC_RELEASE_UNKNOWN_TEXT}, checked today."
+    )
+    assert "{cc_release}" not in out
+    assert caplog.records
+
+
+def test_resolve_intro_text_drops_only_the_release_parenthetical():
+    intro = "Scores (0-100) come from the graph (release {cc_release}) daily."
+    out = gn._resolve_intro_text({"intro_text": intro}, {})
+    assert out == "Scores (0-100) come from the graph daily."
+
+
+def test_default_intro_is_substituted_when_config_omits_intro_text():
+    out = gn._resolve_intro_text({}, {"cc_backlinks": {"latest_release": CC_RELEASE}})
+    assert CC_RELEASE in out
+    assert "{cc_release}" not in out
+
+
+def test_default_intro_hardcodes_no_release_and_no_data_age():
+    """DEFAULT_INTRO must not name a release or claim a vintage of its own —
+    that is exactly the drift this placeholder exists to prevent."""
+    assert gn.CC_RELEASE_PLACEHOLDER in gn.DEFAULT_INTRO
+    assert "cc-main" not in gn.DEFAULT_INTRO
+    assert "3 months" not in gn.DEFAULT_INTRO
+    assert "month" not in gn.DEFAULT_INTRO
+
+
+def test_resolve_intro_text_falls_back_when_intro_text_is_not_a_string(caplog):
+    with caplog.at_level(logging.WARNING, logger=gn.logger.name):
+        out = gn._resolve_intro_text(
+            {"intro_text": 42}, {"cc_backlinks": {"latest_release": CC_RELEASE}}
+        )
+    assert CC_RELEASE in out
+    assert caplog.records
+
+
+def test_generate_newsletter_substitutes_release_in_both_parts():
+    """End-to-end: one resolution feeds the HTML and the plain-text part, so
+    they can never disagree about which release the numbers came from."""
+    config = _config(intro_text=CC_INTRO)
+    config["cc_backlinks"] = {"latest_release": CC_RELEASE}
+    out = gn.generate_newsletter(
+        config,
+        {"domains": [_domain("marketglow.com", 88), _domain("tideblock.io", 74)]},
+        api_key="KEY", today=date(2026, 9, 20), dry_run=True,
+    )
+    assert f"(release {CC_RELEASE})" in out["body"]
+    assert f"(release {CC_RELEASE})" in out["text_body"]
+    assert "{cc_release}" not in out["body"]
+    assert "{cc_release}" not in out["text_body"]
+
+
+def test_generate_newsletter_degrades_intro_when_release_missing_from_config():
+    """No cc_backlinks block at all: the draft is still built, and neither part
+    shows scaffolding or an empty parenthetical."""
+    out = gn.generate_newsletter(
+        _config(intro_text=CC_INTRO),
+        {"domains": [_domain("coppernest.org", 91)]},
+        api_key="KEY", today=date(2026, 9, 20), dry_run=True,
+    )
+    assert out["status"] == "dry_run"
+    for part in (out["body"], out["text_body"]):
+        assert "{cc_release}" not in part
+        assert "(release )" not in part
+        assert "hyperlink graph. All domains" in part

@@ -35,14 +35,18 @@ email anyway.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import smtplib
+import sqlite3
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from email.message import EmailMessage
+from pathlib import Path
+from typing import NamedTuple
 
 # Brevo accepts up to 5 MB total; cap the plain-text body at 500 KB with
 # head+tail kept and the middle truncated. Typical days are 50-100 KB so
@@ -460,6 +464,293 @@ def _likely_cause_line(credit_errors: int, llm_backend: str | None) -> str:
     )
 
 
+# --- Common Crawl backlink-data freshness (added 2026-09-20) ---------------
+#
+# Why this exists: `cc_source_domain_count` carries scoring weight 0.30 — the
+# same as `wayback_snapshots` — yet the Common Crawl release behind it was
+# pulled by hand exactly ONCE (2026-05-13) and then sat 4 months stale with
+# nothing alarming, because a stale-but-present SQLite returns perfectly
+# plausible numbers. That is the same silent-multi-week-degradation shape as
+# the 2026-07-23 → 2026-09-17 LLM outage. The refresh now runs on a weekly
+# systemd timer (systemd/domainsifter-cc-refresh.timer); the line below is the
+# backstop that makes a silently-failing or silently-skipping timer visible.
+#
+# Cost discipline: the derived SQLite is ~6.6 GB and lives in R2. This code
+# NEVER downloads it. It reads the `meta` table from the LOCAL cache when the
+# file is already there (read-only, one tiny query) and otherwise falls back
+# to the result file written by `scripts/cc_refresh.py --auto`.
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = REPO_ROOT / "scripts" / "config.json"
+
+# Only used when config is missing/unreadable — the real value lives in
+# config.json under cc_backlinks.refresh.staleness_warn_days (hard rule 9).
+_CC_DEFAULT_STALENESS_WARN_DAYS = 45
+
+# Refresh outcomes that mean the automated refresh is broken rather than
+# merely idle. `skipped` (blackout / pipeline running) is benign on its own —
+# the weekly timer retries — so it does not escalate by itself; if it keeps
+# happening the age check catches it.
+_CC_FAILED_REFRESH_ACTIONS = ("verification_failed", "discovery_failed")
+
+
+class CCFreshness(NamedTuple):
+    """Structured verdict on the Common Crawl backlink data's freshness.
+
+    age_source records WHERE the age came from, because the two sources mean
+    different things:
+      - "sqlite-meta"    : `built_at` from the derived SQLite's meta table —
+                           the true age of the data the scorer reads.
+      - "refresh-result" : `finished_at` from the refresh result file, used
+                           when the SQLite is not in the local cache. That is
+                           the age of the last refresh RUN, which bounds how
+                           long the data can have been unattended.
+      - "unknown"        : neither source available; never guessed.
+    """
+
+    release: str | None
+    age_days: float | None
+    age_source: str
+    warn_days: int
+    stale: bool
+    last_action: str | None
+    last_reason: str | None
+    note: str | None
+
+    @property
+    def refresh_failed(self) -> bool:
+        """True when the last recorded refresh run failed outright."""
+        return self.last_action in _CC_FAILED_REFRESH_ACTIONS
+
+    @property
+    def escalates(self) -> bool:
+        """True when this must reach the subject line."""
+        return self.stale or self.refresh_failed
+
+
+def _cc_unknown(note: str, *, release: str | None = None, warn_days: int | None = None) -> CCFreshness:
+    """A no-signal CCFreshness carrying the reason the age is unknown."""
+    return CCFreshness(
+        release=release,
+        age_days=None,
+        age_source="unknown",
+        warn_days=warn_days if warn_days is not None else _CC_DEFAULT_STALENESS_WARN_DAYS,
+        stale=False,
+        last_action=None,
+        last_reason=None,
+        note=note,
+    )
+
+
+def _parse_iso8601_utc(value: object) -> datetime | None:
+    """Parse an ISO-8601 timestamp to an aware UTC datetime, or None.
+
+    Tolerates the trailing "Z" that cc_refresh.py writes and a missing
+    offset (assumed UTC). Any unparseable / non-string input returns None
+    rather than raising — this runs in the reporter."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text[-1] in ("Z", "z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _load_config() -> dict:
+    """Load scripts/config.json, or {} when absent/unreadable/malformed."""
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
+            loaded = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
+def _cc_sqlite_meta(release: str) -> dict[str, str] | None:
+    """The derived SQLite's `meta` table for `release`, or None.
+
+    Resolves the cache directory through
+    `scripts.enrichment.cc_backlinks._resolve_cache_dir` so there is exactly
+    one definition of where the cache lives. Opens the file READ-ONLY
+    (`?mode=ro`) and reads only `meta` — this runs on every daily run, so it
+    must be cheap and must never write. Returns None when the SQLite is not
+    cached locally (a legitimate state) or cannot be read; it NEVER downloads
+    the ~6.6 GB artifact from R2 just to build an email.
+    """
+    try:
+        from scripts.enrichment import cc_backlinks
+
+        path = cc_backlinks._resolve_cache_dir() / f"{release}.sqlite"
+        if not path.is_file() or path.stat().st_size == 0:
+            return None
+        conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+        try:
+            rows = conn.execute("SELECT key, value FROM meta").fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        # Corrupt file, missing meta table, unreadable cache dir, import
+        # failure — all degrade to "no signal from the SQLite".
+        return None
+    try:
+        return {str(key): str(value) for key, value in rows}
+    except Exception:
+        return None
+
+
+def _cc_refresh_result(result_path: object) -> dict | None:
+    """The JSON written by `cc_refresh.py --auto`, or None.
+
+    Relative paths resolve against REPO_ROOT (the archive_generator idiom).
+    Missing, unreadable, non-JSON and non-object files all return None.
+    """
+    if not isinstance(result_path, str) or not result_path.strip():
+        return None
+    try:
+        path = Path(result_path.strip())
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        with open(path, "r", encoding="utf-8") as fh:
+            loaded = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    except Exception:
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
+def cc_backlink_freshness(now: datetime | None = None) -> CCFreshness:
+    """How old the Common Crawl backlink data is, and whether that alarms.
+
+    Age comes from `built_at` in the derived SQLite's `meta` table when that
+    SQLite is in the local cache; otherwise from `finished_at` in the refresh
+    result file; otherwise it is reported as unknown (never guessed).
+
+    Never raises: every failure mode (missing config, missing cache file,
+    corrupt SQLite, malformed result JSON, unparseable timestamp) degrades to
+    a readable CCFreshness whose `note` says what was missing.
+    """
+    try:
+        now = now or datetime.now(timezone.utc)
+        config = _load_config()
+        cc_config = config.get("cc_backlinks") or {}
+        if not isinstance(cc_config, dict):
+            return _cc_unknown("no cc_backlinks config")
+        refresh = cc_config.get("refresh") or {}
+        if not isinstance(refresh, dict):
+            refresh = {}
+
+        warn_days = _CC_DEFAULT_STALENESS_WARN_DAYS
+        raw_warn = refresh.get("staleness_warn_days")
+        if isinstance(raw_warn, (int, float)) and raw_warn > 0:
+            warn_days = int(raw_warn)
+
+        release = None
+        try:
+            from scripts.enrichment import cc_backlinks
+
+            release = cc_backlinks._resolve_release(config) or None
+        except Exception:
+            release = cc_config.get("latest_release") or None
+        if not isinstance(release, str) or not release.strip():
+            return _cc_unknown("no release configured", warn_days=warn_days)
+        release = release.strip()
+
+        result = _cc_refresh_result(refresh.get("result_path"))
+        last_action = None
+        last_reason = None
+        if result:
+            action = result.get("action")
+            last_action = action.strip() if isinstance(action, str) and action.strip() else None
+            reason = result.get("reason")
+            last_reason = reason.strip() if isinstance(reason, str) and reason.strip() else None
+
+        meta = _cc_sqlite_meta(release)
+        built_at = _parse_iso8601_utc(meta.get("built_at")) if meta else None
+        if built_at is not None:
+            age_days = (now - built_at).total_seconds() / 86400.0
+            return CCFreshness(
+                release=release,
+                age_days=age_days,
+                age_source="sqlite-meta",
+                warn_days=warn_days,
+                stale=age_days > warn_days,
+                last_action=last_action,
+                last_reason=last_reason,
+                note=None,
+            )
+
+        # No usable SQLite meta. Fall back to the last refresh run's clock:
+        # if even the last refresh ATTEMPT is older than the warn window, the
+        # timer is not running and the data cannot be current either.
+        finished_at = _parse_iso8601_utc(result.get("finished_at")) if result else None
+        if finished_at is not None:
+            age_days = (now - finished_at).total_seconds() / 86400.0
+            note = (
+                "no local SQLite cache — age is of the last refresh run, "
+                "not of the data"
+            )
+            if meta:
+                note = "SQLite meta has no usable built_at — " + note
+            return CCFreshness(
+                release=release,
+                age_days=age_days,
+                age_source="refresh-result",
+                warn_days=warn_days,
+                stale=age_days > warn_days,
+                last_action=last_action,
+                last_reason=last_reason,
+                note=note,
+            )
+
+        note = "no local SQLite cache and no usable refresh result file"
+        if meta:
+            note = "SQLite meta has no usable built_at, and no usable refresh result file"
+        elif result:
+            note = "no local SQLite cache and no usable finished_at in the refresh result"
+        return CCFreshness(
+            release=release,
+            age_days=None,
+            age_source="unknown",
+            warn_days=warn_days,
+            stale=False,
+            last_action=last_action,
+            last_reason=last_reason,
+            note=note,
+        )
+    except Exception as exc:  # belt and braces: the reporter never raises
+        return _cc_unknown(f"freshness check failed ({type(exc).__name__}: {exc})")
+
+
+def _format_cc_freshness(cc: CCFreshness) -> str:
+    """Render the CC backlink-data value for the header block."""
+    parts = [cc.release or "(no release configured)"]
+    if cc.age_days is None:
+        parts.append("age unknown ⚠")
+    elif cc.age_source == "refresh-result":
+        parts.append(f"last refresh run {cc.age_days:.0f}d ago")
+    else:
+        parts.append(f"built {cc.age_days:.0f}d ago")
+    if cc.stale:
+        parts.append(f"🚨 STALE (> {cc.warn_days}d)")
+    if cc.last_action:
+        last = f"last refresh: {cc.last_action}"
+        if cc.last_reason:
+            last += f" ({cc.last_reason})"
+        parts.append(last)
+    else:
+        parts.append("last refresh: (no result file)")
+    if cc.note:
+        parts.append(cc.note)
+    return ", ".join(parts)
+
+
 def _truncate(log: str, max_bytes: int = _MAX_LOG_BYTES) -> str:
     """If log exceeds max_bytes, keep head + tail and replace middle with a
     notice. Preserves the most-useful portions (start: config + first errors;
@@ -507,6 +798,9 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
     credit_errors = _count_credit_balance_errors(log)
     shadow_counts = parse_shadow_verdicts(log)
     shadow_would_evict = parse_shadow_would_evict(log) if shadow_counts else 0
+    # Not parsed from the log: read from the CC data itself (local cache only)
+    # plus the refresh result file. See the section above.
+    cc = cc_backlink_freshness()
     # In shadow mode the screen genuinely isn't evicting, so this still alarms
     # — but as a DELIBERATE state with a different banner, not as a breakage.
     # A permanent identical banner across a validation window is how an
@@ -530,6 +824,12 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         alarms.append("👁 SCREEN IN SHADOW")
     if ranker_fell_back:
         alarms.append("🚨 PHASE 2 FALLBACK")
+    # CC backlink data feeds a 0.30 scoring weight; stale data scores today's
+    # candidates off a months-old webgraph, and that is invisible in the log.
+    if cc.stale:
+        alarms.append("🚨 CC DATA STALE")
+    elif cc.refresh_failed:
+        alarms.append("🚨 CC REFRESH FAILED")
     # " / " between alarms keeps the single-alarm subject byte-identical to
     # the pre-2026-09-18 format ("🚨 RDAP 403 BLOCK — Daily run ...").
     alarm_prefix = " / ".join(alarms) + " — " if alarms else ""
@@ -554,6 +854,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"Snapshot classes : {_format_classifier_counts(classifier_counts)}",
         f"Toxic evicted    : {toxic_live} by today's check, "
         f"{toxic_remembered} from memory (denylist)",
+        f"CC backlink data : {_format_cc_freshness(cc)}",
     ]
     if credit_errors:
         header.append(f"Credit errors    : {credit_errors} ('credit balance is too low')")
@@ -612,6 +913,37 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
             "ranking. A persistent fallback means the LLM ranking stage is\n"
             "effectively switched off — check before assuming list quality.\n"
             + _likely_cause_line(credit_errors, llm_backend)
+        )
+    if cc.stale or cc.refresh_failed:
+        age_str = (
+            f"{cc.age_days:.0f} day(s)" if cc.age_days is not None else "an unknown number of days"
+        )
+        title = (
+            "🚨🚨 COMMON CRAWL BACKLINK DATA IS STALE 🚨🚨"
+            if cc.stale
+            else "🚨🚨 COMMON CRAWL REFRESH IS FAILING 🚨🚨"
+        )
+        alert_blocks += (
+            f"\n{title}\n"
+            + "-" * len(title) + "\n"
+            + f"Installed release: {cc.release or '(none configured)'}\n"
+            f"Data age         : {age_str} (source: {cc.age_source}), "
+            f"warn threshold {cc.warn_days}d\n"
+            f"Last refresh     : {cc.last_action or '(no result file)'}"
+            + (f" — {cc.last_reason}" if cc.last_reason else "")
+            + "\n"
+            "cc_source_domain_count carries scoring weight 0.30 — the same as\n"
+            "wayback_snapshots — so an un-refreshed release means candidates get\n"
+            "ranked against an ageing webgraph. Common Crawl publishes the domain\n"
+            "graph monthly; a release older than the threshold means at least one\n"
+            "release was missed, and a failing refresh means the next one will be\n"
+            "missed too.\n"
+            "This is invisible in the log below: a stale-but-present SQLite\n"
+            "returns perfectly plausible numbers. That is exactly how the data\n"
+            "sat 4 months stale after the single manual 2026-05-13 build.\n"
+            "Check the weekly timer:\n"
+            "  systemctl status domainsifter-cc-refresh.timer\n"
+            "  journalctl -u domainsifter-cc-refresh.service\n"
         )
     if rdap_stops:
         alert_blocks += (

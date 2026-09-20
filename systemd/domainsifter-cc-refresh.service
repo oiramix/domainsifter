@@ -1,0 +1,100 @@
+# /etc/systemd/system/domainsifter-cc-refresh.service
+# DomainSifter Common Crawl refresh — keeps the domain-webgraph release
+# that feeds cc_source_domain_count (scoring weight 0.30) current.
+#
+# WHAT IT RUNS
+# scripts/run-cc-refresh.sh, which syncs the repo to origin/main, runs
+#   python -m scripts.cc_refresh --auto
+# and then commits + pushes scripts/config.json ONLY if that run
+# reported action="installed". --auto HEAD-probes data.commoncrawl.org
+# for the newest release, exits 0 as a cheap no-op when the newest
+# release is already cc_backlinks.latest_release, and otherwise
+# downloads the raw graph (~10.3 GB), builds the derived SQLite via
+# DuckDB, uploads both to R2, verifies the SQLite AS IT EXISTS IN R2
+# against the config canaries, and only then rewrites
+# cc_backlinks.latest_release. See the cc_backlinks.refresh block in
+# scripts/config.json for cadence, blackout, verification and retention.
+#
+# Scheduled by domainsifter-cc-refresh.timer (Sundays 18:00 UTC). That
+# file carries the schedule rationale and the runtime-cap arithmetic.
+# No [Install] section here on purpose: this unit is started by its
+# timer, so `systemctl list-unit-files` reporting it as `static` is the
+# CORRECT state — same as domainsifter-archive.service.
+#
+# HARD RUNTIME CAP: TimeoutStartSec=10h (see [Service] below)
+# A refresh that installs a release normally takes ~5 min download +
+# 15-25 min DuckDB build + ~2 min upload, but a slow mirror or a stalled
+# download makes it a multi-hour job in the worst case, and a multi-hour
+# job started at 18:00 UTC must not still be alive at 09:00 UTC when
+# domainsifter.timer starts the daily pipeline. The cap is enforced by
+# PID 1 rather than trusted to the schedule being "early enough":
+#
+#   Sun 18:00 UTC start + 10h cap = Mon 04:00 UTC kill,
+#   which is 5 hours of clearance before the Mon 09:00 UTC pipeline.
+#
+# WHY TimeoutStartSec= AND NOT RuntimeMaxSec=
+# For Type=oneshot the entire ExecStart runs during the unit's START
+# phase — the unit never reaches "running" — so RuntimeMaxSec= has no
+# effect on it. TimeoutStartSec= is the knob that applies, and for
+# Type=oneshot it defaults to infinity (not to DefaultTimeoutStartSec),
+# which is why an explicit value is required to have any cap at all.
+# On expiry systemd SIGTERMs the whole cgroup (bash wrapper + python +
+# any curl/DuckDB child), then SIGKILLs after TimeoutStopSec, and the
+# unit lands in `failed` with result `timeout` — visible in
+# `systemctl status`, which is what we want.
+#
+# A KILL IS SAFE. Every phase of cc_refresh is idempotent: the raw
+# download resumes via HTTP Range, the DuckDB build is rebuilt from
+# scratch into a temp file, the R2 uploads are overwrites, and
+# cc_backlinks.latest_release is rewritten only after in-R2
+# verification passes. A killed run leaves the previous release
+# installed and still being scored against — degraded, not down — and
+# the next weekly tick picks the work back up. See RECOVERY.md
+# "Weekly Common Crawl refresh".
+#
+# Cost: zero API spend. Common Crawl data is free; R2 storage is ~$0.21/mo
+# for the pinned raw plus ~$0.10/mo per accumulated derived SQLite.
+# Requires R2_* credentials and GITHUB_TOKEN in .env (loaded via
+# EnvironmentFile=). No ANTHROPIC_API_KEY, no email report — the daily
+# operational email's Common Crawl freshness line is the alarm path.
+#
+# Manual trigger: systemctl start domainsifter-cc-refresh.service
+#   NOTE: --auto refuses to start between 07:00 and 16:00 UTC (the
+#   blackout window in config) and exits 0 with action="skipped". See
+#   RECOVERY.md for how to run one by hand outside that window.
+# Logs: journalctl -u domainsifter-cc-refresh.service -f
+
+[Unit]
+Description=DomainSifter Common Crawl release refresh
+After=network-online.target
+Wants=network-online.target
+# Ordering safety only, no Requires=: this unit does not need the daily
+# pipeline or the archive, but if PID 1 ever has all three queued at
+# once (a boot, a manual burst) we want to be last in line rather than
+# racing them for the box and for the push to origin/main.
+After=domainsifter.service domainsifter-archive.service
+
+[Service]
+Type=oneshot
+User=domainsifter
+Group=domainsifter
+WorkingDirectory=/home/domainsifter/domainsifter
+EnvironmentFile=/home/domainsifter/domainsifter/.env
+ExecStart=/home/domainsifter/domainsifter/scripts/run-cc-refresh.sh
+StandardOutput=journal
+StandardError=journal
+# Explicit memory accounting, matching domainsifter.service, so
+# `systemctl show -p MemoryPeak domainsifter-cc-refresh.service` reports
+# a real number after a build. The DuckDB aggregation is the memory-
+# hungry step; the box has 125 GB, so this is for observability, not a
+# limit. No MemoryMax= is set on purpose — starving the build would trade
+# a clean 25-minute run for an OOM kill.
+MemoryAccounting=yes
+# THE HARD RUNTIME CAP. See the header for the arithmetic and for why
+# this is TimeoutStartSec and not RuntimeMaxSec.
+TimeoutStartSec=10h
+# Give the SIGTERMed wrapper and python a real chance to unwind (closing
+# a multi-GB DuckDB write, aborting a boto3 multipart upload) before the
+# SIGKILL. Default is 90s, which is tight for a 6.6 GB file on a slow
+# disk flush.
+TimeoutStopSec=5min

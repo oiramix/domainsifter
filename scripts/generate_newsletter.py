@@ -78,7 +78,12 @@ Configuration sources:
     config["newsletter"]["top_n"]             — default 20
     config["newsletter"]["subject_template"]  — uses {date} placeholder ({n}
                                               still accepted for back-compat)
-    config["newsletter"]["intro_text"]        — body intro paragraph
+    config["newsletter"]["intro_text"]        — body intro paragraph; may
+                                              contain {cc_release}, filled in
+                                              at render time from
+                                              config["cc_backlinks"]
+                                              ["latest_release"]
+                                              (see _resolve_intro_text)
     config["newsletter"]["site_url"]          — for "see full list" link
     config["newsletter"]["featured_n"]        — rich blocks at the top
                                               (default 3)
@@ -114,6 +119,7 @@ import html
 import json
 import logging
 import os
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -192,10 +198,35 @@ EXCERPT_TITLE_DENYLIST = frozenset({
 _SAFE_NAME_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789.-")
 
 DEFAULT_SUBJECT_TEMPLATE = "DomainSifter daily picks — {date}"
+# Used only when config.newsletter.intro_text is absent. It carries the same
+# {cc_release} placeholder as the configured copy (see _resolve_intro_text) so
+# the fallback is subject to the same substitution and cannot name a release of
+# its own. It previously said "Common Crawl's last 3 months of crawl data",
+# which silently became a lie four months after it was written — no wording
+# here may describe the age or vintage of the CC data, only the release it
+# actually came from.
 DEFAULT_INTRO = (
     "Today's top expired domain picks, sorted by score. Backlinks counts "
-    "come from Common Crawl's last 3 months of crawl data. All domains "
-    "were available at last check — verify at registrar before buying."
+    "come from the Common Crawl domain-level hyperlink graph "
+    "(release {cc_release}). All domains were available at last check — "
+    "verify at registrar before buying."
+)
+
+# The literal token operators write into intro_text where the Common Crawl
+# release name belongs. Single source of truth for the release string itself is
+# config["cc_backlinks"]["latest_release"], which cc_refresh.py bumps.
+CC_RELEASE_PLACEHOLDER = "{cc_release}"
+
+# Last-resort filler for the placeholder when the release is unknown AND the
+# operator did not write the placeholder inside a parenthetical (see
+# _resolve_intro_text). Reads grammatically after the word "release".
+CC_RELEASE_UNKNOWN_TEXT = "unspecified"
+
+# Matches a parenthetical aside whose only job is to name the release, e.g.
+# " (release {cc_release})". `[^()]*` on both sides keeps it to a single flat
+# parenthetical so it can never swallow surrounding prose.
+_CC_RELEASE_PARENTHETICAL_RE = re.compile(
+    r"\s*\([^()]*" + re.escape(CC_RELEASE_PLACEHOLDER) + r"[^()]*\)"
 )
 UTM_PARAMS = {
     "utm_source": "newsletter",
@@ -205,6 +236,68 @@ UTM_PARAMS = {
 
 
 # --- Helpers -----------------------------------------------------------------
+
+
+def _resolve_intro_text(nl_cfg: dict, config: dict) -> str:
+    """Return the intro paragraph with `{cc_release}` filled in.
+
+    The intro names the Common Crawl release the backlink counts came from.
+    That release is refreshed on a timer, so the copy must never carry the
+    release name itself — `config["cc_backlinks"]["latest_release"]` (the same
+    key the enricher queries and cc_refresh.py bumps) is the only source of
+    truth, and this resolves the placeholder against it once, before either
+    body is rendered, so the HTML and text parts can never disagree.
+
+    Substitution is `str.replace`, deliberately NOT `str.format`: intro_text is
+    operator-authored prose that may legitimately contain other braces ("a
+    {weird} note"), and `.format()` would raise KeyError/IndexError on them and
+    take the whole newsletter down over a typo in a marketing sentence.
+
+    Fail-soft when the release is missing or empty (hard rule 17 — this step is
+    chained non-fatally after the daily pipeline and must never raise):
+      1. Drop the parenthetical the placeholder sits in, if it sits in one.
+         "...hyperlink graph (release {cc_release}). All domains..." becomes
+         "...hyperlink graph. All domains..." — still true, still grammatical,
+         and it simply says less rather than saying something broken. Chosen
+         over emitting "(release )" or "(release unknown)", which advertise a
+         config glitch to subscribers.
+      2. If the placeholder was written outside any parenthetical, fall back to
+         CC_RELEASE_UNKNOWN_TEXT. Uglier, but a raw `{cc_release}` in a sent
+         email is worse than an awkward word, and a silent empty string would
+         read as a truncated sentence.
+    Either way a warning is logged so the operator sees it in the run log.
+    """
+    intro = nl_cfg.get("intro_text", DEFAULT_INTRO)
+    if not isinstance(intro, str):
+        logger.warning(
+            "newsletter.intro_text is %s, not a string; using the default intro.",
+            type(intro).__name__,
+        )
+        intro = DEFAULT_INTRO
+
+    if CC_RELEASE_PLACEHOLDER not in intro:
+        # Nothing to substitute. No warning: an intro that never mentions the
+        # release is a legitimate choice, not a misconfiguration.
+        return intro
+
+    # Defensive about the shape as well as the value: a hand-edited config that
+    # turned cc_backlinks into something other than an object must degrade like
+    # a missing release, not raise inside the newsletter step.
+    cc_cfg = config.get("cc_backlinks") or {}
+    release = (
+        str(cc_cfg.get("latest_release") or "").strip()
+        if isinstance(cc_cfg, dict) else ""
+    )
+    if release:
+        return intro.replace(CC_RELEASE_PLACEHOLDER, release)
+
+    logger.warning(
+        "newsletter.intro_text contains %s but cc_backlinks.latest_release is "
+        "missing or empty; dropping the release mention from the intro.",
+        CC_RELEASE_PLACEHOLDER,
+    )
+    degraded = _CC_RELEASE_PARENTHETICAL_RE.sub("", intro)
+    return degraded.replace(CC_RELEASE_PLACEHOLDER, CC_RELEASE_UNKNOWN_TEXT)
 
 
 def _append_utm(url: str, params: dict[str, str] | None = None) -> str:
@@ -1446,7 +1539,9 @@ def generate_newsletter(
     top_n = int(nl_cfg.get("top_n", DEFAULT_TOP_N))
     featured_n = int(nl_cfg.get("featured_n", DEFAULT_FEATURED_N) or 0)
     subject_template = nl_cfg.get("subject_template", DEFAULT_SUBJECT_TEMPLATE)
-    intro_text = nl_cfg.get("intro_text", DEFAULT_INTRO)
+    # Resolved once here so both rendered parts get the identical sentence and
+    # no build_*_body call site needs to know about the placeholder.
+    intro_text = _resolve_intro_text(nl_cfg, config)
     site_url = nl_cfg.get("site_url", DEFAULT_SITE_URL).rstrip("/")
     reason_max_chars = int(nl_cfg.get("reason_max_chars", DEFAULT_REASON_MAX_CHARS))
     excerpt_max_chars = int(nl_cfg.get("excerpt_max_chars", DEFAULT_EXCERPT_MAX_CHARS))

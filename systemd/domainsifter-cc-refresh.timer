@@ -1,0 +1,142 @@
+# Weekly timer for the DomainSifter Common Crawl refresh — fires
+# Sundays at 18:00 UTC.
+#
+# WHAT IT RUNS
+# domainsifter-cc-refresh.service, i.e. scripts/run-cc-refresh.sh:
+# syncs the repo to origin/main, runs
+# `python -m scripts.cc_refresh --auto`, and commits + pushes the
+# one-line scripts/config.json change ONLY when that run reports
+# action="installed". --auto HEAD-probes data.commoncrawl.org for the
+# newest domain-level webgraph release, exits 0 as a no-op when the
+# newest release is already cc_backlinks.latest_release, and otherwise
+# downloads the raw graph (~10.3 GB), builds the derived SQLite via
+# DuckDB, uploads both to R2, verifies the SQLite AS IT EXISTS IN R2
+# against the config canaries, and only then rewrites
+# cc_backlinks.latest_release.
+#
+# THIS IS THE ONLY TRIGGER. Unlike the archive, nothing chains this unit
+# with OnSuccess=. If this timer is not enabled, the Common Crawl data
+# never refreshes and nothing else notices except the freshness line in
+# the daily operational email.
+#
+# WHY THE TIMER EXISTS
+# cc_refresh.py had no schedule until 2026-09-20 and had run exactly
+# ONCE, by hand, on 2026-05-13 — while cc_source_domain_count carried
+# scoring weight 0.30. The input silently went four months stale and
+# nothing alarmed. This timer fixes the cadence; send_report.py's
+# Common Crawl freshness line (staleness_warn_days=45 in config) fixes
+# the alarm. Deliberately no email report on this unit: a second,
+# weaker alarm path is worse than one good one.
+#
+# WHY WEEKLY, AND NOT MONTHLY
+# Common Crawl publishes the domain graph MONTHLY, as a rolling
+# three-month window (verified 2026-09-20 against
+# commoncrawl.org/web-graphs: jan-feb-mar, feb-mar-apr, mar-apr-may,
+# apr-may-jun, may-jun-jul, jun-jul-aug all exist for 2026 — the
+# previously recorded belief of ~3x/year was simply wrong). Matching
+# cadence to publication would say monthly, and weekly looks like four
+# times the work. It is not:
+#
+#   * A tick that finds nothing new costs a couple of HEAD requests and
+#     exits 0 before downloading a byte. Three extra no-op ticks a month
+#     are free in money, bandwidth and wall-clock.
+#   * A newly published release is installed within 7 days instead of up
+#     to 30.
+#   * THE REAL REASON — RETRIES. A run that fails discovery, fails
+#     verification, or gets killed by the runtime cap gets an automatic
+#     second attempt in 7 days. On a monthly cadence the same failure
+#     leaves a 0.30-weight scoring input pinned to an old release for a
+#     whole month, and the only thing standing between that and a repeat
+#     of the four-month silent staleness is an operator reading an email
+#     line. Weekly converts "broken until someone acts" into "broken for
+#     at most a week."
+#
+# WHY SUNDAY 18:00 UTC — THIS IS ABOUT GIT PUSH, NOT CPU
+# The box's day is booked: domainsifter.timer starts the pipeline at
+# 09:00 UTC; domainsifter.service finishes between 11:45 and 12:25 UTC
+# (upper end since the LLM ranker returned 2026-09-19); OnSuccess= then
+# chains domainsifter-archive.service, whose own commit and push lands
+# at ~12:45 UTC. domainsifter-archive.timer fires again at 14:00 UTC and
+# a backlog drain takes up to ~20 min, so it is finished by ~14:30 UTC.
+#
+# run-daily.sh and archive_generator BOTH `git push` to origin/main, and
+# so does this job on an install. A push landing while origin has moved
+# is exactly how this project broke on 2026-05-21 (see RECOVERY.md,
+# "Pipeline succeeded, push failed"). 18:00 UTC sits ~3.5 hours past the
+# archive timer's worst case and ~5.25 hours past the daily chain's, so
+# this unit can never push inside either of their push windows, even on
+# a slow day. Sunday is arbitrary but fixed: one known evening a week is
+# easier to reason about than "some weekday", and nothing else on this
+# box is scheduled between 14:30 and 09:00 the next morning.
+#
+# THE RUNTIME CAP IS PART OF THE SCHEDULE, NOT A SEPARATE CONCERN
+# A refresh that installs a release is normally ~5 min download + 15-25
+# min DuckDB build + ~2 min upload, but a slow mirror or a stalled
+# transfer makes it a multi-hour job in the worst case, and a multi-hour
+# job must not still be running when the 09:00 UTC pipeline starts —
+# it would be competing for the box and, worse, could push to
+# origin/main inside the daily run's push window. That is enforced by
+# PID 1, not by hoping 18:00 is early enough:
+# domainsifter-cc-refresh.service sets TimeoutStartSec=10h.
+#
+#   Sun 18:00 UTC start + 10h cap = Mon 04:00 UTC kill at the latest,
+#   giving 5 hours of clearance before the Mon 09:00 UTC pipeline start.
+#
+# A kill is safe: every step of cc_refresh is idempotent, the download
+# resumes via HTTP Range, and cc_backlinks.latest_release is only
+# rewritten after in-R2 verification, so a killed run leaves the
+# previous release installed and scored against. The next tick redoes
+# the work. See the .service header and RECOVERY.md
+# "Weekly Common Crawl refresh".
+#
+# WHY Persistent=true IS DELIBERATELY ABSENT (it is set on
+# domainsifter.timer and domainsifter-archive.timer — this unit differs
+# on purpose, do not "fix" it)
+# Persistent=true replays a missed firing at the next boot, i.e. at an
+# ARBITRARY time of day — including 09:15 UTC, mid-pipeline. That would
+# start a multi-hour, disk- and network-heavy job alongside the daily
+# run and let it push to origin/main inside the daily run's push window:
+# precisely the collision the 18:00 UTC slot exists to avoid, and the
+# 2026-05-21 failure mode. cc_refresh --auto does refuse to start inside
+# the 07:00-16:00 UTC blackout (config cc_backlinks.refresh) and also
+# skips while domainsifter.service is active, so a catch-up would most
+# likely be a harmless action="skipped" — but the schedule should not
+# depend on that interlock for its correctness.
+#
+# And catch-up buys nothing here. The data is a rolling THREE-MONTH
+# window published monthly; the next tick is at most 7 days away; the
+# staleness threshold is 45 days. A firing missed to downtime costs
+# nothing but a week of latency on data that is months wide.
+#
+# INSTALL (server-side, run as root once):
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter-cc-refresh.service /etc/systemd/system/
+#   cp /home/domainsifter/domainsifter/systemd/domainsifter-cc-refresh.timer   /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now domainsifter-cc-refresh.timer
+#   systemctl list-timers | grep cc-refresh   # confirm next Sun 18:00 UTC firing
+#
+# scripts/deploy_systemd.sh picks both files up with no edit — it globs
+# systemd/*.service and systemd/*.timer and daemon-reloads once if
+# anything changed. `sudo scripts/deploy_systemd.sh` is the normal way
+# to deploy subsequent edits to these two files; the cp lines above are
+# only for the first install. Note that deploy_systemd.sh does NOT
+# enable anything, so the `systemctl enable --now` above is still
+# required exactly once.
+#
+# Logs: journalctl -u domainsifter-cc-refresh.service -f
+# Last week's decision in one line:
+#   journalctl -u domainsifter-cc-refresh.service | grep 'cc-refresh summary'
+
+[Unit]
+Description=Run DomainSifter Common Crawl release refresh weekly (Sun 18:00 UTC)
+
+[Timer]
+OnCalendar=Sun *-*-* 18:00:00 UTC
+# Explicit, and explicitly NOT true — see the Persistent= section above.
+# A missed firing waits for next Sunday rather than replaying at an
+# arbitrary time of day, possibly mid-pipeline.
+Persistent=false
+Unit=domainsifter-cc-refresh.service
+
+[Install]
+WantedBy=timers.target

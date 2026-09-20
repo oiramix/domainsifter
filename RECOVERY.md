@@ -324,3 +324,219 @@ But the architecture had allowed a class of failure that, with worse timing or m
 - `Persistent=true` is correct for the downtime-recovery use case but dangerous without a guard. Never restart the timer during the day; rely on the timer's own scheduling.
 - `put_object` on R2 is atomic; partial-write corruption is not a failure mode to plan for.
 - Cross-unit triggers should be done via `OnSuccess=` (PID 1, internal) rather than `ExecStartPost=systemctl start` (user-space, polkit, fragile).
+
+---
+
+## Scenario: "Weekly Common Crawl refresh" (did it run, what did it decide)
+
+`domainsifter-cc-refresh.timer` fires every **Sunday at 18:00 UTC** and
+starts `domainsifter-cc-refresh.service`, which runs
+`scripts/run-cc-refresh.sh` → `python -m scripts.cc_refresh --auto`. Its
+whole job is to keep `cc_backlinks.latest_release` in `scripts/config.json`
+pointed at the newest Common Crawl domain-webgraph release, because that
+field feeds `cc_source_domain_count`, which carries **scoring weight 0.30**.
+It went four months stale unnoticed before this timer existed (built once by
+hand on 2026-05-13, automated 2026-09-20).
+
+Common Crawl publishes monthly, so three Sundays out of four are a
+deliberate no-op: two HEAD requests, "already installed", exit 0, git
+untouched. The fourth does real work — ~5 min download, 15-25 min DuckDB
+build, ~2 min upload, then in-R2 verification — and ends with a one-line
+commit to `scripts/config.json` on origin/main.
+
+### Step 1 — Confirm what happened
+
+Every run leaves exactly one summary line in the journal, on every path:
+
+```bash
+# What did the last few weeks decide?
+journalctl -u domainsifter-cc-refresh.service | grep 'cc-refresh summary'
+
+# Full log of the most recent run:
+journalctl -u domainsifter-cc-refresh.service -n 200
+
+# Is the timer even armed? Expect NEXT: <next Sunday 18:00 UTC>
+systemctl list-timers | grep cc-refresh
+systemctl status domainsifter-cc-refresh.service
+
+# The machine-readable verdict (gitignored, server-local, overwritten each run):
+cat /home/domainsifter/domainsifter/scripts/state/cc_refresh_result.json
+```
+
+A summary line looks like:
+
+```
+cc-refresh summary: action=noop release=cc-main-2026-jun-jul-aug previous=- rows=124646710 pushed=no exit=0 reason=-
+```
+
+| `action` | Meaning | Unit state | Did git move? |
+|---|---|---|---|
+| `noop` | Newest published release is already installed. The normal weekly outcome. | `inactive (dead)` | No |
+| `installed` | New release downloaded, built, uploaded, **verified in R2**, config swapped, committed and pushed. | `inactive (dead)` | Yes — one `data(cc): swap Common Crawl release A -> B` commit |
+| `skipped` | A guard refused to start: inside the 07:00-16:00 UTC blackout, `domainsifter.service` active, or `cc_backlinks.refresh.enabled=false`. | `inactive (dead)` | No |
+| `verification_failed` | An artifact was built but failed its canary checks in R2. **Config was NOT swapped.** | `failed` | No |
+| `discovery_failed` | Could not determine the newest release (Common Crawl 5xx, DNS, no window in range has both raw files). Nothing downloaded. | `failed` | No |
+| `no-result-file` / `unparseable-result` | The refresh died before writing its verdict — usually the runtime cap (see below) or an unhandled crash. | `failed` | No |
+
+If `list-timers` shows no `cc-refresh` row at all, the timer was never
+enabled or got disabled. Deploy and enable it:
+
+```bash
+sudo scripts/deploy_systemd.sh                        # copies + daemon-reload
+sudo systemctl enable --now domainsifter-cc-refresh.timer
+systemctl list-timers | grep cc-refresh
+```
+
+Note that `deploy_systemd.sh` never enables anything — a unit file that is
+present but not enabled is silent, and silence is exactly the failure this
+scenario exists to make visible.
+
+### `verification_failed` — this is degraded, NOT down
+
+Read this before touching anything: **a failed verification changed
+nothing.** `cc_refresh` gates the config swap on reading the derived SQLite
+back out of R2 and checking it against `cc_backlinks.refresh.verification`
+(row-count floor, `google.com` present with a large count, the invented
+`canary_absent` names absent). If that check fails it refuses to rewrite
+`latest_release`, the wrapper refuses to touch git, and the pipeline keeps
+scoring the **previous** release exactly as it did yesterday.
+
+So: no emergency, and nothing to roll back. The only cost of sitting on it
+is that the backlink signal ages, and the daily operational email's Common
+Crawl freshness line starts warning once `built_at` passes
+`staleness_warn_days` (45). You have weeks, and next Sunday's tick retries
+automatically.
+
+Diagnose at leisure:
+
+```bash
+journalctl -u domainsifter-cc-refresh.service -n 300 | grep -i -A5 verif
+cat /home/domainsifter/domainsifter/scripts/state/cc_refresh_result.json
+```
+
+The usual causes are a truncated or partial build (row count far below
+`min_cc_apex_rows`) and a genuinely different upstream release shape. The
+first is answered by re-running (the raw download resumes, the build starts
+clean); the second is a config decision, not a recovery action — adjust the
+thresholds deliberately and record why in STATE.md.
+
+### The runtime cap fired (job killed mid-run)
+
+`domainsifter-cc-refresh.service` sets `TimeoutStartSec=10h`. Sunday 18:00
+UTC + 10h = Monday 04:00 UTC at the latest, which leaves 5 hours of
+clearance before the 09:00 UTC pipeline. PID 1 enforces this so a stalled
+multi-hour job can never be alive during the daily run, competing for the
+box or pushing to origin/main inside the daily run's push window.
+
+It looks like this:
+
+```bash
+systemctl status domainsifter-cc-refresh.service
+#   Active: failed (Result: timeout)
+journalctl -u domainsifter-cc-refresh.service | tail -20
+#   ... Start operation timed out. Terminating.
+```
+
+**No recovery action is needed, and that is by design.** Every phase is
+idempotent: the raw download resumes via HTTP Range, the derived SQLite is
+rebuilt from scratch into a fresh file, the R2 uploads are overwrites, and
+`latest_release` is only rewritten after in-R2 verification. A killed run
+leaves the previous release installed and scored against. Next Sunday picks
+the work up where it stopped. Investigate *why* it took ten hours
+(data.commoncrawl.org throughput, disk pressure) before re-running by hand.
+
+### Re-running by hand — and the blackout guard that will stop you
+
+`--auto` deliberately refuses to start between **07:00 and 16:00 UTC**
+(half-open `[07:00, 16:00)`, from `cc_backlinks.refresh`), and also while
+`domainsifter.service` is active. That window is when the daily pipeline
+(09:00, finishing 11:45-12:25), its chained archive push (~12:45) and the
+archive timer (14:00, done by ~14:30) own the box and own the push to
+origin/main. A manual run inside it exits 0 with `action=skipped` and does
+nothing:
+
+```
+cc-refresh summary: action=skipped release=- previous=- rows=- pushed=no exit=0 reason=inside the blackout window [07:00, 16:00) UTC ...
+```
+
+That is the guard working, not a fault. Run it after 16:00 UTC or before
+07:00 UTC:
+
+```bash
+sudo systemctl start domainsifter-cc-refresh.service     # the same path the timer takes
+journalctl -u domainsifter-cc-refresh.service -f
+```
+
+Cheap read-only checks that need neither R2 credentials nor the window:
+
+```bash
+sudo -u domainsifter -i
+cd /home/domainsifter/domainsifter
+.venv/bin/python -m scripts.cc_refresh --discover-only   # prints the newest published release
+grep -n '"latest_release"' scripts/config.json           # prints the installed one
+```
+
+If you genuinely must build inside the blackout window (you almost never
+must — the data is a rolling three-month window), the explicit manual path
+is **not** blackout-guarded:
+
+```bash
+sudo -u domainsifter -i
+cd /home/domainsifter/domainsifter
+.venv/bin/python -m scripts.cc_refresh --release cc-main-2026-jun-jul-aug --install
+```
+
+Two things to know first: it competes with the daily run for disk and
+network, and it swaps `latest_release` in the working tree **without
+committing** — you own the commit and the push, and that push must not land
+between ~11:45 and ~14:30 UTC (see "Pipeline succeeded, push failed" for
+what that collision costs). Waiting until 16:00 UTC is almost always right.
+
+### Rolling back a bad release
+
+If a newly installed release verifies but turns out to be wrong in a way
+only the daily output reveals (scores collapse, implausible
+`cc_source_domain_count` everywhere), roll the pointer back. It is one line,
+and the previous release's derived SQLite is still on R2 — derived artifacts
+are never deleted:
+
+```bash
+sudo -u domainsifter -i
+cd /home/domainsifter/domainsifter
+git fetch origin main && git reset --hard origin/main
+# Edit the ONE line back to the previous release name:
+$EDITOR scripts/config.json          # "latest_release": "cc-main-2026-feb-mar-apr"
+git add scripts/config.json
+git commit -m "revert(cc): pin latest_release back to cc-main-2026-feb-mar-apr"
+git push "https://x-access-token:$(grep ^GITHUB_TOKEN= .env | cut -d= -f2)@github.com/oiramix/domainsifter.git" main
+```
+
+The next pipeline run downloads that release's SQLite from R2 into
+`~/.cache/domainsifter/cc/` and scores against it again. Be aware the weekly
+refresh will re-discover the newer release and install it again next Sunday
+— a rollback is a stopgap, so record the reason in STATE.md and decide
+whether to set `cc_backlinks.refresh.enabled=false` until it is understood.
+
+### Install succeeded but the push didn't
+
+The summary reads `action=installed pushed=failed exit=1`: R2 holds the
+verified artifacts and the commit exists on the server only. The recipe is
+the same as "Pipeline succeeded, push failed" — rebase onto origin/main and
+push by hand. If you leave it alone nothing breaks: tomorrow's 09:00 UTC run
+does `reset --hard origin/main`, discards the local commit and keeps scoring
+the previous release, and next Sunday's tick redoes the work (downloads
+resume, uploads overwrite) and pushes a fresh commit.
+
+### What lives on R2, and what is safe to delete
+
+| Artifact | Tier | Retention |
+|---|---|---|
+| Raw vertices + edges (~10-18 GiB/release) | IA (`STANDARD_IA`) | **Pruned** automatically to the newest `prune_raw_after_releases` (2) releases |
+| Derived SQLite (~1.5-6.6 GiB/release) | Standard | **Never deleted** by this code, at any setting |
+| Local SQLite cache `~/.cache/domainsifter/cc/` | OVH disk | Pruned to the active release when `prune_local_cache` is true |
+
+Pruned raw is not a loss: it exists only to rebuild the derived SQLite and
+is re-downloadable from data.commoncrawl.org for free at any time. The
+derived SQLite is the durable asset — it is what the pipeline reads, and the
+only thing that could ever support a backwards-looking backlink trend. Do
+not hand-delete derived objects to save $0.10/month.

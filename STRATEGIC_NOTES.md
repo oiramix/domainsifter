@@ -4,11 +4,11 @@ Long-horizon decisions that don't fit neatly into PLAN.md (which scopes the curr
 
 Index of decisions:
 
-- [Common Crawl integration — accumulation strategy (2026-05-13)](#common-crawl-integration--accumulation-strategy-2026-05-13)
+- [Common Crawl integration — accumulation strategy (2026-05-13 — raw pruning added 2026-09-20)](#common-crawl-integration--accumulation-strategy-2026-05-13)
 - [Multi-release CC query strategy (2026-05-13 — Strategy A active 2026-05-14)](#multi-release-cc-query-strategy-2026-05-13-pending)
 - [Free vs paid tier model (2026-05-13, pending)](#free-vs-paid-tier-model-2026-05-13-pending)
 - [Daily publication count cap (2026-05-13, pending)](#daily-publication-count-cap-2026-05-13-pending)
-- [Common Crawl refresh cadence — manual vs automated (2026-05-13, pending)](#common-crawl-refresh-cadence--manual-vs-automated-2026-05-13-pending)
+- [Common Crawl refresh cadence — manual vs automated (2026-05-13 — RESOLVED 2026-09-20: automated, weekly)](#common-crawl-refresh-cadence--manual-vs-automated-2026-05-13-pending)
 
 ---
 
@@ -27,6 +27,19 @@ The immediate use case is "use the latest release's `source_domain_count` as one
 The strategic part is **decay velocity**. When a domain is freshly dropped on day D, its CC release on D−30 still contains the link graph as the rest of the web saw it 1–4 months ago (CC crawl window). If a domain had 800 inbound source domains in Feb 2026 and only 12 in May 2026, that's a steep decay signal — far more informative than the single point. **We can't measure that without historical retention.**
 
 This is the kind of capability that's expensive to acquire retroactively (you can't go back in time and download the Feb 2026 release after they're stale) and cheap to acquire prospectively (just don't delete). The asymmetry decides it.
+
+### Revision (2026-09-20): prune raw, keep derived forever
+
+"We never delete old releases" is refined, not reversed. The distinction the 2026-05-13 note didn't draw is between the two artifact classes:
+
+- **Derived SQLite** (~6.6 GB/release, `cc/derived/{release}.sqlite`) — `apex_domain -> source_domain_count`. **Never deleted.** This is the artifact the decay-velocity thesis above actually needs: every one of the four enabled capabilities is a query over counts across releases, and none of them reads raw. It is also the only artifact the pipeline ever touches.
+- **Raw vertices + edges** (~10-18 GB/release, `cc/raw/{release}/*.txt.gz`) — **pruned to the newest 2 releases.** Raw exists for exactly one purpose: to build the derived SQLite. Once derived is built and verified, raw is a build input we already consumed. The newest 2 are kept so a discovered build bug can be re-derived without a re-download.
+
+The asymmetry argument that decided the original policy does not apply to raw, because raw is **not** expensive to acquire retroactively: data.commoncrawl.org keeps its hyperlinkgraph releases indefinitely and serves them free. Verified 2026-09-20 — every 2026 release plus the 2025 back-catalogue still returns 200. So the "you can't go back in time" premise is true of derived (we build it, nobody else hosts it) and false of raw (CC hosts it forever).
+
+Cost effect: raw pinned at ~21 GB IA (~$0.21/mo) instead of growing 10-18 GB every month; derived still accumulates ~$0.10/mo per release. Five-year projection drops from ~$14/mo to ~$6/mo with **zero** loss of strategic capability. That matters more than it did in May: there is still no revenue, and the EUR 120/mo Max subscription is the whole budget.
+
+Implemented as `cc_backlinks.refresh.prune_raw_after_releases` (default 2; set 0 to disable). The pruning code refuses to delete anything under `cc/derived/` at any config value, refuses to touch the active release, and skips any release name it cannot parse — three independent guards, because deleting the live derived SQLite would silently zero out a 0.30-weight scoring input.
 
 ### What this enables (eventually, not now)
 
@@ -239,7 +252,31 @@ Cons: more moving parts (CC's actual publish date varies; the cron has to either
 
 **Option Hybrid.** Cron checks if a new release is available on CC; if yes, run `cc_refresh` and send an email asking Mario to confirm + bump config. Best of both — no missed releases, but operator stays in the loop.
 
-### Provisional lean
+### RESOLVED 2026-09-20 — Option Cron, weekly, with automated verification
+
+The revisit date set below ("call it July-August 2026") passed unobserved, and the failure mode this note predicted is exactly what happened: **the refresh never ran again.** One manual run, 2026-05-13. Four months stale by 2026-09-20, through releases mar-apr-may, apr-may-jun, may-jun-jul and jun-jul-aug — while `cc_source_domain_count` carried scoring weight 0.30. Nobody noticed, because stale data produces plausible numbers.
+
+That settles the argument the "provisional lean" was making. Its three reasons were all about deferring automation cost; none of them priced the cost of the manual path simply not being walked. The empirical answer to "what variance should we expect in CC's publication timing and file sizes" also arrived, and it is undramatic: monthly like clockwork, vertices stable at 0.88-0.92 GB, schema unchanged. The thing that actually varied was human attention.
+
+**Option Hybrid is rejected**, despite being the conservative choice. Hybrid's "email Mario to confirm + bump config" step is the manual step that already failed — it moves the single point of failure from "notice the release" to "act on the email" without removing it. Automation that still needs a human to finish is the worst of the three, because it also lets everyone believe the problem is solved.
+
+**Option Cron as built**, addressing each of its listed cons:
+
+| 2026-05-13 objection | How it is answered |
+|---|---|
+| "CC's actual publish date varies" | Weekly ticks, not a day-of-month. A release is picked up within 7 days of appearing, against a 3-month-wide data window — irrelevant staleness. |
+| "hard-code a release name pattern or scrape CC's index" | Neither. The release name is *computed* from the rolling 3-month window and then **HEAD-probed** on data.commoncrawl.org, walking back up to 6 windows. Authoritative (it checks the artifact, not a web page), no HTML parsing to break. |
+| "a silent failure goes unnoticed unless the email reporter is wired to catch refresh failures too" | So the email reporter was wired. The daily operational email now carries the installed release and its age, and escalates the subject when it exceeds `staleness_warn_days`. This objection was correct and is the single most important part of the change — same lesson as the 2026-07-23 to 2026-09-17 LLM outage. |
+| "the config bump is a deliberate human acknowledgment that the new data is good" (the Manual pro) | Replaced by a machine check that is *stricter* than the human one ever was: the derived SQLite is re-downloaded **from R2** and probed for row count and known-apex canaries before `latest_release` moves. The manual bumps never verified anything. |
+
+Two safety properties worth stating plainly, because a half-applied refresh is the one genuinely dangerous outcome:
+
+1. **The config swap happens only after verification passes.** A verification failure leaves `latest_release` pointing at the previous release, so the pipeline keeps scoring on known-good data. Degraded, never broken, never half-swapped mid-run.
+2. **The job cannot still be running at 09:00 UTC.** Not by being scheduled early enough, but by a systemd runtime cap that has PID 1 kill it with hours of clearance. Every step is idempotent and the download resumes by HTTP Range, so a kill costs one week, not one release.
+
+Weekly rather than monthly is mostly about that last point: a monthly timer that gets killed or fails leaves the 0.30-weight input stale for a month. Weekly gives every failure an automatic retry, and a no-op tick costs two HEAD requests.
+
+### Provisional lean (2026-05-13, superseded — kept for the reasoning)
 
 **Stay manual for the next 2-3 releases.** Reasons:
 

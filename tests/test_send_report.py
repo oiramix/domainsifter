@@ -12,8 +12,12 @@ These tests verify each branch of that contract.
 from __future__ import annotations
 
 import io
+import json
 import os
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -32,6 +36,31 @@ def required_env(monkeypatch):
     # short-circuit the systemctl-mocked fallback path. Clear it by default;
     # tests that exercise the env-var path set it explicitly.
     monkeypatch.delenv("DOMAINSIFTER_MEMORY_PEAK_BYTES", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def cc_sandbox(tmp_path_factory, monkeypatch):
+    """Point every Common-Crawl-freshness lookup at an empty temp world.
+
+    Autouse on purpose: on the production box a real cached SQLite under
+    ~/.cache/domainsifter/cc/ and a real scripts/state/cc_refresh_result.json
+    both exist, and a stale one of either would escalate the subject line and
+    break every test that asserts "no alarm". Isolating it here keeps the whole
+    file hermetic — nothing touches the real cache, and nothing downloads.
+
+    Returns the sandbox root so the CC tests can plant fixtures inside it:
+      <sandbox>/cache/<release>.sqlite       — the derived SQLite
+      <sandbox>/repo/scripts/config.json     — the config
+      <sandbox>/repo/scripts/state/*.json    — the refresh result
+    """
+    sandbox = tmp_path_factory.mktemp("cc-sandbox")
+    monkeypatch.setenv("CC_BACKLINKS_CACHE_DIR", str(sandbox / "cache"))
+    monkeypatch.delenv("CC_BACKLINKS_RELEASE", raising=False)
+    monkeypatch.setattr(send_report, "REPO_ROOT", sandbox / "repo")
+    monkeypatch.setattr(
+        send_report, "CONFIG_PATH", sandbox / "repo" / "scripts" / "config.json",
+    )
+    return sandbox
 
 
 # --- log parsing -----------------------------------------------------------
@@ -971,3 +1000,417 @@ def test_toxic_counts_render_in_report_body(required_env):
     assert "Toxic evicted" in body
     assert "1 by today's check" in body
     assert "3 from memory" in body
+
+
+# ---------------------------------------------------------------------------
+# Common Crawl backlink-data freshness (2026-09-20).
+#
+# cc_source_domain_count carries scoring weight 0.30 — equal to
+# wayback_snapshots — and the CC release behind it was built by hand ONCE
+# (2026-05-13), then sat 4 months stale with nothing alarming, because a
+# stale-but-present SQLite returns plausible numbers. These tests pin the
+# backstop: the daily email reports the release's real age (from the derived
+# SQLite's `meta.built_at`) and escalates to the subject line when it goes
+# stale or when the weekly refresh is failing.
+#
+# Everything runs against temp SQLite files inside the `cc_sandbox` fixture —
+# no R2, no real cache, no live APIs. Domains are invented (hard rule 1).
+# ---------------------------------------------------------------------------
+
+_CC_RELEASE = "cc-main-2026-feb-mar-apr"
+_CC_RESULT_REL_PATH = "scripts/state/cc_refresh_result.json"
+
+
+def _cc_iso(days_ago: float) -> str:
+    """ISO-8601 Z timestamp `days_ago` days before now, as cc_refresh writes it."""
+    when = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    return when.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_cc_config(
+    sandbox: Path,
+    *,
+    release: str | None = _CC_RELEASE,
+    warn_days: int | None = 45,
+    result_path: str | None = _CC_RESULT_REL_PATH,
+) -> Path:
+    """Write a minimal scripts/config.json into the sandbox repo."""
+    cc_backlinks: dict = {}
+    if release is not None:
+        cc_backlinks["latest_release"] = release
+    refresh: dict = {}
+    if warn_days is not None:
+        refresh["staleness_warn_days"] = warn_days
+    if result_path is not None:
+        refresh["result_path"] = result_path
+    cc_backlinks["refresh"] = refresh
+    path = sandbox / "repo" / "scripts" / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"cc_backlinks": cc_backlinks}), encoding="utf-8")
+    return path
+
+
+def _write_cc_sqlite(
+    sandbox: Path,
+    *,
+    release: str = _CC_RELEASE,
+    built_at: str | None,
+    with_meta_table: bool = True,
+) -> Path:
+    """Build a real (tiny) derived-SQLite stand-in with a `meta` table.
+
+    Same key/value meta shape cc_refresh.py writes; the huge cc_apex table is
+    irrelevant to the freshness check and deliberately omitted.
+    """
+    cache_dir = sandbox / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    path = cache_dir / f"{release}.sqlite"
+    conn = sqlite3.connect(path)
+    try:
+        if with_meta_table:
+            conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)")
+            rows = [("release", release), ("schema_version", "1")]
+            if built_at is not None:
+                rows.append(("built_at", built_at))
+            conn.executemany("INSERT INTO meta VALUES (?, ?)", rows)
+        else:
+            conn.execute("CREATE TABLE cc_apex (apex_domain TEXT, source_domain_count INT)")
+            conn.execute("INSERT INTO cc_apex VALUES ('marketglow.com', 3)")
+        conn.commit()
+    finally:
+        conn.close()
+    return path
+
+
+def _write_cc_result(sandbox: Path, payload: dict | None, *, raw: str | None = None) -> Path:
+    """Write the refresh result file (or arbitrary `raw` text for the
+    malformed-JSON case)."""
+    path = sandbox / "repo" / _CC_RESULT_REL_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(raw if raw is not None else json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _cc_result(action: str, *, days_ago: float = 1.0, reason: str | None = None) -> dict:
+    return {
+        "action": action,
+        "release": _CC_RELEASE,
+        "previous_release": None,
+        "rows": 124_646_710,
+        "reason": reason,
+        "finished_at": _cc_iso(days_ago),
+    }
+
+
+# --- fresh data: reports the age, stays quiet -------------------------------
+
+
+def test_cc_fresh_release_reports_age_and_does_not_escalate(required_env, cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(12))
+    _write_cc_result(cc_sandbox, _cc_result("noop", days_ago=2))
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=42.0)
+    body = msg.get_content()
+    assert f"CC backlink data : {_CC_RELEASE}, built 12d ago" in body
+    assert "last refresh: noop" in body
+    assert "🚨" not in msg["Subject"]
+    assert "COMMON CRAWL" not in body
+
+
+def test_cc_freshness_reads_built_at_from_sqlite_meta(cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(9))
+    cc = send_report.cc_backlink_freshness()
+    assert cc.release == _CC_RELEASE
+    assert cc.age_source == "sqlite-meta"
+    assert 8.5 < cc.age_days < 9.5
+    assert cc.stale is False
+    assert cc.escalates is False
+
+
+def test_cc_freshness_does_not_write_to_the_sqlite(cc_sandbox):
+    """The check runs every day; it must be read-only (`?mode=ro`)."""
+    _write_cc_config(cc_sandbox)
+    path = _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(3))
+    before = (path.stat().st_mtime_ns, path.stat().st_size)
+    send_report.cc_backlink_freshness()
+    assert (path.stat().st_mtime_ns, path.stat().st_size) == before
+    # No -wal / -journal sidecar left behind either.
+    assert not (path.parent / f"{path.name}-wal").exists()
+    assert not (path.parent / f"{path.name}-journal").exists()
+
+
+# --- stale data: escalates --------------------------------------------------
+
+
+def test_cc_stale_release_escalates_subject_and_fires_banner(required_env, cc_sandbox):
+    """THE regression guard: a release that quietly aged past the threshold."""
+    _write_cc_config(cc_sandbox, warn_days=45)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(130))
+    _write_cc_result(cc_sandbox, _cc_result("noop", days_ago=1))
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=42.0)
+    subject = msg["Subject"]
+    body = msg.get_content()
+    assert "🚨 CC DATA STALE" in subject
+    assert "SUCCESS" in subject  # exit code really was 0 — that's the point
+    assert "🚨 STALE (> 45d)" in body
+    assert "built 130d ago" in body
+    assert "COMMON CRAWL BACKLINK DATA IS STALE" in body
+    assert "scoring weight 0.30" in body
+
+
+def test_cc_staleness_threshold_comes_from_config_not_hardcoded(cc_sandbox):
+    """Hard rule 9: the window is config-driven. 60d old is fresh at
+    warn_days=90 and stale at warn_days=45."""
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(60))
+
+    _write_cc_config(cc_sandbox, warn_days=90)
+    assert send_report.cc_backlink_freshness().stale is False
+
+    _write_cc_config(cc_sandbox, warn_days=45)
+    stale = send_report.cc_backlink_freshness()
+    assert stale.stale is True
+    assert stale.warn_days == 45
+
+
+def test_cc_verification_failed_escalates_even_when_data_is_fresh(required_env, cc_sandbox):
+    """A failing refresh is the reason data goes stale — alarm before it does."""
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(5))
+    _write_cc_result(
+        cc_sandbox,
+        _cc_result("verification_failed", days_ago=1, reason="cc_apex rows 41200000 below floor"),
+    )
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=42.0)
+    body = msg.get_content()
+    assert "🚨 CC REFRESH FAILED" in msg["Subject"]
+    assert "COMMON CRAWL REFRESH IS FAILING" in body
+    assert "last refresh: verification_failed (cc_apex rows 41200000 below floor)" in body
+
+
+def test_cc_discovery_failed_escalates(required_env, cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(5))
+    _write_cc_result(cc_sandbox, _cc_result("discovery_failed", days_ago=1, reason="all HEADs 404"))
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=42.0)
+    assert "🚨 CC REFRESH FAILED" in msg["Subject"]
+    assert send_report.cc_backlink_freshness().refresh_failed is True
+
+
+def test_cc_skipped_action_alone_does_not_escalate(required_env, cc_sandbox):
+    """`skipped` is benign — the weekly timer retries next Sunday."""
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(4))
+    _write_cc_result(cc_sandbox, _cc_result("skipped", days_ago=1, reason="blackout window"))
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=42.0)
+    assert "🚨" not in msg["Subject"]
+    assert "last refresh: skipped (blackout window)" in msg.get_content()
+
+
+def test_cc_stale_alarm_coexists_with_the_llm_alarms(required_env, cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(200))
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_CLASSIFIER_ALL_UNKNOWN + "\n", duration_sec=42.0,
+    )
+    subject = msg["Subject"]
+    assert "🚨 TOXIC SCREEN OFF" in subject
+    assert "🚨 CC DATA STALE" in subject
+
+
+# --- fallback to the refresh result file ------------------------------------
+
+
+def test_cc_falls_back_to_result_file_when_sqlite_not_cached(required_env, cc_sandbox):
+    """Not having the 6.6 GB SQLite locally is a legitimate state."""
+    _write_cc_config(cc_sandbox)
+    _write_cc_result(cc_sandbox, _cc_result("installed", days_ago=3))
+
+    cc = send_report.cc_backlink_freshness()
+    assert cc.age_source == "refresh-result"
+    assert 2.5 < cc.age_days < 3.5
+    assert cc.stale is False
+    body = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0).get_content()
+    assert "last refresh run 3d ago" in body
+    assert "no local SQLite cache" in body
+
+
+def test_cc_fallback_never_downloads_the_sqlite_from_r2(cc_sandbox):
+    """Hard requirement: building an email must never pull 6.6 GB from R2."""
+    from scripts.enrichment import cc_backlinks
+
+    _write_cc_config(cc_sandbox)
+    _write_cc_result(cc_sandbox, _cc_result("installed", days_ago=3))
+    exploder = MagicMock(side_effect=AssertionError("attempted to download the CC SQLite"))
+    with patch.object(cc_backlinks, "_ensure_local_sqlite", exploder), \
+            patch.object(cc_backlinks, "_get_connection", exploder):
+        cc = send_report.cc_backlink_freshness()
+    assert cc.age_source == "refresh-result"
+    exploder.assert_not_called()
+    assert not (cc_sandbox / "cache" / f"{_CC_RELEASE}.sqlite").exists()
+
+
+def test_cc_fallback_marks_stale_when_last_refresh_run_is_ancient(required_env, cc_sandbox):
+    """No SQLite AND the newest refresh record is months old → the timer is
+    not running, so the data cannot be current either."""
+    _write_cc_config(cc_sandbox, warn_days=45)
+    _write_cc_result(cc_sandbox, _cc_result("noop", days_ago=120))
+
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0)
+    assert "🚨 CC DATA STALE" in msg["Subject"]
+    assert "last refresh run 120d ago" in msg.get_content()
+
+
+def test_cc_unparseable_built_at_falls_back_to_result_file(cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at="not-a-timestamp")
+    _write_cc_result(cc_sandbox, _cc_result("installed", days_ago=2))
+
+    cc = send_report.cc_backlink_freshness()
+    assert cc.age_source == "refresh-result"
+    assert "no usable built_at" in (cc.note or "")
+
+
+# --- no signal at all: "unknown", never a crash, never a false alarm --------
+
+
+def test_cc_no_sqlite_and_no_result_file_reports_unknown(required_env, cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0)
+    body = msg.get_content()
+    assert f"CC backlink data : {_CC_RELEASE}, age unknown" in body
+    assert "last refresh: (no result file)" in body
+    # Unknown is not proof of staleness — do not cry wolf.
+    assert "🚨" not in msg["Subject"]
+
+
+def test_cc_missing_config_reports_unknown_without_crashing(required_env, cc_sandbox):
+    """No config.json at all (CONFIG_PATH points into an empty sandbox)."""
+    cc = send_report.cc_backlink_freshness()
+    assert cc.age_days is None
+    assert cc.age_source == "unknown"
+    assert cc.stale is False
+    body = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0).get_content()
+    assert "CC backlink data : (no release configured), age unknown" in body
+
+
+def test_cc_malformed_config_json_reports_unknown(required_env, cc_sandbox):
+    path = cc_sandbox / "repo" / "scripts" / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{ not json at all", encoding="utf-8")
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0)
+    assert "age unknown" in msg.get_content()
+    assert "🚨" not in msg["Subject"]
+
+
+def test_cc_corrupt_sqlite_reports_unknown_without_crashing(required_env, cc_sandbox):
+    _write_cc_config(cc_sandbox, result_path=None)
+    cache_dir = cc_sandbox / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / f"{_CC_RELEASE}.sqlite").write_bytes(b"\x00\x01not a database\xff")
+
+    cc = send_report.cc_backlink_freshness()
+    assert cc.age_source == "unknown"
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0)
+    assert "age unknown" in msg.get_content()
+    assert "🚨" not in msg["Subject"]
+
+
+def test_cc_sqlite_without_meta_table_reports_unknown(cc_sandbox):
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=None, with_meta_table=False)
+    assert send_report.cc_backlink_freshness().age_source == "unknown"
+
+
+def test_cc_empty_sqlite_file_reports_unknown(cc_sandbox):
+    """A zero-byte file is what a killed download leaves behind."""
+    _write_cc_config(cc_sandbox)
+    cache_dir = cc_sandbox / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / f"{_CC_RELEASE}.sqlite").write_bytes(b"")
+    assert send_report.cc_backlink_freshness().age_source == "unknown"
+
+
+@pytest.mark.parametrize("raw", [
+    "not json at all",
+    "",
+    "[1, 2, 3]",
+    '{"action": "installed", "finished_at": "yesterday-ish"}',
+    '{"action": null, "finished_at": null}',
+    '{"action": 42, "finished_at": 42}',
+])
+def test_cc_malformed_result_file_reports_unknown_without_crashing(
+    required_env, cc_sandbox, raw,
+):
+    _write_cc_config(cc_sandbox)
+    _write_cc_result(cc_sandbox, None, raw=raw)
+
+    cc = send_report.cc_backlink_freshness()
+    assert cc.age_days is None
+    assert cc.age_source == "unknown"
+    assert cc.stale is False
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0)
+    assert "age unknown" in msg.get_content()
+    assert "🚨" not in msg["Subject"]
+
+
+def test_cc_result_file_is_a_directory_reports_unknown(cc_sandbox):
+    """OSError path: something created a directory where the file belongs."""
+    _write_cc_config(cc_sandbox)
+    (cc_sandbox / "repo" / _CC_RESULT_REL_PATH).mkdir(parents=True, exist_ok=True)
+    assert send_report.cc_backlink_freshness().age_source == "unknown"
+
+
+def test_cc_freshness_never_raises_even_if_config_load_explodes(cc_sandbox):
+    """Belt-and-braces: an unexpected exception anywhere inside degrades to
+    'unknown' rather than propagating out of the reporter."""
+    with patch.object(
+        send_report, "_load_config", MagicMock(side_effect=RuntimeError("boom")),
+    ):
+        cc = send_report.cc_backlink_freshness()
+    assert cc.age_source == "unknown"
+    assert cc.stale is False
+    assert "freshness check failed (RuntimeError: boom)" in (cc.note or "")
+
+
+def test_main_exits_zero_when_cc_stale_banner_fires(required_env, cc_sandbox, monkeypatch):
+    """Reporter alarms must never change the pipeline's exit code (rule 17)."""
+    _write_cc_config(cc_sandbox)
+    _write_cc_sqlite(cc_sandbox, built_at=_cc_iso(365))
+    monkeypatch.setenv("INVOCATION_ID", "cc-stale-1")
+    monkeypatch.setattr(
+        send_report,
+        "_capture_journal",
+        MagicMock(return_value="Wrote 12 domains to src/data/daily-domains.json\n"),
+    )
+    sent: list[EmailMessage] = []
+    monkeypatch.setattr(send_report, "_send", lambda msg: sent.append(msg))
+
+    assert send_report.main(["--pipeline-exit", "0"]) == 0
+    assert "🚨 CC DATA STALE" in sent[0]["Subject"]
+
+
+# --- timestamp parsing -----------------------------------------------------
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("2026-09-20T18:00:00Z", datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc)),
+    ("2026-09-20T18:00:00z", datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc)),
+    ("2026-09-20T18:00:00+00:00", datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc)),
+    ("2026-09-20T20:00:00+02:00", datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc)),
+    ("2026-09-20T18:00:00", datetime(2026, 9, 20, 18, 0, tzinfo=timezone.utc)),
+])
+def test_parse_iso8601_utc_accepts_the_shapes_cc_refresh_writes(value, expected):
+    assert send_report._parse_iso8601_utc(value) == expected
+
+
+@pytest.mark.parametrize("value", [
+    None, "", "   ", "not-a-timestamp", 1758393600, [], {}, "2026-13-45T99:99:99Z",
+])
+def test_parse_iso8601_utc_returns_none_for_junk(value):
+    assert send_report._parse_iso8601_utc(value) is None
