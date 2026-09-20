@@ -533,7 +533,7 @@ resume, uploads overwrite) and pushes a fresh commit.
 |---|---|---|
 | Raw vertices + edges (~10-18 GiB/release) | IA (`STANDARD_IA`) | **Pruned** automatically to the newest `prune_raw_after_releases` (2) releases |
 | Derived SQLite (~1.5-6.6 GiB/release) | Standard | **Never deleted** by this code, at any setting |
-| Local SQLite cache `~/.cache/domainsifter/cc/` | OVH disk | Pruned to the active release when `prune_local_cache` is true |
+| Local SQLite cache `~/.cache/domainsifter/cc/` | OVH disk | Pruned to the **history window** (`cc_backlinks.history.max_releases`, newest-first, always including the active release) when `prune_local_cache` is true. Was active-release-only before 2026-09-20; pruning to one release now would force a ~30 GB re-download inside the next 09:00 run. Keeps EVERYTHING if the window cannot be determined, and collapses back to active-release-only when `history.enabled` is false. ~6 GB per cached release |
 
 Pruned raw is not a loss: it exists only to rebuild the derived SQLite and
 is re-downloadable from data.commoncrawl.org for free at any time. The

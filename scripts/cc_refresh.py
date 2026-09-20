@@ -57,11 +57,16 @@ every release in the window is on local disk BEFORE the 09:00 pipeline
 asks for it, gated on `history.prewarm_on_refresh`. This is the same
 trick in-R2 verification already plays for the active release. Pre-warm
 runs BEFORE the local-cache prune, so the prune sees the files the window
-wants and cannot race the download. A pre-warm failure is NON-FATAL and
-never undoes the install: the release is verified and installed by that
-point, and a cold cache only costs time on the next run. The result file
-records `prewarmed_releases`. `--prewarm-history` does the same warming
-on demand and nothing else.
+wants and cannot race the download. Between the swap and the pre-warm the
+in-memory config is pointed at the new release and the enricher's window
+cache is dropped: the window is keyed on `latest_release` AND forces it to
+the head, so a stale dict would pre-warm the superseded release and protect
+it from the prune — invisible at `max_releases: 6`, where the window holds
+everything either way, and wrong at a tighter cap. A pre-warm failure is
+NON-FATAL and never undoes the install: the release is verified and
+installed by that point, and a cold cache only costs time on the next run.
+The result file records `prewarmed_releases`. `--prewarm-history` does the
+same warming on demand and nothing else.
 
     Disk arithmetic: ~6 GB per cached derived release, so the default
     `history.max_releases: 6` is ~36 GB of local cache, and the window
