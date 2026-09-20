@@ -83,6 +83,7 @@ from scripts import (
     phase2_ranker,
     score,
     snapshot_classifier,
+    toxic_denylist,
     zone_parser,
 )
 
@@ -1077,9 +1078,30 @@ def main(argv: list[str] | None = None) -> int:
     ))
     _write_sidecar_excerpts(enriched, sidecar_path)
 
+    # Remember this run's toxic verdicts BEFORE filtering, so a later run
+    # whose archive.org fetch fails still evicts them. `unknown` is both
+    # "not abusive" and "the fetch failed", and recomputing from scratch
+    # every run meant a transient network failure silently erased a correct
+    # verdict — on 2026-09-20 that put an Indonesian slot-gambling site back
+    # on the published list AND gave it a permanent archive page.
+    #
+    # Placed after the sidecar write so a denylist failure can never cost us
+    # the excerpts. record_toxic never raises (hard rule 17).
+    if toxic_denylist.is_enabled(config):
+        toxic_denylist.record_toxic(
+            [c["name"] for c in enriched
+             if c.get("snapshot_category") == "toxic" and c.get("name")],
+            today=today,
+            classifier_version=snapshot_classifier.CLASSIFIER_VERSION,
+        )
+        remembered_toxic = toxic_denylist.load_denylist()
+    else:
+        remembered_toxic = set()
+
     # Stage 5: post-enrichment filter
     survivors = filter_mod.filter_candidates_post_enrichment(
-        enriched, config, strict_spam_check=True
+        enriched, config, strict_spam_check=True,
+        toxic_denylist=remembered_toxic,
     )
 
     # Stage 6: score + sort (null components excluded from normalization,

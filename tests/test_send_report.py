@@ -928,3 +928,46 @@ def test_all_unknown_without_shadow_line_still_alarms_loudly(required_env):
     msg = send_report._build_email(0, _CLASSIFIER_ALL_UNKNOWN, 120.0)
     assert "TOXIC-DOMAIN SCREEN IS NOT RUNNING" in msg.get_content()
     assert "TOXIC SCREEN OFF" in msg["Subject"]
+
+
+# ---------------------------------------------------------------------------
+# Toxic eviction counts (2026-09-20). `snapshot_toxic_remembered` is the
+# denylist catching a domain whose archived content could not be re-fetched —
+# the number that shows the durable memory is doing work rather than sitting
+# idle. It exists because a domain correctly flagged toxic on 2026-09-19 came
+# back `unknown` on a failed fetch, stayed published, and got a permanent page.
+# ---------------------------------------------------------------------------
+
+_REJECTIONS = (
+    "2026-09-20 12:21:32,630 INFO scripts.filter Post-enrichment filter "
+    "rejections: {'snapshot_toxic': 1, 'snapshot_toxic_remembered': 3, "
+    "'spam_flagged': 2, 'no_wayback_confirmed': 7}"
+)
+
+
+def test_parse_toxic_rejections_reads_both_counts():
+    assert send_report.parse_toxic_rejections(_REJECTIONS) == (1, 3)
+
+
+def test_parse_toxic_rejections_live_only():
+    log = (
+        "INFO scripts.filter Post-enrichment filter rejections: "
+        "{'snapshot_toxic': 2, 'spam_flagged': 1}"
+    )
+    assert send_report.parse_toxic_rejections(log) == (2, 0)
+
+
+def test_parse_toxic_rejections_absent_line_is_zero_not_error():
+    assert send_report.parse_toxic_rejections("a clean log\nnothing here\n") == (0, 0)
+
+
+def test_parse_toxic_rejections_empty_dict():
+    log = "INFO scripts.filter Post-enrichment filter rejections: {}"
+    assert send_report.parse_toxic_rejections(log) == (0, 0)
+
+
+def test_toxic_counts_render_in_report_body(required_env):
+    body = send_report._build_email(0, _REJECTIONS, 120.0).get_content()
+    assert "Toxic evicted" in body
+    assert "1 by today's check" in body
+    assert "3 from memory" in body

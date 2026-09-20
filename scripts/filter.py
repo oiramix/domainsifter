@@ -5,7 +5,7 @@ Two-stage filtering:
     keep_structural — runs BEFORE enrichment. Cheap rules that need only
                       the candidate's name + tld + config. R1-R5.
     keep_post_enrichment — runs AFTER enrichment. Rules that need the
-                           merged enrichment fields. R6-R10.
+                           merged enrichment fields. R6-R11.
 
 Splitting them lets the pipeline reject the obvious garbage (punycode,
 all-numeric, banned keywords) before paying for any external API calls.
@@ -56,6 +56,22 @@ Reject rules (any one triggers rejection):
                                    per-domain query failed; conservative
                                    reject. (Caller decides whether to
                                    enforce by passing strict_spam_check.)
+    R11 remembered toxic         — name is in the injected `toxic_denylist`
+                                   set (added 2026-09-20). Rejects with the
+                                   DISTINCT reason `snapshot_toxic_remembered`
+                                   regardless of this run's
+                                   snapshot_category. Exists because
+                                   `unknown` doubles as the classifier's
+                                   failure value: a failed archive.org fetch
+                                   returned `unknown`, the live toxic gate
+                                   passed, and domains already judged toxic
+                                   the day before went back onto the
+                                   published list (ridgemotorsports.net and
+                                   two others, 2026-09-20). The set is
+                                   loaded from R2 by the CALLER — see
+                                   scripts/toxic_denylist.py — and passed
+                                   in; this module never touches the
+                                   network and never holds it.
 
 Keyword matching, 2026-05-17 (replaces the prior naive substring match
 that false-positived 'essex' on 'sex', 'camera' on 'cam'):
@@ -308,13 +324,20 @@ def keep_post_enrichment(
     config: dict,
     *,
     strict_spam_check: bool = True,
+    toxic_denylist: set[str] | None = None,
 ) -> tuple[bool, str | None]:
-    """Post-enrichment rejects (R6-R10). Reads enrichment fields off the
+    """Post-enrichment rejects (R6-R11). Reads enrichment fields off the
     candidate dict; treats absent fields as 'unknown' (mostly tolerant).
 
     DNSBL fields (`surbl_listed`, `spamhaus_listed`) follow the three-state
     contract: only `is True` rejects. `None` and missing both pass — see
     module docstring.
+
+    `toxic_denylist` (R11) is the durable memory of past toxic verdicts,
+    loaded by the CALLER from R2 via `scripts.toxic_denylist.load_denylist`
+    and injected here (hard rule 16 — this module makes no network call and
+    holds no state). Default None keeps every pre-2026-09-20 caller
+    bit-for-bit unchanged.
     """
     thresholds = config.get("filter_thresholds", {})
     min_wayback = thresholds.get("min_wayback_snapshots", 1)
@@ -336,6 +359,21 @@ def keep_post_enrichment(
     # may slip past unclassified on flaky days.
     if candidate.get("snapshot_category") == "toxic":
         return False, "snapshot_toxic"
+
+    # R11 — remembered toxic verdict (added 2026-09-20). Checked AFTER the
+    # live category so a domain that is toxic on both paths reports the live
+    # reason; `snapshot_toxic_remembered` therefore counts exactly the cases
+    # where MEMORY caught what this run's live check missed, which is the
+    # direct measure of the fix's value in the daily report.
+    #
+    # Why it is needed: `unknown` is both "not classified" and "the fetch
+    # failed", and fetch failure is common. Without memory, a transient
+    # archive.org error silently erases a known-correct abuse verdict and
+    # the domain returns to the published list. See scripts/toxic_denylist.py.
+    if toxic_denylist:
+        name_key = str(candidate.get("name", "")).strip().lower()
+        if name_key in toxic_denylist:
+            return False, "snapshot_toxic_remembered"
 
     if "wayback_snapshots" in candidate:
         if candidate["wayback_snapshots"] < min_wayback:
@@ -380,13 +418,19 @@ def keep(
     config: dict,
     *,
     strict_spam_check: bool = True,
+    toxic_denylist: set[str] | None = None,
 ) -> tuple[bool, str | None]:
     """Apply structural + post-enrichment rules in sequence. Backward-
     compatible wrapper for callers that still want a single decision point."""
     ok, reason = keep_structural(candidate, config)
     if not ok:
         return False, reason
-    return keep_post_enrichment(candidate, config, strict_spam_check=strict_spam_check)
+    return keep_post_enrichment(
+        candidate,
+        config,
+        strict_spam_check=strict_spam_check,
+        toxic_denylist=toxic_denylist,
+    )
 
 
 def _apply(
@@ -438,8 +482,9 @@ def filter_candidates_post_enrichment(
     config: dict,
     *,
     strict_spam_check: bool = True,
+    toxic_denylist: set[str] | None = None,
 ) -> list[dict]:
-    """Post-enrichment filter — keeps only candidates that pass R6-R10.
+    """Post-enrichment filter — keeps only candidates that pass R6-R11.
 
     Logs a DNSBL signal-distribution line BEFORE applying rejections so
     daily reports can distinguish "domain listed" (a real bad-signal
@@ -459,9 +504,20 @@ def filter_candidates_post_enrichment(
             tallies["spamhaus_listed"], tallies["spamhaus_unknown"],
             tallies["surbl_listed"], tallies["surbl_unknown"],
         )
+    if toxic_denylist:
+        logger.info(
+            "Toxic memory gate ACTIVE: %d remembered toxic domain(s) will be "
+            "rejected regardless of this run's snapshot_category",
+            len(toxic_denylist),
+        )
     return _apply(
         candidates,
-        lambda c: keep_post_enrichment(c, config, strict_spam_check=strict_spam_check),
+        lambda c: keep_post_enrichment(
+            c,
+            config,
+            strict_spam_check=strict_spam_check,
+            toxic_denylist=toxic_denylist,
+        ),
         "Post-enrichment filter",
     )
 
@@ -471,11 +527,17 @@ def filter_candidates(
     config: dict,
     *,
     strict_spam_check: bool = True,
+    toxic_denylist: set[str] | None = None,
 ) -> list[dict]:
     """Apply all reject rules in one pass. Backward-compatible — preserved
     for tests and callers that don't want to split the stages."""
     return _apply(
         candidates,
-        lambda c: keep(c, config, strict_spam_check=strict_spam_check),
+        lambda c: keep(
+            c,
+            config,
+            strict_spam_check=strict_spam_check,
+            toxic_denylist=toxic_denylist,
+        ),
         "Filter",
     )

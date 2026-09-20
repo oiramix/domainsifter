@@ -336,6 +336,39 @@ def _phase2_ranker_outcome(log: str) -> str | None:
     return None
 
 
+_TOXIC_REJECTIONS_RE = re.compile(
+    r"Post-enrichment filter rejections:\s*(\{[^\n]*\})"
+)
+
+
+def parse_toxic_rejections(log: str) -> tuple[int, int]:
+    """(evicted_by_live_check, evicted_from_memory) this run.
+
+    Parsed from filter.py's rejection tally. `snapshot_toxic` is a domain
+    this run's classifier read and judged abusive. `snapshot_toxic_remembered`
+    is one the DENYLIST caught — a domain we classified toxic on some earlier
+    run whose archived content could not be fetched this time.
+
+    That second number is the whole point of the denylist: on 2026-09-20 a
+    domain correctly flagged toxic the previous day came back `unknown`
+    because archive.org failed, stayed published, and was given a permanent
+    page. Surfacing the count is how we know the memory is earning its keep
+    rather than quietly doing nothing.
+    """
+    live = remembered = 0
+    for match in _TOXIC_REJECTIONS_RE.finditer(log):
+        blob = match.group(1)
+        for key, setter in (("snapshot_toxic_remembered", "r"), ("snapshot_toxic", "l")):
+            hit = re.search(rf"'{key}':\s*(\d+)", blob)
+            if hit:
+                if setter == "r":
+                    remembered = int(hit.group(1))
+                else:
+                    live = int(hit.group(1))
+        # A run logs this line once; last occurrence wins if it ever repeats.
+    return live, remembered
+
+
 def _snapshot_classifier_counts(log: str) -> dict[str, int] | None:
     """Parse the classifier's per-category tally line.
 
@@ -470,6 +503,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
     llm_backend = _llm_backend(log)
     ranker_outcome = _phase2_ranker_outcome(log)
     classifier_counts = _snapshot_classifier_counts(log)
+    toxic_live, toxic_remembered = parse_toxic_rejections(log)
     credit_errors = _count_credit_balance_errors(log)
     shadow_counts = parse_shadow_verdicts(log)
     shadow_would_evict = parse_shadow_would_evict(log) if shadow_counts else 0
@@ -518,6 +552,8 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"LLM backend      : {llm_backend or '(none used)'}",
         f"Phase 2 ranker   : {ranker_outcome or '(no ranker line in log)'}",
         f"Snapshot classes : {_format_classifier_counts(classifier_counts)}",
+        f"Toxic evicted    : {toxic_live} by today's check, "
+        f"{toxic_remembered} from memory (denylist)",
     ]
     if credit_errors:
         header.append(f"Credit errors    : {credit_errors} ('credit balance is too low')")

@@ -159,6 +159,10 @@
     "excerpt_max_heading_chars": 140,
     "excerpt_max_headings": 5
   },
+  "toxic_denylist": {
+    "_doc": "Durable memory of every domain ever classified toxic, in private R2 at state/toxic_denylist.jsonl (never the public repo — it is a list of named domains we judge abusive). Exists because 'unknown' is BOTH 'not abusive' and 'the archive.org fetch failed', and verdicts were recomputed from scratch every run: on 2026-09-20 ridgemotorsports.net was correctly classified toxic the day before, came back 'unknown' when the fetch failed, stayed published and was given a permanent archive page — its archived content is an Indonesian online-slot gambling site. A verdict must not be erased by a transient network failure. Set enabled=false to neutralise the gate via config if a bad classifier run ever poisons the list; the pipeline then degrades to live-check-only, which is the pre-2026-09-20 behaviour.",
+    "enabled": true
+  },
   "snapshot_classifier": {
     "_doc": "Wayback-excerpt content classifier. Its 'toxic' verdict is the ONLY thing that trips the toxic gate in filter.keep_post_enrichment (scripts/filter.py). That gate has been open since 2026-07-23 because the classifier returned 'unknown' for every domain once API credits ran out. batch_size groups domains per model call (the old path made one call per domain, which is unusable against Claude Code's per-call overhead). shadow=true writes the verdict to snapshot_category_shadow and leaves snapshot_category='unknown', so nothing is evicted while we validate the new backend against the API-era verdicts; set false to arm it for real.",
     "batch_size": 20,

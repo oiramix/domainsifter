@@ -789,3 +789,156 @@ class TestSnapshotToxicRejection:
         names = {c["name"] for c in kept}
         assert "bad.com" not in names
         assert names == {"good.com", "park.com", "empt.com", "huh.com"}
+
+
+# --- R11: remembered toxic verdict (toxic_denylist, 2026-09-20) ------------
+
+
+class TestToxicDenylistMemory:
+    """The classifier's `unknown` doubles as its failure value, so a failed
+    archive.org fetch used to erase a known-correct toxic verdict and let the
+    domain back onto the published list. R11 injects a durable set of past
+    toxic verdicts (loaded from R2 by the caller) and rejects on it
+    regardless of this run's category.
+    """
+
+    def test_denylisted_domain_rejected_when_current_category_is_unknown(self):
+        # The exact production defect: yesterday TOXIC, today the fetch
+        # failed so the classifier returned `unknown`.
+        cand = _ok(name="tideblock.io", snapshot_category="unknown")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic_remembered"
+
+    def test_denylisted_domain_rejected_when_category_missing_entirely(self):
+        cand = _ok(name="tideblock.io")  # no snapshot_category at all
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic_remembered"
+
+    def test_denylisted_domain_rejected_even_when_now_classified_legitimate(self):
+        # The archived content does not become clean later; memory wins.
+        cand = _ok(name="tideblock.io", snapshot_category="legitimate")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic_remembered"
+
+    def test_live_toxic_verdict_still_rejects_with_original_reason(self):
+        cand = _ok(name="marketglow.com", snapshot_category="toxic")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic"
+
+    def test_reasons_are_distinct_so_the_report_can_count_memory_catches(self):
+        live = _ok(name="marketglow.com", snapshot_category="toxic")
+        remembered = _ok(name="tideblock.io", snapshot_category="unknown")
+        _, live_reason = filter_mod.keep_post_enrichment(
+            live, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        _, remembered_reason = filter_mod.keep_post_enrichment(
+            remembered, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert live_reason != remembered_reason
+        assert live_reason == "snapshot_toxic"
+        assert remembered_reason == "snapshot_toxic_remembered"
+
+    def test_domain_toxic_on_both_paths_reports_the_live_reason(self):
+        # `snapshot_toxic_remembered` must count ONLY the cases memory caught
+        # that the live check missed — that count is the measure of the fix.
+        cand = _ok(name="tideblock.io", snapshot_category="toxic")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic"
+
+    def test_domain_on_neither_path_is_kept(self):
+        cand = _ok(name="coppernest.org", snapshot_category="unknown")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is True
+        assert reason is None
+
+    def test_lookup_is_case_insensitive(self):
+        cand = _ok(name="TideBlock.IO", snapshot_category="unknown")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic_remembered"
+
+    def test_default_no_denylist_behaves_exactly_as_before(self):
+        # Every pre-2026-09-20 caller passes nothing; `unknown` still passes.
+        cand = _ok(name="tideblock.io", snapshot_category="unknown")
+        assert filter_mod.keep_post_enrichment(cand, CONFIG) == (True, None)
+        assert filter_mod.keep(cand, CONFIG) == (True, None)
+
+    def test_empty_denylist_behaves_exactly_as_before(self):
+        cand = _ok(name="tideblock.io", snapshot_category="unknown")
+        keep, reason = filter_mod.keep_post_enrichment(
+            cand, CONFIG, toxic_denylist=set(),
+        )
+        assert keep is True
+        assert reason is None
+
+    def test_keep_wrapper_threads_the_denylist_through(self):
+        cand = _ok(name="tideblock.io", snapshot_category="unknown")
+        keep, reason = filter_mod.keep(
+            cand, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "snapshot_toxic_remembered"
+
+    def test_structural_reject_still_wins_over_the_denylist(self):
+        # Cheap rules run first; a punycode name never reaches R11.
+        cand = _ok(name="xn--tideblock.io", snapshot_category="unknown")
+        keep, reason = filter_mod.keep(
+            cand, CONFIG, toxic_denylist={"xn--tideblock.io"},
+        )
+        assert keep is False
+        assert reason == "punycode"
+
+    def test_filter_candidates_post_enrichment_evicts_remembered_toxic(self):
+        cands = [
+            _ok(name="marketglow.com", snapshot_category="unknown"),
+            _ok(name="tideblock.io", snapshot_category="unknown"),
+            _ok(name="coppernest.org", snapshot_category="toxic"),
+        ]
+        kept = filter_mod.filter_candidates_post_enrichment(
+            cands, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert {c["name"] for c in kept} == {"marketglow.com"}
+
+    def test_post_enrichment_log_counts_the_two_reasons_separately(self, caplog):
+        import logging
+
+        cands = [
+            _ok(name="tideblock.io", snapshot_category="unknown"),
+            _ok(name="coppernest.org", snapshot_category="toxic"),
+        ]
+        with caplog.at_level(logging.INFO, logger="scripts.filter"):
+            filter_mod.filter_candidates_post_enrichment(
+                cands, CONFIG, toxic_denylist={"tideblock.io"},
+            )
+        joined = " ".join(rec.getMessage() for rec in caplog.records)
+        assert "'snapshot_toxic': 1" in joined
+        assert "'snapshot_toxic_remembered': 1" in joined
+
+    def test_filter_candidates_one_pass_wrapper_threads_the_denylist(self):
+        cands = [
+            _ok(name="marketglow.com", snapshot_category="unknown"),
+            _ok(name="tideblock.io", snapshot_category="unknown"),
+        ]
+        kept = filter_mod.filter_candidates(
+            cands, CONFIG, toxic_denylist={"tideblock.io"},
+        )
+        assert {c["name"] for c in kept} == {"marketglow.com"}

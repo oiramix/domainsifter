@@ -109,7 +109,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from scripts import llm_backend
+from scripts import llm_backend, toxic_denylist
 from scripts.wayback_excerpt import fetch_excerpt
 
 logger = logging.getLogger("scripts.archive_generator")
@@ -361,11 +361,24 @@ def build_system_prompt(has_excerpt: bool) -> str:
 
 
 def _filter_qualifying(
-    domains: list[dict], already_archived: set[str],
+    domains: list[dict],
+    already_archived: set[str],
+    *,
+    remembered_toxic: set[str] | None = None,
 ) -> list[dict]:
-    """Verdict in {Clean, Promising} AND name not already archived. Domains
-    without a verdict (legacy payloads) are rejected — the archive only
-    contains entries we've explicitly labeled."""
+    """Verdict in {Clean, Promising}, not already archived, and never
+    classified toxic. Domains without a verdict (legacy payloads) are
+    rejected — the archive only contains entries we've explicitly labeled.
+
+    The toxic check is defence in depth. Upstream eviction should mean no
+    toxic domain ever reaches this list, but on 2026-09-20 one did:
+    ridgemotorsports.net was classified toxic the day before, reverted to
+    `unknown` when a later archive.org fetch failed, stayed published, and
+    was minted a PERMANENT page here. A page is far harder to retract than
+    a list entry — it gets indexed — so this function refuses to write one
+    for anything the denylist remembers, whatever today's verdict says.
+    """
+    remembered = remembered_toxic or set()
     out: list[dict] = []
     for d in domains:
         verdict = d.get("verdict")
@@ -373,6 +386,13 @@ def _filter_qualifying(
             continue
         name = d.get("name")
         if not name or name in already_archived:
+            continue
+        if name.lower() in remembered:
+            logger.warning(
+                "archive: refusing a page for %s — previously classified "
+                "toxic (today's category is %r)",
+                name, d.get("snapshot_category"),
+            )
             continue
         out.append(d)
     return out
@@ -981,7 +1001,14 @@ def generate_archive(
     archived_entries: list[dict] = index_payload.get("entries") or []
     already = {e.get("name") for e in archived_entries if e.get("name")}
 
-    qualifying = _filter_qualifying(domains, already)
+    remembered_toxic = (
+        toxic_denylist.load_denylist()
+        if toxic_denylist.is_enabled(config)
+        else set()
+    )
+    qualifying = _filter_qualifying(
+        domains, already, remembered_toxic=remembered_toxic,
+    )
     if not qualifying:
         logger.info(
             "No new qualifying domains (%d in payload, %d already archived).",

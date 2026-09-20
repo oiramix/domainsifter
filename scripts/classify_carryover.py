@@ -52,7 +52,7 @@ import tempfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from scripts import llm_backend, snapshot_classifier
+from scripts import llm_backend, snapshot_classifier, toxic_denylist
 
 logger = logging.getLogger("scripts.classify_carryover")
 
@@ -147,19 +147,34 @@ def filter_targets(
     return targets
 
 
-def split_toxic(domains: list[dict]) -> tuple[list[dict], list[str]]:
+def split_toxic(
+    domains: list[dict], *, remembered_toxic: set[str] | None = None,
+) -> tuple[list[dict], list[str]]:
     """Partition domains into (kept, evicted_names).
 
-    Only snapshot_category=="toxic" is evicted. Parked / empty / unknown /
-    legitimate all stay in the list (parked + empty get verdict-downgraded
-    in Phase 4 but remain published; unknown is informational; legitimate
-    is the good path).
+    A domain is evicted when THIS run classified it toxic, or when it is in
+    `remembered_toxic` — the durable denylist of everything ever classified
+    toxic (scripts/toxic_denylist.py). Parked / empty / unknown / legitimate
+    all stay (parked + empty get verdict-downgraded in Phase 4 but remain
+    published; unknown is informational; legitimate is the good path).
+
+    The remembered set matters because `unknown` is ALSO the classifier's
+    failure value. This exact function produced the correct `toxic` verdict
+    for ridgemotorsports.net on 2026-09-19; the next run's archive.org fetch
+    failed, the domain came back `unknown`, and it stayed published and was
+    given a permanent archive page. Its archived content is an Indonesian
+    online-slot gambling site. A transient network failure must not erase a
+    verdict we already reached.
+
+    `remembered_toxic` defaults to None so existing callers are unchanged.
     """
+    remembered = remembered_toxic or set()
     kept: list[dict] = []
     evicted: list[str] = []
     for d in domains:
-        if d.get("snapshot_category") == "toxic":
-            evicted.append(d.get("name", "<unknown>"))
+        name = d.get("name", "")
+        if d.get("snapshot_category") == "toxic" or name.lower() in remembered:
+            evicted.append(name or "<unknown>")
         else:
             kept.append(d)
     return kept, evicted
@@ -456,7 +471,21 @@ def run(
     # counts. strip_inline_excerpts runs BEFORE split_toxic so the kept
     # entries have no wayback_excerpt key when written.
     strip_inline_excerpts(domains)
-    kept, evicted = split_toxic(domains)
+
+    # Consult AND update the durable toxic memory. This tool is the one that
+    # produced the correct verdict which a later fetch failure then erased,
+    # so it must both remember what it finds and honour what it already knew.
+    if toxic_denylist.is_enabled(config):
+        toxic_denylist.record_toxic(
+            [d.get("name", "") for d in domains
+             if d.get("snapshot_category") == "toxic" and d.get("name")],
+            today=today,
+            classifier_version=snapshot_classifier.CLASSIFIER_VERSION,
+        )
+        remembered = toxic_denylist.load_denylist()
+    else:
+        remembered = set()
+    kept, evicted = split_toxic(domains, remembered_toxic=remembered)
     payload["domains"] = kept
     update_counts(payload)
     payload["generated_at"] = datetime.now(timezone.utc).strftime(
