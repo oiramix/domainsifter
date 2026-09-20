@@ -107,7 +107,7 @@
     "enabled": true,
     "top_n": 20,
     "subject_template": "DomainSifter daily picks — {date}",
-    "intro_text": "Today's top expired domain picks, sorted by score. Backlinks counts come from Common Crawl's last 3 months of crawl data. All domains were available at last check — verify at registrar before buying.",
+    "intro_text": "Today's top expired domain picks, sorted by score. Backlinks counts come from the Common Crawl domain-level hyperlink graph (release cc-main-2026-feb-mar-apr). All domains were available at last check — verify at registrar before buying.",
     "_evidence_doc": "Added 2026-09-19 for the first-ever send. featured_n picks render as rich blocks (reason + archived page title + signals) and the rest stay compact: a flat list of 20 equal rows gets skimmed and closed. The archived title comes from the wayback sidecar and is the differentiating content no competitor list has. excerpt_title_denylist suppresses boilerplate titles (Page not found, Home, Untitled) because showing those on a featured pick reads as filler and implies we checked something we did not; set it to [] to show every title. plaintext_api_field is OFF until the Buttondown field name for a caller-supplied text/plain part is confirmed - a wrong name is retried once without it, so a bad guess cannot cost the draft.",
     "featured_n": 3,
     "sidecar_excerpts_path": "src/data/wayback_excerpts.json",
