@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T14:01:06Z",
+  "generated_at": "2026-09-21T14:00:35Z",
   "entries": [
     {
       "name": "usimin.net",
@@ -1419,6 +1419,28 @@
       "wayback_snapshots": 14608,
       "cc_source_domain_count": 3,
       "open_page_rank": 2.19
+    },
+    {
+      "name": "electricianyorkpa.com",
+      "tld": "com",
+      "verdict": "Clean",
+      "score": 87,
+      "dropped_date": "2026-09-21",
+      "archived_date": "2026-09-21",
+      "wayback_snapshots": 578,
+      "cc_source_domain_count": null,
+      "open_page_rank": null
+    },
+    {
+      "name": "giantbrandsolutions.com",
+      "tld": "com",
+      "verdict": "Promising",
+      "score": 56,
+      "dropped_date": "2026-09-15",
+      "archived_date": "2026-09-21",
+      "wayback_snapshots": 2069,
+      "cc_source_domain_count": 14,
+      "open_page_rank": 2.43
     }
   ]
 }
