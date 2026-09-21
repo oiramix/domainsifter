@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-21T16:32:12Z",
-  "domain_count": 234,
+  "generated_at": "2026-09-21T16:44:35Z",
+  "domain_count": 230,
   "today_count": 1,
-  "carryover_count": 233,
+  "carryover_count": 229,
   "domains": [
     {
       "name": "electricianyorkpa.com",
@@ -1230,7 +1230,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -2322,7 +2322,7 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -2751,48 +2751,9 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2",
       "phase2_reason": "location plus healthcare specialty clear"
-    },
-    {
-      "name": "chotooutdoorgear.net",
-      "tld": "net",
-      "dropped_date": "2026-09-13",
-      "wayback_snapshots": 1353,
-      "wayback_last_snapshot": "2026-02-15",
-      "open_page_rank": 0.68,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 47,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dchotooutdoorgear.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=chotooutdoorgear.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=chotooutdoorgear.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-13T11:25:55Z",
-      "first_seen_date": "2026-09-13",
-      "last_validated_date": "2026-09-21",
-      "days_listed": 8,
-      "cc_source_domain_count": 2,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v2",
-      "phase2_reason": null
     },
     {
       "name": "arcadiahealthservices.com",
@@ -3804,7 +3765,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -4155,7 +4116,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -4233,7 +4194,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -5642,45 +5603,6 @@
       "phase2_reason": null
     },
     {
-      "name": "attorneysportorange.com",
-      "tld": "com",
-      "dropped_date": "2026-09-10",
-      "wayback_snapshots": 40,
-      "wayback_last_snapshot": "2025-02-26",
-      "open_page_rank": 1.31,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 39,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dattorneysportorange.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=attorneysportorange.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=attorneysportorange.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-10T10:52:29Z",
-      "first_seen_date": "2026-09-10",
-      "last_validated_date": "2026-09-21",
-      "days_listed": 11,
-      "cc_source_domain_count": 5,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v2",
-      "phase2_reason": null
-    },
-    {
       "name": "exceldirectional.com",
       "tld": "com",
       "dropped_date": "2026-09-10",
@@ -6495,7 +6417,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -6885,7 +6807,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -7821,7 +7743,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v2",
       "phase2_reason": "furniture retail readable"
     },
@@ -8255,45 +8177,6 @@
       "phase2_reason": null
     },
     {
-      "name": "walgreenslistens.site",
-      "tld": "site",
-      "dropped_date": "2026-09-17",
-      "wayback_snapshots": 19,
-      "wayback_last_snapshot": "2024-09-19",
-      "open_page_rank": 2.16,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 33,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwalgreenslistens.site"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=walgreenslistens.site&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=walgreenslistens.site&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-17T09:43:37Z",
-      "first_seen_date": "2026-09-17",
-      "last_validated_date": "2026-09-21",
-      "days_listed": 4,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v2",
-      "phase2_reason": null
-    },
-    {
       "name": "thebarenecessity.biz",
       "tld": "biz",
       "dropped_date": "2026-09-17",
@@ -8445,7 +8328,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
@@ -8992,45 +8875,6 @@
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
       "snapshot_category": "empty",
-      "snapshot_classifier_version": "v2",
-      "phase2_reason": null
-    },
-    {
-      "name": "ironforgeenterprises.org",
-      "tld": "org",
-      "dropped_date": "2026-09-10",
-      "wayback_snapshots": 128,
-      "wayback_last_snapshot": "2026-05-28",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 31,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dironforgeenterprises.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=ironforgeenterprises.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=ironforgeenterprises.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-10T09:49:57Z",
-      "first_seen_date": "2026-09-10",
-      "last_validated_date": "2026-09-21",
-      "days_listed": 11,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
       "snapshot_classifier_version": "v2",
       "phase2_reason": null
     },
