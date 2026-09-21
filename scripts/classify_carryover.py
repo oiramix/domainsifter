@@ -3,9 +3,21 @@
 Standalone — does not import from scripts.pipeline or scripts.run_daily.
 Touches only these on-disk artifacts:
     src/data/daily-domains.json       — read; mutated; rewritten atomically
-    src/data/wayback_excerpts.json    — read (if exists); merged; rewritten
-                                        atomically (the sidecar from design
-                                        decision (h))
+    src/data/wayback_excerpts.json    — read (if exists); fed BACK IN as the
+                                        classifier's excerpt cache; merged;
+                                        rewritten atomically (the sidecar from
+                                        design decision (h))
+
+2026-09-21 — the sidecar became an INPUT as well as an output. Until then
+snapshot_classifier re-fetched every domain's excerpt from archive.org on
+every run, so the same domain was judged on different evidence each time: a
+dry run found 9 toxic and the live run 20 minutes later found 8, overlapping
+by only 5, and one domain came back toxic in one pass and legitimate in the
+next. Because "unknown" means BOTH "not abusive" and "the fetch failed", that
+churn silently downgraded already-screened domains back to unscreened — the
+mechanism that published a gambling domain with a permanent archive page on
+2026-09-20. Reusing the stored excerpt makes the evidence stable and drops
+archive.org load. Gated by snapshot_classifier.reuse_cached_excerpts.
 
 Network dependencies:
     archive.org (via scripts.wayback_excerpt) — one fetch per target with
@@ -43,6 +55,7 @@ Git:
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import logging
 import os
@@ -66,6 +79,19 @@ GITHUB_REPO_URL_TEMPLATE = (
 GIT_USER_NAME = "domainsifter-classifier"
 GIT_USER_EMAIL = "99090280+oiramix@users.noreply.github.com"
 
+# Applied when snapshot_classifier.reuse_cached_excerpts is absent from
+# config.json. Hard rule 9 keeps the real value in config; this only decides
+# what happens on a config that predates the key. Reuse is ON by default
+# because re-fetching is what produced the verdict instability above.
+REUSE_CACHED_EXCERPTS_DEFAULT = True
+
+# The four content fields snapshot_classifier actually shows the model. An
+# excerpt carrying none of them is not evidence — it is a fetch that returned
+# nothing useful — so it never displaces a stored excerpt that has content.
+EXCERPT_CONTENT_FIELDS: tuple[str, ...] = (
+    "title", "meta_description", "h1", "h2",
+)
+
 
 # --- I/O helpers ------------------------------------------------------------
 
@@ -79,6 +105,25 @@ def _load_json(path: Path, default):
     except (OSError, ValueError) as exc:
         logger.warning("Could not read %s (%s); using default.", path, exc)
         return default
+
+
+def load_sidecar(path: Path) -> dict[str, dict | None]:
+    """Read wayback_excerpts.json, degrading to {} on every failure path.
+
+    Missing file, unreadable file, invalid JSON and a valid-JSON-but-wrong-
+    shape file (list, string, null) all yield an empty dict with a warning.
+    Hard rule 17: a corrupt sidecar must not crash a classification run — it
+    only costs us the reuse benefit for that run.
+    """
+    raw = _load_json(path, default={})
+    if not isinstance(raw, dict):
+        logger.warning(
+            "Existing %s is not a dict (corrupted?); treating as empty — no "
+            "excerpt reuse this run.",
+            path,
+        )
+        return {}
+    return raw
 
 
 def _atomic_write_json(path: Path, payload) -> None:
@@ -214,6 +259,124 @@ def build_sidecar_updates(targets: list[dict]) -> dict[str, dict | None]:
     return out
 
 
+def is_usable_excerpt(excerpt: object) -> bool:
+    """True when `excerpt` carries at least one of the four content fields.
+
+    Mirrors the usability rule snapshot_classifier applies when deciding
+    whether a cached excerpt can stand in for a fetch. `None` (a remembered
+    failure), a non-dict, and a dict holding only bookkeeping keys
+    (snapshot_url / snapshot_timestamp) are all NOT usable.
+    """
+    if not isinstance(excerpt, dict):
+        return False
+    return any(excerpt.get(field) for field in EXCERPT_CONTENT_FIELDS)
+
+
+def reuse_cached_excerpts_enabled(config: dict | None) -> bool:
+    """Read snapshot_classifier.reuse_cached_excerpts (hard rule 9).
+
+    Read here rather than via snapshot_classifier.cfg() so a config or a
+    classifier build that predates the key cannot raise KeyError inside the
+    backfill tool.
+    """
+    section = (config or {}).get("snapshot_classifier")
+    if not isinstance(section, dict):
+        return REUSE_CACHED_EXCERPTS_DEFAULT
+    return bool(section.get(
+        "reuse_cached_excerpts", REUSE_CACHED_EXCERPTS_DEFAULT,
+    ))
+
+
+def _describe_excerpt_ageing(config: dict | None) -> str:
+    """Log fragment naming snapshot_classifier.excerpt_max_age_days, so a low
+    "reused" count is interpretable.
+
+    The classifier ages excerpts by their Wayback CAPTURE timestamp, not by
+    when we stored them, and these are dropped domains whose last capture is
+    usually old: on the 2026-09-21 sidecar only 12 of 249 usable entries fell
+    inside the configured 90 days, so ~237 get re-fetched despite being
+    cached. Without this fragment an operator reading "12 reused" would
+    reasonably conclude reuse was broken. Ageing itself is the classifier's
+    business — this function only reports the knob.
+    """
+    section = (config or {}).get("snapshot_classifier")
+    if not isinstance(section, dict):
+        return ""
+    raw = section.get("excerpt_max_age_days")
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return ""
+    if days <= 0:
+        return "; no age limit, any stored excerpt is reusable"
+    return (
+        f"; excerpt_max_age_days={days}, so entries whose capture is older "
+        f"than that are re-fetched anyway"
+    )
+
+
+def merge_sidecar(
+    existing: dict[str, dict | None], updates: dict[str, dict | None],
+) -> dict[str, dict | None]:
+    """Merge this run's excerpts into the stored sidecar without ever losing
+    a good excerpt.
+
+    Three cases, in order:
+        1. This run produced a USABLE excerpt → it replaces whatever was
+           stored (a fresher capture of real content is always at least as
+           good as an older one).
+        2. This run produced nothing usable (fetch failed, archive.org 503,
+           no snapshot) but a USABLE excerpt is already stored → the stored
+           excerpt survives untouched. This is the whole point: the plain
+           `{**existing, **updates}` this replaced would overwrite it with
+           null, and on the 2026-09-21 sidecar (598 entries, 379 null, 214
+           with content) a run whose fetches mostly failed would have
+           destroyed the 214.
+        3. Neither is usable → the update is stored anyway, so a first-time
+           failure is remembered as null (unchanged from today's behaviour;
+           snapshot_classifier still retries a cached null).
+
+    Domains absent from `updates` are never touched — the sidecar spans a
+    14-day rolling window and more, and this run only sees today's targets.
+    """
+    merged: dict[str, dict | None] = dict(existing)
+    for name, excerpt in updates.items():
+        if is_usable_excerpt(excerpt):
+            merged[name] = excerpt
+        elif is_usable_excerpt(merged.get(name)):
+            logger.debug(
+                "Keeping stored excerpt for %s — this run's fetch produced "
+                "nothing usable.", name,
+            )
+        else:
+            merged[name] = excerpt
+    return merged
+
+
+def count_excerpt_sources(
+    targets: list[dict], cache: dict[str, dict | None] | None,
+) -> dict[str, int]:
+    """Tally where each target's excerpt came from: {reused, fetched, missing}.
+
+    Compared by value against the cache we handed the classifier, so it holds
+    whether the classifier reused the very dict object or a copy of it. Call
+    this BEFORE strip_inline_excerpts, while the excerpts are still inline.
+    """
+    counts = {"reused": 0, "fetched": 0, "missing": 0}
+    cache = cache or {}
+    for record in targets:
+        excerpt = record.get("wayback_excerpt")
+        if not is_usable_excerpt(excerpt):
+            counts["missing"] += 1
+            continue
+        cached = cache.get(record.get("name", ""))
+        if is_usable_excerpt(cached) and cached == excerpt:
+            counts["reused"] += 1
+        else:
+            counts["fetched"] += 1
+    return counts
+
+
 def strip_inline_excerpts(domains: list[dict]) -> None:
     """Remove the wayback_excerpt key from each domain dict. The excerpt
     lives in the sidecar (design decision (h)) — keeping it inline would
@@ -346,6 +509,89 @@ def _git_commit_and_push(
 # --- Orchestration ---------------------------------------------------------
 
 
+def _accepts_excerpt_cache(func) -> bool:
+    """True when `func` can be called with excerpt_cache=...
+
+    snapshot_classifier.classify_all grew the keyword argument on 2026-09-21;
+    this tool may run against a build that predates it (or a test double).
+    Asking the signature first means the common case never depends on
+    catching a TypeError after the classifier has already spent model calls.
+    A callable whose signature cannot be read (C builtins, some mocks) is
+    treated as accepting it — the TypeError fallback below then covers it.
+    """
+    try:
+        params = inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return True
+    if "excerpt_cache" in params:
+        return True
+    return any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+    )
+
+
+def classify_with_cache(
+    targets: list[dict],
+    *,
+    client,
+    config: dict | None,
+    excerpt_cache: dict[str, dict | None] | None,
+    classify_all=None,
+) -> tuple[dict[str, int], bool]:
+    """Call snapshot_classifier.classify_all, passing the excerpt cache when
+    that build supports it. Returns (counts, cache_was_passed).
+
+    Two layers of guard against the older signature, because the classifier
+    change may land after this one:
+        1. Signature introspection — no cache keyword at all if the callee
+           cannot take it.
+        2. A TypeError fallback for the "signature says yes but the call
+           still rejects it" case. The retry is deliberately narrowed to
+           TypeErrors that name the argument, so an unrelated TypeError from
+           inside the classifier propagates instead of silently re-running a
+           whole classification pass.
+    """
+    classify_all = classify_all or snapshot_classifier.classify_all
+    if not excerpt_cache:
+        return classify_all(targets, client=client, config=config), False
+
+    if not _accepts_excerpt_cache(classify_all):
+        logger.warning(
+            "snapshot_classifier.classify_all does not accept excerpt_cache "
+            "(older build) — every excerpt will be re-fetched from "
+            "archive.org this run.",
+        )
+        return classify_all(targets, client=client, config=config), False
+
+    try:
+        counts = classify_all(
+            targets, client=client, config=config, excerpt_cache=excerpt_cache,
+        )
+    except TypeError as exc:
+        message = str(exc)
+        if "excerpt_cache" not in message and "keyword argument" not in message:
+            raise
+        logger.warning(
+            "snapshot_classifier.classify_all rejected excerpt_cache (%s) — "
+            "retrying without reuse; this run re-fetches from archive.org.",
+            message,
+        )
+        return classify_all(targets, client=client, config=config), False
+    return counts, True
+
+
+def _format_reuse_summary(counts: dict[str, int], *, cache_used: bool) -> str:
+    """One line, once per run — the operator's view of the archive.org load
+    drop. Deliberately not per-domain: at 200+ targets that would bury the
+    classification summary."""
+    return (
+        f"excerpt sources: {counts['reused']} reused from sidecar, "
+        f"{counts['fetched']} fetched from archive.org, "
+        f"{counts['missing']} with no usable excerpt "
+        f"(reuse {'on' if cache_used else 'off'})"
+    )
+
+
 def _format_summary(target_count: int, counts: dict[str, int]) -> str:
     return (
         f"classified {target_count} entries: "
@@ -435,7 +681,35 @@ def run(
         )
         return 1
 
-    counts = snapshot_classifier.classify_all(targets, client=client, config=config)
+    # Feed the sidecar back in as evidence. Read it BEFORE classification (in
+    # dry-run too — reading writes nothing) so a domain we already have a good
+    # excerpt for is judged on the same evidence as last time instead of on
+    # whatever archive.org happens to serve today.
+    existing_sidecar = load_sidecar(excerpts_path)
+    if reuse_cached_excerpts_enabled(config):
+        # A copy, so a classifier that mutated what it was handed could not
+        # corrupt the dict we merge into on the way out.
+        excerpt_cache: dict[str, dict | None] | None = dict(existing_sidecar)
+        logger.info(
+            "Excerpt reuse ON — sidecar holds %d entries, %d with usable "
+            "content%s.",
+            len(excerpt_cache),
+            sum(1 for v in excerpt_cache.values() if is_usable_excerpt(v)),
+            _describe_excerpt_ageing(config),
+        )
+    else:
+        excerpt_cache = None
+        logger.info(
+            "snapshot_classifier.reuse_cached_excerpts is false — no cache "
+            "passed; every excerpt is re-fetched from archive.org.",
+        )
+
+    counts, cache_used = classify_with_cache(
+        targets, client=client, config=config, excerpt_cache=excerpt_cache,
+    )
+    logger.info(_format_reuse_summary(
+        count_excerpt_sources(targets, excerpt_cache), cache_used=cache_used,
+    ))
     summary = _format_summary(len(targets), counts)
     logger.info(summary)
 
@@ -453,19 +727,9 @@ def run(
 
     # ---- Live mode ----
 
-    existing_sidecar = _load_json(excerpts_path, default={})
-    if not isinstance(existing_sidecar, dict):
-        # Defensive: a corrupted sidecar shouldn't lose all earlier excerpts
-        # silently. Warn loudly and reset (the rewrite below preserves at
-        # least this run's data).
-        logger.warning(
-            "Existing %s is not a dict (corrupted?); resetting to empty.",
-            excerpts_path,
-        )
-        existing_sidecar = {}
-
+    # existing_sidecar was loaded (and shape-checked) before classification.
     sidecar_updates = build_sidecar_updates(targets)
-    merged_sidecar = {**existing_sidecar, **sidecar_updates}
+    merged_sidecar = merge_sidecar(existing_sidecar, sidecar_updates)
 
     # daily-domains.json: strip inline excerpts, evict toxics, recompute
     # counts. strip_inline_excerpts runs BEFORE split_toxic so the kept

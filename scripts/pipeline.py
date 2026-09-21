@@ -57,6 +57,7 @@ failures log and continue.
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import logging
 import os
@@ -766,6 +767,175 @@ def _bucket_and_cap_for_availability(
     return final, stats
 
 
+def _load_sidecar_excerpts(sidecar_path: Path) -> dict[str, dict | None]:
+    """Read the excerpt sidecar into a {domain: excerpt|None} cache.
+
+    Never raises: a missing, empty, unreadable, non-JSON or wrong-shaped
+    sidecar all degrade to {} ("no cache"), which simply means the
+    classifier re-fetches everything — i.e. the pre-2026-09-21 behaviour.
+    Values that are neither a dict nor None are dropped rather than
+    handed to the classifier as bogus evidence.
+    """
+    if not sidecar_path.exists():
+        logger.info(
+            "Excerpt sidecar %s does not exist yet; no cached excerpts to reuse.",
+            sidecar_path,
+        )
+        return {}
+    try:
+        with open(sidecar_path, "r", encoding="utf-8") as fh:
+            loaded = json.load(fh)
+    except (OSError, ValueError) as exc:
+        logger.warning(
+            "Excerpt sidecar %s unreadable (%s); proceeding with no cached "
+            "excerpts (classifier will re-fetch).",
+            sidecar_path, exc,
+        )
+        return {}
+
+    if not isinstance(loaded, dict):
+        logger.warning(
+            "Excerpt sidecar %s is not a dict (corrupted?); proceeding with "
+            "no cached excerpts.",
+            sidecar_path,
+        )
+        return {}
+
+    cache: dict[str, dict | None] = {}
+    skipped = 0
+    for name, excerpt in loaded.items():
+        if not isinstance(name, str):
+            skipped += 1
+            continue
+        if excerpt is None or isinstance(excerpt, dict):
+            cache[name] = excerpt
+        else:
+            skipped += 1
+    if skipped:
+        logger.warning(
+            "Excerpt sidecar %s: skipped %d entries with an unexpected shape.",
+            sidecar_path, skipped,
+        )
+    return cache
+
+
+def _build_excerpt_cache(
+    config: dict,
+    sidecar_path: Path,
+) -> dict[str, dict | None] | None:
+    """Assemble the excerpt_cache handed to snapshot_classifier.classify_all.
+
+    Returns None when reuse is switched off via
+    config["snapshot_classifier"]["reuse_cached_excerpts"] — the caller
+    then omits the kwarg entirely, restoring exactly the pre-2026-09-21
+    "re-fetch every domain every run" behaviour.
+
+    Never raises (hard rule 17): any problem degrades to {} / None, never
+    to a failed daily run.
+    """
+    try:
+        classifier_cfg = config.get("snapshot_classifier")
+        if not isinstance(classifier_cfg, dict):
+            classifier_cfg = {}
+        if not classifier_cfg.get("reuse_cached_excerpts", True):
+            logger.info(
+                "Excerpt reuse disabled (snapshot_classifier."
+                "reuse_cached_excerpts=false); classifier will re-fetch "
+                "every candidate from archive.org.",
+            )
+            return None
+        cache = _load_sidecar_excerpts(sidecar_path)
+        usable = sum(1 for excerpt in cache.values() if excerpt)
+        logger.info(
+            "Excerpt cache: %d sidecar entries loaded from %s "
+            "(%d usable, %d remembered failures).",
+            len(cache), sidecar_path, usable, len(cache) - usable,
+        )
+        return cache
+    except Exception as exc:  # defensive: cache is an optimisation, not a stage
+        logger.warning(
+            "Excerpt cache unavailable (%s); classifier will re-fetch every "
+            "candidate.", exc,
+        )
+        return {}
+
+
+def _classifier_accepts_excerpt_cache(classify_fn: object) -> bool:
+    """True when `classify_fn` can take an `excerpt_cache` keyword.
+
+    The kwarg landed in snapshot_classifier as a separate change, so the
+    daily run has to survive BOTH signatures. We inspect before calling
+    rather than catching TypeError after: a retry-without-the-kwarg would
+    re-run the whole classification, i.e. a second full sweep of
+    archive.org fetches and model calls. Inspection failure (C-implemented
+    or exotic callable) is treated as "old signature" — reuse is skipped,
+    which is merely the old behaviour.
+    """
+    try:
+        params = inspect.signature(classify_fn).parameters  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    except Exception:  # pragma: no cover - inspect is not supposed to do this
+        return False
+    param = params.get("excerpt_cache")
+    if param is not None and param.kind in (
+        inspect.Parameter.KEYWORD_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    ):
+        return True
+    return any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+    )
+
+
+def _log_excerpt_reuse_summary(
+    counts: object,
+    candidates: list[dict],
+    excerpt_cache: dict[str, dict | None] | None,
+    cache_passed: bool,
+) -> None:
+    """One line per run so the archive.org load drop is visible in the
+    daily report. Never raises — it is a log line, not a stage."""
+    try:
+        total = len(candidates)
+        if not cache_passed:
+            logger.info(
+                "Excerpt reuse: off this run — all %d candidates fetched "
+                "from archive.org.", total,
+            )
+            return
+        cache = excerpt_cache or {}
+        reused = fetched = None
+        if isinstance(counts, dict):
+            reported_reused = counts.get("excerpts_reused")
+            reported_fetched = counts.get("excerpts_fetched")
+            if isinstance(reported_reused, int) and isinstance(reported_fetched, int):
+                reused, fetched = reported_reused, reported_fetched
+        if reused is not None and fetched is not None:
+            logger.info(
+                "Excerpt reuse: %d of %d candidates reused a stored excerpt, "
+                "%d needed an archive.org fetch (cache holds %d entries).",
+                reused, total, fetched, len(cache),
+            )
+            return
+        # The classifier does not report the split, so derive it from cache
+        # hits: by contract a usable stored excerpt is reused and a stored
+        # None still retries. Said as "eligible" because the classifier also
+        # re-fetches excerpts older than excerpt_max_age_days, which this
+        # side deliberately does not re-implement — its own evidence log
+        # line is the authoritative tally.
+        reused = sum(1 for c in candidates if cache.get(c.get("name") or ""))
+        fetched = total - reused
+        logger.info(
+            "Excerpt reuse: %d of %d candidates had a stored excerpt eligible "
+            "for reuse, %d needed an archive.org fetch (cache holds %d "
+            "entries; derived from cache hits).",
+            reused, total, fetched, len(cache),
+        )
+    except Exception as exc:  # pragma: no cover - logging must never break a run
+        logger.warning("Excerpt reuse summary unavailable (%s).", exc)
+
+
 def _write_sidecar_excerpts(
     classified: list[dict],
     sidecar_path: Path,
@@ -781,7 +951,9 @@ def _write_sidecar_excerpts(
     are preserved (today's classifier only sees today's enriched set —
     historical sidecar entries from prior runs survive). Names in
     `classified` overwrite the sidecar entry — today's excerpt is fresher
-    than yesterday's if the entry was re-classified.
+    than yesterday's if the entry was re-classified — EXCEPT when today's
+    excerpt is empty/None and a usable one is already stored: a failed
+    fetch never destroys stored evidence.
 
     Returns the count of sidecar entries written (today's new + existing
     preserved). 0 means nothing to write because the classifier didn't
@@ -830,7 +1002,27 @@ def _write_sidecar_excerpts(
                 sidecar_path, exc,
             )
 
-    merged = {**existing, **updates}
+    # A failed fetch this run must NEVER overwrite a usable stored excerpt
+    # with null (added 2026-09-21). archive.org failed 184 of 289 fetches on
+    # the 2026-09-19 sweep, so a wholesale {**existing, **updates} merge
+    # could wipe most of the stored evidence in a single bad run — and
+    # losing the excerpt is what lets a screened domain drift back to
+    # `unknown` (= "not abusive" OR "the fetch failed"). A None update is
+    # still recorded when nothing usable is stored for that name, so a
+    # remembered failure is not lost either.
+    merged = dict(existing)
+    preserved = 0
+    for name, excerpt in updates.items():
+        if not excerpt and merged.get(name):
+            preserved += 1
+            continue
+        merged[name] = excerpt
+    if preserved:
+        logger.info(
+            "Sidecar wayback excerpts: kept %d stored excerpt(s) whose "
+            "re-fetch failed this run (not overwritten with null).",
+            preserved,
+        )
 
     # Atomic write — temp file + os.replace, same pattern as
     # output.write_output and classify_carryover._atomic_write_json.
@@ -1065,17 +1257,67 @@ def main(argv: list[str] | None = None) -> int:
     # knobs. Without it both fall back to in-code defaults and editing
     # config.json would silently have no effect on this stage.
     classifier_client = snapshot_classifier.make_default_client(config)
-    snapshot_classifier.classify_all(
+
+    sidecar_path = Path(config.get(
+        "sidecar_excerpts_path", "src/data/wayback_excerpts.json",
+    ))
+
+    # Excerpt reuse (added 2026-09-21): hand the classifier the excerpts
+    # already stored in the sidecar so it re-asks archive.org only for the
+    # ones it has nothing for. Two reasons: archive.org is the binding
+    # constraint (184 of 289 fetches failed on the 2026-09-19 sweep), and
+    # re-fetching meant the same domain was judged on different evidence
+    # every run — a dry run on 2026-09-21 found 9 toxic and the real run
+    # 20 minutes later found 8, overlapping by only 5. Stable evidence
+    # stops a transient fetch failure silently downgrading a screened
+    # domain back to `unknown`.
+    #
+    # Every part of this is optional-by-design: cache is None when reuse is
+    # disabled in config, {} when the sidecar is missing/corrupt, and the
+    # kwarg is omitted entirely when classify_all's signature does not take
+    # it. All three degrade to exactly the old behaviour, never to a failed
+    # run (hard rule 17).
+    excerpt_cache: dict[str, dict | None] | None = None
+    classifier_kwargs: dict[str, object] = {}
+    cache_passed = False
+    try:
+        excerpt_cache = _build_excerpt_cache(config, sidecar_path)
+        if excerpt_cache is not None and _classifier_accepts_excerpt_cache(
+            snapshot_classifier.classify_all,
+        ):
+            classifier_kwargs["excerpt_cache"] = excerpt_cache
+            cache_passed = True
+        elif excerpt_cache is not None:
+            logger.warning(
+                "snapshot_classifier.classify_all does not accept "
+                "excerpt_cache; skipping excerpt reuse this run (every "
+                "candidate re-fetched).",
+            )
+    except Exception as exc:
+        # Outer belt to the helpers' own braces. Reuse is an optimisation
+        # layered on top of Stage 4b; no failure of it may cost the day's
+        # publish.
+        logger.warning(
+            "Excerpt reuse wiring failed (%s); classifying with no cache.", exc,
+        )
+        classifier_kwargs = {}
+        cache_passed = False
+
+    classifier_counts = snapshot_classifier.classify_all(
         enriched, client=classifier_client, pause_seconds=1.0, config=config,
+        **classifier_kwargs,
     )
+    try:
+        _log_excerpt_reuse_summary(
+            classifier_counts, enriched, excerpt_cache, cache_passed,
+        )
+    except Exception as exc:
+        logger.warning("Excerpt reuse summary failed (%s).", exc)
 
     # Persist excerpts to sidecar BEFORE Stage 5 so toxic-rejected entries
     # still have their excerpt available for forensics. Mutates `enriched`
     # to strip the inline wayback_excerpt key after writing — sidecar is
     # the canonical location.
-    sidecar_path = Path(config.get(
-        "sidecar_excerpts_path", "src/data/wayback_excerpts.json",
-    ))
     _write_sidecar_excerpts(enriched, sidecar_path)
 
     # Remember this run's toxic verdicts BEFORE filtering, so a later run

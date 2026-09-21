@@ -22,11 +22,26 @@ Coverage:
   - The canonical summary line is emitted in BOTH modes, shadow line only
     in shadow mode
   - classify_all fetch pacing (only between fetches, not after the last)
+
+2026-09-21 additions:
+  - excerpt_cache reuse: a usable cached excerpt SKIPS the network entirely
+    and never sleeps; a cached None is a remembered failure and IS retried;
+    a failed re-fetch NEVER replaces a usable cached excerpt (the invariant
+    the whole change exists for); age-based re-fetch; an unparseable
+    snapshot_timestamp means "reuse", not "crash" and not "re-fetch
+    everything"; reuse_cached_excerpts=false restores the old behaviour
+  - parked_markers: a marker in the RAW snapshot HTML sets "parked" with no
+    model call, shadow-aware, and every production marker matches
+    case-insensitively
+  - spam_signatures wiring: a signature firing on a domain the model did not
+    call toxic applies signature_action and is logged by name
 """
 
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 
@@ -983,3 +998,872 @@ class TestVersionStamping:
         sc.classify_all(records, client=None)
         for r in records:
             assert r["snapshot_classifier_version"] == sc.CLASSIFIER_VERSION
+
+
+# ===========================================================================
+# 2026-09-21 — excerpt reuse, parked-marker detection, spam signatures
+# ===========================================================================
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = REPO_ROOT / "scripts" / "config.json"
+
+# A parked page as it actually appears: a couple of KB of ad-network markup
+# with no title, no meta description and no headings, so wayback_excerpt
+# extracts NO content signal at all and the old code path could only file it
+# under "unknown".
+PARKED_HTML = (
+    "<!DOCTYPE html><html><head>"
+    "<script src=\"https://ww1.example-ads.test/px.js\"></script>"
+    "</head><body data-adblockkey=\"MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJB\">"
+    "<div id=\"target\"></div></body></html>"
+)
+
+REAL_SITE_HTML = (
+    "<!DOCTYPE html><html><head><title>Coppernest Woodworking Journal</title>"
+    "<meta name=\"description\" content=\"Hand-tool joinery notes.\">"
+    "</head><body><h1>Hand-tool joinery</h1><h2>Recent projects</h2></body></html>"
+)
+
+SIGNATURE_CONFIG: dict = {
+    "snapshot_classifier": {
+        "shadow": False,
+        "signature_action": "toxic",
+        "signature_terms_latin": ["casino"],
+        "signature_terms_cjk": ["金沙"],
+    }
+}
+
+
+def _ts(days_ago: float) -> str:
+    """A 14-digit Wayback timestamp `days_ago` days in the past."""
+    moment = datetime.now(timezone.utc) - timedelta(days=days_ago)
+    return moment.strftime("%Y%m%d%H%M%S")
+
+
+def _cached(title: str = "Tideblock Tidal Data", *, age_days: float = 1.0) -> dict:
+    """A usable cached excerpt with a controllable capture age."""
+    return {
+        "snapshot_timestamp": _ts(age_days),
+        "snapshot_url": "http://web.archive.org/web/x/http://tideblock.io/",
+        "title": title,
+        "meta_description": None,
+        "h1": [],
+        "h2": [],
+    }
+
+
+def _spy_fetch(monkeypatch, by_name: dict) -> list[str]:
+    """Stub fetch_excerpt and RECORD every domain it was called with.
+
+    A recording spy rather than an exception-raising stub because
+    _fetch_excerpt_only deliberately swallows exceptions (hard rule 11) — an
+    AssertionError raised in there would be logged, not surfaced.
+    """
+    calls: list[str] = []
+
+    def _stub(name, target_date):
+        calls.append(name)
+        value = by_name.get(name)
+        if callable(value):
+            return value(name, target_date)
+        return value
+
+    monkeypatch.setattr("scripts.wayback_excerpt.fetch_excerpt", _stub)
+    return calls
+
+
+def _stub_bundle(monkeypatch, html_by_name: dict) -> list[str]:
+    """Stub the three network helpers the raw-markup path composes.
+
+    `_parse_content_signals` is left REAL, so these tests exercise the actual
+    bs4 extraction over the fixture markup and prove the assembled excerpt has
+    fetch_excerpt's exact shape. Returns the list of fetched domains.
+    """
+    from scripts import wayback_excerpt as we
+
+    calls: list[str] = []
+
+    def _availability(domain, target_date):
+        calls.append(domain)
+        if domain not in html_by_name:
+            return None
+        return {"domain": domain}
+
+    def _closest(payload):
+        if not payload:
+            return None
+        return {
+            "available": True,
+            "timestamp": "20260901120000",
+            "url": (
+                "http://web.archive.org/web/20260901120000/"
+                f"http://{payload['domain']}/"
+            ),
+        }
+
+    def _html(url):
+        name = url.rstrip("/").rsplit("/", 1)[-1]
+        value = html_by_name.get(name)
+        if isinstance(value, str):
+            return value.encode("utf-8")
+        return value
+
+    monkeypatch.setattr(we, "_fetch_availability", _availability)
+    monkeypatch.setattr(we, "_extract_closest_snapshot", _closest)
+    monkeypatch.setattr(we, "_fetch_snapshot_html", _html)
+    return calls
+
+
+def _markers_config(markers: list[str], **extra) -> dict:
+    section = {"shadow": False, "parked_markers": markers}
+    section.update(extra)
+    return {"snapshot_classifier": section}
+
+
+def _production_markers() -> list[str]:
+    """The live parked_markers from scripts/config.json, for parametrisation.
+
+    Returns [] rather than skipping when the key is missing: this runs at
+    COLLECTION time inside a parametrize decorator, where pytest.skip is not
+    allowed. An empty parameter set skips the test on its own.
+    """
+    if not CONFIG_PATH.exists():  # pragma: no cover - config is checked in
+        return []
+    section = (
+        json.loads(CONFIG_PATH.read_text(encoding="utf-8")).get("snapshot_classifier")
+        or {}
+    )
+    markers = section.get("parked_markers")
+    if not isinstance(markers, list):
+        return []
+    return [m for m in markers if isinstance(m, str) and m.strip()]
+
+
+# ---------------------------------------------------------------------------
+# is_usable_excerpt / age helpers
+# ---------------------------------------------------------------------------
+
+
+class TestUsableExcerpt:
+    @pytest.mark.parametrize("field,value", [
+        ("title", "T"), ("meta_description", "M"),
+        ("h1", ["A"]), ("h2", ["B"]),
+    ])
+    def test_any_single_signal_is_usable(self, field, value):
+        assert sc.is_usable_excerpt({field: value}) is True
+
+    def test_all_fields_empty_is_not_usable(self):
+        assert sc.is_usable_excerpt(
+            {"title": None, "meta_description": "", "h1": [], "h2": []}
+        ) is False
+
+    def test_none_and_non_dict_not_usable(self):
+        assert sc.is_usable_excerpt(None) is False
+        assert sc.is_usable_excerpt("title") is False
+        assert sc.is_usable_excerpt([{"title": "T"}]) is False
+
+
+class TestExcerptAge:
+    def test_age_in_days_from_wayback_timestamp(self):
+        age = sc._excerpt_age_days({"snapshot_timestamp": _ts(10)})
+        assert age is not None and 9.9 < age < 10.1
+
+    @pytest.mark.parametrize("stamp", [
+        None, "", "2025-12-15", "2025121512", "20251215120000000",
+        "not-a-timestamp", "99999999999999", 20251215120000,
+    ])
+    def test_unparseable_timestamp_is_unknowable_not_a_crash(self, stamp):
+        assert sc._excerpt_age_days({"snapshot_timestamp": stamp}) is None
+
+    def test_missing_key_is_unknowable(self):
+        assert sc._excerpt_age_days({}) is None
+
+    def test_unknowable_age_is_never_stale(self):
+        # "I cannot tell how old this is" must mean REUSE — never re-fetch
+        # everything, and never raise.
+        assert sc._is_stale({"snapshot_timestamp": "nonsense"}, 90) is False
+
+    def test_stale_beyond_max_age(self):
+        assert sc._is_stale({"snapshot_timestamp": _ts(120)}, 90) is True
+
+    def test_fresh_within_max_age(self):
+        assert sc._is_stale({"snapshot_timestamp": _ts(30)}, 90) is False
+
+    def test_zero_max_age_disables_ageing(self):
+        assert sc._is_stale({"snapshot_timestamp": _ts(4000)}, 0) is False
+
+    def test_non_numeric_max_age_disables_ageing(self, caplog):
+        config = {"snapshot_classifier": {"excerpt_max_age_days": "ninety"}}
+        with caplog.at_level("WARNING"):
+            assert sc._max_excerpt_age_days(config) == 0.0
+        assert any("excerpt_max_age_days" in m for m in caplog.messages)
+
+    def test_default_max_age_is_ninety(self):
+        assert sc._max_excerpt_age_days({}) == 90.0
+
+
+# ---------------------------------------------------------------------------
+# Excerpt reuse — the fix for verdict instability
+# ---------------------------------------------------------------------------
+
+
+class TestExcerptReuse:
+    def test_usable_cached_excerpt_skips_the_network(self, monkeypatch):
+        calls = _spy_fetch(monkeypatch, {})
+        cached = _cached()
+        records = _records("tideblock.io")
+        client = _FakeClient(_all("legitimate"))
+
+        sc.classify_all(
+            records, client=client, pause_seconds=0.0, config=SHADOW_OFF,
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert calls == []                               # no archive.org call
+        assert records[0]["wayback_excerpt"] == cached    # same evidence as before
+        assert records[0]["snapshot_category"] == "legitimate"
+        assert client.batches == [["tideblock.io"]]       # still classified
+
+    def test_reuse_count_logged_once_not_per_domain(self, monkeypatch, caplog):
+        names = ["tideblock.io", "marketglow.com", "coppernest.org"]
+        _spy_fetch(monkeypatch, {})
+        cache = {n: _cached() for n in names}
+
+        with caplog.at_level("INFO"):
+            sc.classify_all(
+                _records(*names), client=_FakeClient(_all("legitimate")),
+                pause_seconds=0.0, config=SHADOW_OFF, excerpt_cache=cache,
+            )
+
+        summaries = [m for m in caplog.messages if "evidence —" in m]
+        assert len(summaries) == 1
+        assert "3 excerpt(s) reused from cache" in summaries[0]
+        assert "0 fetched from archive.org" in summaries[0]
+
+    def test_cached_none_is_a_remembered_failure_and_is_retried(
+        self, monkeypatch, good_excerpt,
+    ):
+        # Retrying failures is the only way coverage improves — a remembered
+        # failure must never become permanent.
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+        records = _records("tideblock.io")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=SHADOW_OFF, excerpt_cache={"tideblock.io": None},
+        )
+
+        assert calls == ["tideblock.io"]
+        assert records[0]["wayback_excerpt"] == good_excerpt
+        assert records[0]["snapshot_category"] == "legitimate"
+
+    def test_unusable_cached_dict_is_retried(self, monkeypatch, good_excerpt):
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+        empty_cached = {"snapshot_timestamp": _ts(1), "title": None,
+                        "meta_description": None, "h1": [], "h2": []}
+
+        sc.classify_all(
+            _records("tideblock.io"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0, config=SHADOW_OFF,
+            excerpt_cache={"tideblock.io": empty_cached},
+        )
+
+        assert calls == ["tideblock.io"]
+
+    def test_cache_miss_falls_through_to_fetch(self, monkeypatch, good_excerpt):
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+
+        sc.classify_all(
+            _records("tideblock.io"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0, config=SHADOW_OFF,
+            excerpt_cache={"someoneelse.dev": _cached()},
+        )
+
+        assert calls == ["tideblock.io"]
+
+    def test_failed_refetch_never_overwrites_a_usable_cached_excerpt(
+        self, monkeypatch, caplog,
+    ):
+        # THE INVARIANT. The cached excerpt is stale, so a re-fetch is
+        # attempted; archive.org fails (its normal state — 184 of 289 fetches
+        # failed on the 2026-09-19 sweep). The good evidence must survive and
+        # the domain must NOT be downgraded to unscreened.
+        cached = _cached(age_days=400)
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": None})
+        records = _records("tideblock.io")
+        config = {"snapshot_classifier": {"shadow": False,
+                                          "excerpt_max_age_days": 90}}
+
+        with caplog.at_level("INFO"):
+            counts = sc.classify_all(
+                records, client=_FakeClient([_reply({"tideblock.io": "toxic"})]),
+                pause_seconds=0.0, config=config,
+                excerpt_cache={"tideblock.io": cached},
+            )
+
+        assert calls == ["tideblock.io"]                    # the retry happened
+        assert records[0]["wayback_excerpt"] == cached      # evidence preserved
+        assert records[0]["snapshot_category"] == "toxic"   # still screened
+        assert counts["unknown"] == 0
+        assert any("1 preserved after a failed re-fetch" in m
+                   for m in caplog.messages)
+
+    def test_failed_refetch_of_raw_markup_path_also_preserves(self, monkeypatch):
+        # Same invariant on the parked-marker fetch path (markers configured →
+        # the composed raw-HTML fetch), where the whole snapshot GET fails.
+        cached = _cached(age_days=400)
+        _stub_bundle(monkeypatch, {})       # availability returns None
+        records = _records("tideblock.io")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"], excerpt_max_age_days=90),
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert records[0]["wayback_excerpt"] == cached
+        assert records[0]["snapshot_category"] == "legitimate"
+
+    def test_stale_excerpt_is_refetched_and_the_new_one_used(
+        self, monkeypatch, good_excerpt,
+    ):
+        cached = _cached(age_days=200)
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+        records = _records("tideblock.io")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config={"snapshot_classifier": {"shadow": False,
+                                            "excerpt_max_age_days": 90}},
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert calls == ["tideblock.io"]
+        assert records[0]["wayback_excerpt"] == good_excerpt
+
+    def test_unparseable_cached_timestamp_is_reused_not_refetched(
+        self, monkeypatch,
+    ):
+        cached = {**_cached(), "snapshot_timestamp": "whenever"}
+        calls = _spy_fetch(monkeypatch, {})
+        records = _records("tideblock.io")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config={"snapshot_classifier": {"shadow": False,
+                                            "excerpt_max_age_days": 90}},
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert calls == []
+        assert records[0]["wayback_excerpt"] == cached
+
+    def test_max_age_zero_reuses_an_ancient_excerpt(self, monkeypatch):
+        cached = _cached(age_days=4000)
+        calls = _spy_fetch(monkeypatch, {})
+
+        sc.classify_all(
+            _records("tideblock.io"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0,
+            config={"snapshot_classifier": {"shadow": False,
+                                            "excerpt_max_age_days": 0}},
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert calls == []
+
+    def test_reuse_disabled_restores_todays_behaviour_exactly(
+        self, monkeypatch, good_excerpt,
+    ):
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+        records = _records("tideblock.io")
+        config = {"snapshot_classifier": {"shadow": False,
+                                          "reuse_cached_excerpts": False}}
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=config, excerpt_cache={"tideblock.io": _cached()},
+        )
+
+        assert calls == ["tideblock.io"]                   # cache ignored
+        assert records[0]["wayback_excerpt"] == good_excerpt
+
+    def test_reuse_disabled_does_not_preserve_cached_on_failure(
+        self, monkeypatch,
+    ):
+        # With reuse off the pre-2026-09-21 outcome is reproduced exactly: a
+        # failed fetch means unknown, cache or no cache.
+        _spy_fetch(monkeypatch, {"tideblock.io": None})
+        records = _records("tideblock.io")
+        config = {"snapshot_classifier": {"shadow": False,
+                                          "reuse_cached_excerpts": False}}
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=config, excerpt_cache={"tideblock.io": _cached()},
+        )
+
+        assert records[0]["wayback_excerpt"] is None
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+
+    def test_no_cache_argument_is_unchanged_behaviour(
+        self, monkeypatch, good_excerpt,
+    ):
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+        sc.classify_all(
+            _records("tideblock.io"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0, config=SHADOW_OFF,
+        )
+        assert calls == ["tideblock.io"]
+
+    def test_reused_excerpts_do_not_sleep(self, monkeypatch, good_excerpt):
+        # The pacing contract: pause_seconds is archive.org courtesy, so only
+        # REAL fetches pay it. This is most of the speed win.
+        sleeps: list[float] = []
+        monkeypatch.setattr(sc.time, "sleep", lambda s: sleeps.append(s))
+        names = ["tideblock.io", "marketglow.com", "coppernest.org", "lot04test.dev"]
+        _spy_fetch(monkeypatch, {n: good_excerpt for n in names})
+        cache = {"tideblock.io": _cached(), "marketglow.com": _cached()}
+
+        sc.classify_all(
+            _records(*names), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.5, config=SHADOW_OFF, excerpt_cache=cache,
+        )
+
+        # 2 reused (no sleep) + 2 fetched → exactly one inter-fetch pause.
+        assert sleeps == [0.5]
+
+    def test_all_reused_means_no_sleep_at_all(self, monkeypatch):
+        sleeps: list[float] = []
+        monkeypatch.setattr(sc.time, "sleep", lambda s: sleeps.append(s))
+        names = ["tideblock.io", "marketglow.com"]
+        _spy_fetch(monkeypatch, {})
+
+        sc.classify_all(
+            _records(*names), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.5, config=SHADOW_OFF,
+            excerpt_cache={n: _cached() for n in names},
+        )
+
+        assert sleeps == []
+
+    def test_records_without_snapshot_date_ignore_the_cache(self, monkeypatch):
+        # No wayback_last_snapshot means no snapshot to reason about at all;
+        # a stray cache entry must not resurrect one.
+        _spy_fetch(monkeypatch, {})
+        record = {"name": "tideblock.io"}
+
+        sc.classify_all(
+            [record], client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=SHADOW_OFF, excerpt_cache={"tideblock.io": _cached()},
+        )
+
+        assert record["wayback_excerpt"] is None
+        assert record["snapshot_category"] == sc.UNKNOWN_CATEGORY
+
+    def test_empty_cache_dict_behaves_like_no_cache(self, monkeypatch, good_excerpt):
+        calls = _spy_fetch(monkeypatch, {"tideblock.io": good_excerpt})
+        sc.classify_all(
+            _records("tideblock.io"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0, config=SHADOW_OFF, excerpt_cache={},
+        )
+        assert calls == ["tideblock.io"]
+
+    def test_reuse_is_shadow_aware(self, monkeypatch):
+        cached = _cached()
+        _spy_fetch(monkeypatch, {})
+        records = _records("tideblock.io")
+
+        sc.classify_all(
+            records, client=_FakeClient([_reply({"tideblock.io": "toxic"})]),
+            pause_seconds=0.0, config=SHADOW_ON,
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert records[0][sc.SHADOW_FIELD] == "toxic"
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+
+
+# ---------------------------------------------------------------------------
+# Parked-page detection from raw markup (no model call)
+# ---------------------------------------------------------------------------
+
+
+class TestParkedMarkerDetection:
+    def test_marker_sets_parked_without_a_model_call(self, monkeypatch, caplog):
+        _stub_bundle(monkeypatch, {"marketglow.com": PARKED_HTML})
+        records = _records("marketglow.com")
+        client = _FakeClient(_all("legitimate"))
+
+        with caplog.at_level("INFO"):
+            counts = sc.classify_all(
+                records, client=client, pause_seconds=0.0,
+                config=_markers_config(["data-adblockkey", "sedoparking.com"]),
+            )
+
+        assert records[0]["snapshot_category"] == "parked"
+        assert client.batches == []          # the model was never asked
+        assert counts == {"legitimate": 0, "parked": 1, "toxic": 0,
+                          "empty": 0, "unknown": 0}
+        assert any("markup marker 'data-adblockkey'" in m for m in caplog.messages)
+
+    def test_parked_page_yields_no_excerpt_but_is_still_categorised(
+        self, monkeypatch,
+    ):
+        # The exact defect: no title / meta / headings → fetch_excerpt's
+        # contract says None → the old code could only say "unknown".
+        _stub_bundle(monkeypatch, {"marketglow.com": PARKED_HTML})
+        records = _records("marketglow.com")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"]),
+        )
+
+        assert records[0]["wayback_excerpt"] is None
+        assert records[0]["snapshot_category"] == "parked"
+
+    def test_parked_detection_is_shadow_aware(self, monkeypatch):
+        _stub_bundle(monkeypatch, {"marketglow.com": PARKED_HTML})
+        records = _records("marketglow.com")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"], shadow=True),
+        )
+
+        assert records[0][sc.SHADOW_FIELD] == "parked"
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+
+    def test_marker_match_is_case_insensitive(self, monkeypatch):
+        html = "<html><body DATA-AdBlockKey=\"ABC\"></body></html>"
+        _stub_bundle(monkeypatch, {"marketglow.com": html})
+        records = _records("marketglow.com")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"]),
+        )
+
+        assert records[0]["snapshot_category"] == "parked"
+
+    @pytest.mark.parametrize("marker", _production_markers())
+    def test_every_production_marker_matches_case_insensitively(self, marker):
+        html = f"<html><body>PREFIX {marker.upper()} SUFFIX</body></html>"
+        assert sc.matched_parked_marker(html, [marker.lower()]) == marker.lower()
+        assert sc.matched_parked_marker(html.lower(), [marker.lower()]) is not None
+
+    def test_matched_parked_marker_returns_first_hit(self):
+        html = "<html><body>buy this domain via sedoparking.com</body></html>"
+        assert sc.matched_parked_marker(
+            html, ["sedoparking.com", "buy this domain"]
+        ) == "sedoparking.com"
+
+    def test_matched_parked_marker_handles_empty_inputs(self):
+        assert sc.matched_parked_marker(None, ["data-adblockkey"]) is None
+        assert sc.matched_parked_marker("", ["data-adblockkey"]) is None
+        assert sc.matched_parked_marker(PARKED_HTML, []) is None
+
+    def test_real_site_without_a_marker_goes_to_the_model(self, monkeypatch):
+        _stub_bundle(monkeypatch, {"coppernest.org": REAL_SITE_HTML})
+        records = _records("coppernest.org")
+        client = _FakeClient([_reply({"coppernest.org": "legitimate"})])
+
+        sc.classify_all(
+            records, client=client, pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"]),
+        )
+
+        # The composed raw-markup path must produce fetch_excerpt's shape.
+        excerpt = records[0]["wayback_excerpt"]
+        assert excerpt["title"] == "Coppernest Woodworking Journal"
+        assert excerpt["meta_description"] == "Hand-tool joinery notes."
+        assert excerpt["h1"] == ["Hand-tool joinery"]
+        assert excerpt["h2"] == ["Recent projects"]
+        assert excerpt["snapshot_timestamp"] == "20260901120000"
+        assert excerpt["snapshot_url"].endswith("http://coppernest.org/")
+        assert client.batches == [["coppernest.org"]]
+        assert records[0]["snapshot_category"] == "legitimate"
+
+    def test_no_markers_configured_keeps_the_legacy_fetch_path(
+        self, monkeypatch, good_excerpt,
+    ):
+        calls = _spy_fetch(monkeypatch, {"coppernest.org": good_excerpt})
+        bundle_calls = _stub_bundle(monkeypatch, {"coppernest.org": REAL_SITE_HTML})
+
+        sc.classify_all(
+            _records("coppernest.org"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0, config=SHADOW_OFF,
+        )
+
+        assert calls == ["coppernest.org"]   # fetch_excerpt, as before
+        assert bundle_calls == []            # no raw-markup fetch
+
+    def test_markers_configured_uses_the_raw_markup_path(
+        self, monkeypatch, good_excerpt,
+    ):
+        calls = _spy_fetch(monkeypatch, {"coppernest.org": good_excerpt})
+        bundle_calls = _stub_bundle(monkeypatch, {"coppernest.org": REAL_SITE_HTML})
+
+        sc.classify_all(
+            _records("coppernest.org"), client=_FakeClient(_all("legitimate")),
+            pause_seconds=0.0, config=_markers_config(["data-adblockkey"]),
+        )
+
+        assert bundle_calls == ["coppernest.org"]
+        assert calls == []                   # exactly ONE fetch, not two
+
+    def test_malformed_markers_config_disables_detection(
+        self, monkeypatch, good_excerpt, caplog,
+    ):
+        calls = _spy_fetch(monkeypatch, {"coppernest.org": good_excerpt})
+        config = {"snapshot_classifier": {"shadow": False,
+                                          "parked_markers": "data-adblockkey"}}
+
+        with caplog.at_level("WARNING"):
+            sc.classify_all(
+                _records("coppernest.org"), client=_FakeClient(_all("legitimate")),
+                pause_seconds=0.0, config=config,
+            )
+
+        assert calls == ["coppernest.org"]
+        assert any("parked_markers is not a list" in m for m in caplog.messages)
+
+    def test_snapshot_fetch_failure_on_markup_path_yields_unknown(
+        self, monkeypatch,
+    ):
+        from scripts import wayback_excerpt as we
+        _stub_bundle(monkeypatch, {"marketglow.com": PARKED_HTML})
+        monkeypatch.setattr(we, "_fetch_snapshot_html", lambda url: None)
+        records = _records("marketglow.com")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"]),
+        )
+
+        assert records[0]["wayback_excerpt"] is None
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+
+    def test_raising_helper_on_markup_path_fails_soft(self, monkeypatch, caplog):
+        from scripts import wayback_excerpt as we
+        _stub_bundle(monkeypatch, {"marketglow.com": PARKED_HTML})
+
+        def _boom(domain, target_date):
+            raise RuntimeError("availability exploded")
+
+        monkeypatch.setattr(we, "_fetch_availability", _boom)
+        records = _records("marketglow.com")
+
+        with caplog.at_level("WARNING"):
+            sc.classify_all(
+                records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+                config=_markers_config(["data-adblockkey"]),
+            )
+
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+        assert any("snapshot fetch raised" in m for m in caplog.messages)
+
+    def test_missing_helper_falls_back_to_fetch_excerpt(
+        self, monkeypatch, good_excerpt, caplog,
+    ):
+        # wayback_excerpt is not our file; if its internals are renamed we
+        # lose parked detection, not the pipeline.
+        from scripts import wayback_excerpt as we
+        calls = _spy_fetch(monkeypatch, {"coppernest.org": good_excerpt})
+        monkeypatch.delattr(we, "_parse_content_signals")
+        records = _records("coppernest.org")
+
+        with caplog.at_level("WARNING"):
+            sc.classify_all(
+                records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+                config=_markers_config(["data-adblockkey"]),
+            )
+
+        assert calls == ["coppernest.org"]
+        assert records[0]["wayback_excerpt"] == good_excerpt
+        assert records[0]["snapshot_category"] == "legitimate"
+        assert any("no longer exposes the helpers" in m for m in caplog.messages)
+
+    def test_reused_excerpt_skips_markup_fetch_entirely(self, monkeypatch):
+        bundle_calls = _stub_bundle(monkeypatch, {"tideblock.io": PARKED_HTML})
+        records = _records("tideblock.io")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(["data-adblockkey"]),
+            excerpt_cache={"tideblock.io": _cached()},
+        )
+
+        assert bundle_calls == []
+        assert records[0]["snapshot_category"] == "legitimate"
+
+
+# ---------------------------------------------------------------------------
+# spam_signatures wiring — the second net
+# ---------------------------------------------------------------------------
+
+
+class TestSignatureOverride:
+    def test_model_legitimate_but_signature_fires(self, monkeypatch, caplog):
+        cloaked = {
+            "snapshot_timestamp": _ts(1),
+            "snapshot_url": "http://web.archive.org/web/x/http://marketglow.com/",
+            "title": "Orange County machinery — 9001cc金沙以诚为本",
+            "meta_description": None,
+            "h1": ["Inner Mongolia machinery supply"],
+            "h2": [],
+        }
+        _spy_fetch(monkeypatch, {"marketglow.com": cloaked})
+        records = _records("marketglow.com")
+        client = _FakeClient([_reply({"marketglow.com": "legitimate"})])
+
+        with caplog.at_level("WARNING"):
+            counts = sc.classify_all(
+                records, client=client, pause_seconds=0.0, config=SIGNATURE_CONFIG,
+            )
+
+        assert records[0]["snapshot_category"] == "toxic"
+        assert counts["toxic"] == 1 and counts["legitimate"] == 0
+        assert any(
+            "SIGNATURE override" in m and "marketglow.com" in m
+            and "'legitimate'" in m and "金沙" in m
+            for m in caplog.messages
+        )
+        assert any(
+            "signatures fired on 1 domain(s) the model did not call toxic" in m
+            for m in caplog.messages
+        )
+
+    def test_signature_fires_when_the_model_is_down(self, monkeypatch):
+        # The 2026-09-21 story: a token outage published 247 domains with no
+        # screening. With signatures, a cached excerpt still screens for free.
+        _spy_fetch(monkeypatch, {})
+        cached = _cached(title="Bandar casino terpercaya")
+        records = _records("tideblock.io")
+
+        counts = sc.classify_all(
+            records, client=_FakeClient([LLMBackendError("token expired")]),
+            pause_seconds=0.0, config=SIGNATURE_CONFIG,
+            excerpt_cache={"tideblock.io": cached},
+        )
+
+        assert records[0]["snapshot_category"] == "toxic"
+        assert counts["toxic"] == 1
+
+    def test_signature_can_override_a_parked_verdict(self, monkeypatch):
+        html = (
+            "<html><head><title>Casino bonus</title></head>"
+            "<body data-adblockkey=\"K\"><h1>Situs</h1></body></html>"
+        )
+        _stub_bundle(monkeypatch, {"marketglow.com": html})
+        records = _records("marketglow.com")
+
+        sc.classify_all(
+            records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+            config=_markers_config(
+                ["data-adblockkey"],
+                signature_action="toxic",
+                signature_terms_latin=["casino"],
+            ),
+        )
+
+        assert records[0]["snapshot_category"] == "toxic"
+
+    def test_model_toxic_is_not_re_logged_as_an_override(self, monkeypatch, caplog):
+        _spy_fetch(monkeypatch, {"marketglow.com": _cached(title="Casino bonus")})
+        records = _records("marketglow.com")
+        client = _FakeClient([_reply({"marketglow.com": "toxic"})])
+
+        with caplog.at_level("WARNING"):
+            sc.classify_all(
+                records, client=client, pause_seconds=0.0, config=SIGNATURE_CONFIG,
+            )
+
+        assert records[0]["snapshot_category"] == "toxic"
+        assert not any("SIGNATURE override" in m for m in caplog.messages)
+
+    def test_clean_excerpt_is_not_overridden(self, monkeypatch, good_excerpt):
+        _spy_fetch(monkeypatch, {"coppernest.org": good_excerpt})
+        records = _records("coppernest.org")
+
+        sc.classify_all(
+            records, client=_FakeClient([_reply({"coppernest.org": "legitimate"})]),
+            pause_seconds=0.0, config=SIGNATURE_CONFIG,
+        )
+
+        assert records[0]["snapshot_category"] == "legitimate"
+
+    def test_invalid_signature_action_leaves_the_verdict_alone(
+        self, monkeypatch, caplog,
+    ):
+        _spy_fetch(monkeypatch, {"marketglow.com": _cached(title="Casino bonus")})
+        records = _records("marketglow.com")
+        config = {"snapshot_classifier": {
+            "shadow": False, "signature_action": "quarantine",
+            "signature_terms_latin": ["casino"],
+        }}
+
+        with caplog.at_level("WARNING"):
+            sc.classify_all(
+                records,
+                client=_FakeClient([_reply({"marketglow.com": "legitimate"})]),
+                pause_seconds=0.0, config=config,
+            )
+
+        assert records[0]["snapshot_category"] == "legitimate"
+        assert any("is not a category" in m for m in caplog.messages)
+
+    def test_signature_override_is_shadow_aware(self, monkeypatch):
+        _spy_fetch(monkeypatch, {"marketglow.com": _cached(title="Casino bonus")})
+        records = _records("marketglow.com")
+        config = {"snapshot_classifier": {
+            "shadow": True, "signature_action": "toxic",
+            "signature_terms_latin": ["casino"],
+        }}
+
+        sc.classify_all(
+            records, client=_FakeClient([_reply({"marketglow.com": "legitimate"})]),
+            pause_seconds=0.0, config=config,
+        )
+
+        assert records[0][sc.SHADOW_FIELD] == "toxic"
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+
+    def test_no_signature_terms_configured_changes_nothing(self, monkeypatch):
+        _spy_fetch(monkeypatch, {"marketglow.com": _cached(title="Casino bonus")})
+        records = _records("marketglow.com")
+
+        sc.classify_all(
+            records, client=_FakeClient([_reply({"marketglow.com": "legitimate"})]),
+            pause_seconds=0.0, config=SHADOW_OFF,
+        )
+
+        assert records[0]["snapshot_category"] == "legitimate"
+
+    def test_records_without_an_excerpt_are_not_scanned(self, monkeypatch, caplog):
+        _spy_fetch(monkeypatch, {"marketglow.com": None})
+        records = _records("marketglow.com")
+
+        with caplog.at_level("WARNING"):
+            sc.classify_all(
+                records, client=_FakeClient(_all("legitimate")), pause_seconds=0.0,
+                config=SIGNATURE_CONFIG,
+            )
+
+        assert records[0]["snapshot_category"] == sc.UNKNOWN_CATEGORY
+        assert not any("SIGNATURE" in m for m in caplog.messages)
+
+    def test_canonical_summary_line_is_still_last(self, monkeypatch, caplog):
+        # send_report.py parses the canonical line; the new override and
+        # evidence lines must not displace it.
+        _spy_fetch(monkeypatch, {"marketglow.com": _cached(title="Casino bonus")})
+
+        with caplog.at_level("INFO"):
+            sc.classify_all(
+                _records("marketglow.com"),
+                client=_FakeClient([_reply({"marketglow.com": "legitimate"})]),
+                pause_seconds=0.0, config=SIGNATURE_CONFIG,
+            )
+
+        assert caplog.messages[-1].startswith("snapshot_classifier: results — ")

@@ -121,6 +121,116 @@ def _stub_fetch(monkeypatch, by_name):
     monkeypatch.setattr("scripts.wayback_excerpt.fetch_excerpt", _stub)
 
 
+# --- Excerpt-reuse test doubles --------------------------------------------
+#
+# The reuse tests mock snapshot_classifier.classify_all outright: what is
+# under test is how classify_carryover feeds the sidecar in and merges it
+# back out, not the classifier's own fetch logic. Nothing here touches the
+# network.
+
+
+class _ClassifyAllSpy:
+    """Stand-in for snapshot_classifier.classify_all.
+
+    Records the kwargs of every call, then writes onto each candidate the
+    same three fields the real function writes: wayback_excerpt (scripted per
+    domain — None models a fetch that failed this run), snapshot_category and
+    the version stamp.
+
+    `raise_on_cache` makes the spy reject an `excerpt_cache` kwarg, which is
+    how the older-signature fallback path gets exercised.
+    """
+
+    def __init__(self, *, excerpts=None, categories=None, raise_on_cache=None):
+        self.excerpts: dict[str, dict | None] = dict(excerpts or {})
+        self.categories: dict[str, str] = dict(categories or {})
+        self.raise_on_cache: TypeError | None = raise_on_cache
+        self.calls: list[dict] = []
+
+    def __call__(self, candidates: list[dict], **kwargs) -> dict[str, int]:
+        self.calls.append(kwargs)
+        if self.raise_on_cache is not None and "excerpt_cache" in kwargs:
+            raise self.raise_on_cache
+        counts = {c: 0 for c in (*sc.VALID_CATEGORIES, sc.UNKNOWN_CATEGORY)}
+        for record in candidates:
+            name = record.get("name", "")
+            record["wayback_excerpt"] = self.excerpts.get(name)
+            category = self.categories.get(name, sc.UNKNOWN_CATEGORY)
+            record["snapshot_category"] = category
+            record["snapshot_classifier_version"] = sc.CLASSIFIER_VERSION
+            counts[category] = counts.get(category, 0) + 1
+        return counts
+
+    @property
+    def last_kwargs(self) -> dict:
+        return self.calls[-1]
+
+
+def _legacy_classify_all(
+    candidates: list[dict], *, client=None, pause_seconds: float = 1.0,
+    config: dict | None = None,
+) -> dict[str, int]:
+    """The pre-2026-09-21 signature, with NO excerpt_cache parameter. Used to
+    prove classify_carryover survives landing before the classifier change."""
+    _legacy_classify_all.calls.append(len(candidates))
+    counts = {c: 0 for c in (*sc.VALID_CATEGORIES, sc.UNKNOWN_CATEGORY)}
+    for record in candidates:
+        record["wayback_excerpt"] = {"title": "fetched fresh"}
+        record["snapshot_category"] = "legitimate"
+        record["snapshot_classifier_version"] = sc.CLASSIFIER_VERSION
+        counts["legitimate"] += 1
+    return counts
+
+
+_legacy_classify_all.calls = []
+
+
+# Invented names only (hard rule 1) — none of these are real registrations.
+STORED_EXCERPT = {"title": "Coppernest Pottery Studio", "h1": ["Hand-thrown"]}
+UNRELATED_EXCERPT = {"title": "Driftlantern Sailing Club"}
+
+
+@pytest.fixture
+def reuse_payload():
+    """Two unclassified entries: one we have a stored excerpt for, one we
+    do not."""
+    return {
+        "generated_at": "2026-09-21T06:40:00Z",
+        "domain_count": 2, "today_count": 2, "carryover_count": 0,
+        "domains": [
+            {
+                "name": "coppernest.org", "tld": "org", "score": 80,
+                "days_listed": 0, "wayback_last_snapshot": "2025-08-14",
+            },
+            {
+                "name": "tideblock.io", "tld": "io", "score": 70,
+                "days_listed": 0, "wayback_last_snapshot": "2025-07-02",
+            },
+        ],
+    }
+
+
+@pytest.fixture
+def write_sidecar(tmp_paths):
+    def _w(mapping):
+        tmp_paths["sidecar"].write_text(
+            json.dumps(mapping, indent=2), encoding="utf-8",
+        )
+    return _w
+
+
+# Keeps the durable toxic denylist (a real repo-state file) out of every
+# live-mode reuse test; eviction behaviour has its own coverage above.
+NO_DENYLIST = {"toxic_denylist": {"enabled": False}}
+
+
+def _reuse_config(enabled: bool | None = None) -> dict:
+    config: dict = dict(NO_DENYLIST)
+    if enabled is not None:
+        config["snapshot_classifier"] = {"reuse_cached_excerpts": enabled}
+    return config
+
+
 # ---------------------------------------------------------------------------
 # filter_targets
 # ---------------------------------------------------------------------------
@@ -728,6 +838,549 @@ class TestRunLive:
         assert "legacy.com" in sidecar
         assert sidecar["legacy.com"] == {"title": "Earlier"}
         assert sidecar["alpha.com"] == {"title": "New"}
+
+
+# ---------------------------------------------------------------------------
+# Excerpt-cache pure helpers
+# ---------------------------------------------------------------------------
+
+
+class TestIsUsableExcerpt:
+    def test_content_field_makes_it_usable(self):
+        assert cc.is_usable_excerpt({"title": "Coppernest Pottery"})
+        assert cc.is_usable_excerpt({"meta_description": "Hand-thrown mugs"})
+        assert cc.is_usable_excerpt({"h1": ["Welcome"]})
+        assert cc.is_usable_excerpt({"h2": ["Our kilns"]})
+
+    def test_remembered_failure_is_not_usable(self):
+        assert not cc.is_usable_excerpt(None)
+
+    def test_bookkeeping_only_is_not_usable(self):
+        # A fetch that resolved a snapshot URL but extracted no content is
+        # not evidence — it must never displace a stored excerpt.
+        assert not cc.is_usable_excerpt({
+            "snapshot_url": "https://web.archive.org/web/2025/x",
+            "snapshot_timestamp": "20250814120000",
+            "title": None, "meta_description": "", "h1": [], "h2": [],
+        })
+
+    def test_non_dict_is_not_usable(self):
+        assert not cc.is_usable_excerpt("Coppernest")
+        assert not cc.is_usable_excerpt(["title"])
+
+
+class TestReuseFlag:
+    def test_default_is_on_when_key_absent(self):
+        assert cc.reuse_cached_excerpts_enabled({}) is True
+        assert cc.reuse_cached_excerpts_enabled(None) is True
+        assert cc.reuse_cached_excerpts_enabled(
+            {"snapshot_classifier": {"batch_size": 20}}
+        ) is True
+
+    def test_explicit_false_disables(self):
+        assert cc.reuse_cached_excerpts_enabled(
+            {"snapshot_classifier": {"reuse_cached_excerpts": False}}
+        ) is False
+
+    def test_malformed_section_falls_back_to_default(self):
+        assert cc.reuse_cached_excerpts_enabled(
+            {"snapshot_classifier": "not-a-dict"}
+        ) is True
+
+
+class TestDescribeExcerptAgeing:
+    """The fragment that stops an operator misreading a low "reused" count:
+    the classifier ages excerpts by CAPTURE date, and dropped domains' last
+    captures are mostly old, so most cached entries get re-fetched even
+    though reuse is working."""
+
+    def test_positive_limit_is_named(self):
+        text = cc._describe_excerpt_ageing(
+            {"snapshot_classifier": {"excerpt_max_age_days": 90}}
+        )
+        assert "excerpt_max_age_days=90" in text
+
+    def test_zero_means_no_ageing(self):
+        text = cc._describe_excerpt_ageing(
+            {"snapshot_classifier": {"excerpt_max_age_days": 0}}
+        )
+        assert "no age limit" in text
+
+    def test_absent_or_malformed_says_nothing(self):
+        assert cc._describe_excerpt_ageing({}) == ""
+        assert cc._describe_excerpt_ageing(None) == ""
+        assert cc._describe_excerpt_ageing({"snapshot_classifier": {}}) == ""
+        assert cc._describe_excerpt_ageing(
+            {"snapshot_classifier": {"excerpt_max_age_days": "ninety"}}
+        ) == ""
+
+
+class TestMergeSidecar:
+    def test_failed_refetch_never_overwrites_stored_excerpt(self):
+        """THE regression this change exists to prevent: on 2026-09-21 the
+        sidecar held 598 entries of which 214 had content; a plain
+        {**existing, **updates} merge on a run whose fetches failed would
+        replace those with null and re-expose screened domains."""
+        existing = {"coppernest.org": STORED_EXCERPT}
+        merged = cc.merge_sidecar(existing, {"coppernest.org": None})
+        assert merged["coppernest.org"] == STORED_EXCERPT
+
+    def test_usable_new_excerpt_replaces_stored(self):
+        fresh = {"title": "Coppernest Pottery — new capture"}
+        merged = cc.merge_sidecar(
+            {"coppernest.org": STORED_EXCERPT}, {"coppernest.org": fresh},
+        )
+        assert merged["coppernest.org"] == fresh
+
+    def test_unusable_new_excerpt_does_not_overwrite_stored(self):
+        # A dict that fetched but extracted nothing is as bad as None.
+        merged = cc.merge_sidecar(
+            {"coppernest.org": STORED_EXCERPT},
+            {"coppernest.org": {"title": None, "h1": []}},
+        )
+        assert merged["coppernest.org"] == STORED_EXCERPT
+
+    def test_first_failure_is_recorded_as_null(self):
+        # Unchanged from the old behaviour: with nothing stored, a failure
+        # still lands in the sidecar as null.
+        merged = cc.merge_sidecar({}, {"tideblock.io": None})
+        assert merged["tideblock.io"] is None
+
+    def test_stored_null_is_replaced_by_content(self):
+        merged = cc.merge_sidecar(
+            {"tideblock.io": None}, {"tideblock.io": {"title": "Tideblock"}},
+        )
+        assert merged["tideblock.io"] == {"title": "Tideblock"}
+
+    def test_domains_absent_from_updates_are_untouched(self):
+        existing = {
+            "driftlantern.net": UNRELATED_EXCERPT,
+            "marketglow.com": None,
+        }
+        merged = cc.merge_sidecar(existing, {"coppernest.org": None})
+        assert merged["driftlantern.net"] == UNRELATED_EXCERPT
+        assert merged["marketglow.com"] is None
+        assert set(merged) == {
+            "driftlantern.net", "marketglow.com", "coppernest.org",
+        }
+
+    def test_does_not_mutate_the_input(self):
+        existing = {"coppernest.org": STORED_EXCERPT}
+        cc.merge_sidecar(existing, {"tideblock.io": None})
+        assert existing == {"coppernest.org": STORED_EXCERPT}
+
+
+class TestCountExcerptSources:
+    def test_splits_reused_fetched_and_missing(self):
+        cache = {
+            "coppernest.org": STORED_EXCERPT,
+            "tideblock.io": {"title": "Old Tideblock"},
+        }
+        targets = [
+            # byte-identical to the cache → reused, no archive.org hit
+            {"name": "coppernest.org", "wayback_excerpt": dict(STORED_EXCERPT)},
+            # different content → freshly fetched
+            {"name": "tideblock.io", "wayback_excerpt": {"title": "New Tideblock"}},
+            # nothing at all → no usable excerpt
+            {"name": "marketglow.com", "wayback_excerpt": None},
+        ]
+        assert cc.count_excerpt_sources(targets, cache) == {
+            "reused": 1, "fetched": 1, "missing": 1,
+        }
+
+    def test_no_cache_counts_everything_as_fetched(self):
+        targets = [{"name": "coppernest.org", "wayback_excerpt": STORED_EXCERPT}]
+        assert cc.count_excerpt_sources(targets, None) == {
+            "reused": 0, "fetched": 1, "missing": 0,
+        }
+
+
+class TestAcceptsExcerptCache:
+    def test_true_for_the_new_signature(self):
+        def new_sig(candidates, *, client=None, config=None, excerpt_cache=None):
+            return {}
+        assert cc._accepts_excerpt_cache(new_sig) is True
+
+    def test_false_for_the_old_signature(self):
+        assert cc._accepts_excerpt_cache(_legacy_classify_all) is False
+
+    def test_true_for_kwargs_passthrough(self):
+        assert cc._accepts_excerpt_cache(_ClassifyAllSpy()) is True
+
+    def test_real_classifier_is_called_correctly_either_way(self):
+        # Whatever the concurrently-edited classifier currently looks like,
+        # the answer must be a bool and must not raise.
+        assert isinstance(
+            cc._accepts_excerpt_cache(sc.classify_all), bool
+        )
+
+
+# ---------------------------------------------------------------------------
+# run() — excerpt reuse end to end
+# ---------------------------------------------------------------------------
+
+
+class TestRunExcerptReuse:
+    def test_sidecar_is_passed_in_as_excerpt_cache(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        write_payload(reuse_payload)
+        stored = {"coppernest.org": STORED_EXCERPT, "tideblock.io": None}
+        write_sidecar(stored)
+        spy = _ClassifyAllSpy(
+            excerpts={"coppernest.org": STORED_EXCERPT},
+            categories={"coppernest.org": "legitimate"},
+        )
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=True, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(True),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        assert rc == 0
+        assert spy.last_kwargs["excerpt_cache"] == stored
+        # A copy, not the object we merge into later.
+        assert spy.last_kwargs["excerpt_cache"] is not stored
+
+    def test_reuse_benefit_logged_once(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload,
+        write_sidecar, caplog,
+    ):
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        spy = _ClassifyAllSpy(
+            excerpts={
+                # reused verbatim from the cache
+                "coppernest.org": dict(STORED_EXCERPT),
+                # freshly fetched
+                "tideblock.io": {"title": "Tideblock Surf Report"},
+            },
+            categories={
+                "coppernest.org": "legitimate", "tideblock.io": "legitimate",
+            },
+        )
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        with caplog.at_level("INFO"):
+            cc.run(
+                daily_path=tmp_paths["daily"],
+                excerpts_path=tmp_paths["sidecar"],
+                force=False, only_unknown=False, limit=None,
+                dry_run=True, no_push=True,
+                today=date(2026, 9, 21),
+                config=_reuse_config(True),
+                client_factory=lambda *_a, **_k: MagicMock(),
+            )
+
+        reuse_lines = [m for m in caplog.messages if "excerpt sources:" in m]
+        assert len(reuse_lines) == 1          # one summary line, not per domain
+        assert "1 reused from sidecar" in reuse_lines[0]
+        assert "1 fetched from archive.org" in reuse_lines[0]
+
+    def test_stored_excerpt_survives_a_failed_refetch(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        """The merge contract: a usable stored excerpt + a fetch that failed
+        this run → the stored excerpt is still in the sidecar afterwards, and
+        an unrelated domain's entry is untouched."""
+        write_payload(reuse_payload)
+        write_sidecar({
+            "coppernest.org": STORED_EXCERPT,
+            "driftlantern.net": UNRELATED_EXCERPT,   # not in this run at all
+        })
+        # Both of this run's targets come back with NO excerpt (archive.org
+        # down), which in the old code path wrote null over coppernest.org.
+        spy = _ClassifyAllSpy(excerpts={
+            "coppernest.org": None, "tideblock.io": None,
+        })
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=False, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(True),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        assert rc == 0
+        sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))
+        assert sidecar["coppernest.org"] == STORED_EXCERPT   # survived
+        assert sidecar["driftlantern.net"] == UNRELATED_EXCERPT  # untouched
+        assert sidecar["tideblock.io"] is None   # first failure remembered
+
+    def test_reuse_disabled_passes_no_cache(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        spy = _ClassifyAllSpy(excerpts={"coppernest.org": STORED_EXCERPT})
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=True, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(False),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        assert rc == 0
+        # Today's behaviour exactly: the kwarg is absent, not empty.
+        assert "excerpt_cache" not in spy.last_kwargs
+
+    def test_reuse_disabled_still_merges_protectively(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        # Reuse off only stops the cache being READ. The merge still must not
+        # destroy stored content — that guard is not behind the flag.
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        monkeypatch.setattr(sc, "classify_all", _ClassifyAllSpy(excerpts={
+            "coppernest.org": None, "tideblock.io": None,
+        }))
+
+        cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=False, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(False),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))
+        assert sidecar["coppernest.org"] == STORED_EXCERPT
+
+    def test_dry_run_does_not_touch_the_sidecar(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        before = tmp_paths["sidecar"].read_text(encoding="utf-8")
+        monkeypatch.setattr(sc, "classify_all", _ClassifyAllSpy(excerpts={
+            "coppernest.org": None, "tideblock.io": {"title": "New"},
+        }))
+        monkeypatch.setattr(cc, "_atomic_write_json", MagicMock(
+            side_effect=AssertionError("dry run must write nothing"),
+        ))
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=True, no_push=False,
+            today=date(2026, 9, 21),
+            config=_reuse_config(True),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        assert rc == 0
+        assert tmp_paths["sidecar"].read_text(encoding="utf-8") == before
+
+    @pytest.mark.parametrize("content", ["{not json", '["a-list"]', '"a string"'])
+    def test_corrupt_sidecar_degrades_to_no_cache(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, content,
+    ):
+        """Hard rule 17: an unreadable sidecar costs us the reuse benefit for
+        the run, it does not raise and it does not abort."""
+        write_payload(reuse_payload)
+        tmp_paths["sidecar"].write_text(content, encoding="utf-8")
+        spy = _ClassifyAllSpy(excerpts={
+            "coppernest.org": {"title": "Coppernest"},
+        })
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=False, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(True),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        assert rc == 0
+        # Empty cache → nothing to pass, so the kwarg is omitted entirely.
+        assert "excerpt_cache" not in spy.last_kwargs
+        # And the rewrite leaves a valid sidecar holding this run's data.
+        sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))
+        assert sidecar["coppernest.org"] == {"title": "Coppernest"}
+
+    def test_missing_sidecar_is_not_an_error(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload,
+    ):
+        write_payload(reuse_payload)
+        assert not tmp_paths["sidecar"].exists()
+        spy = _ClassifyAllSpy()
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=True, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(True),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+        assert rc == 0
+        assert "excerpt_cache" not in spy.last_kwargs
+
+
+class TestReuseSkipsTheFetch:
+    def test_cached_domain_is_not_re_fetched(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        """Models the classifier side of the contract: a usable cached excerpt
+        is reused and the archive.org call is skipped, a cached null still
+        retries. Pins that the cache we hand over is keyed and shaped the way
+        the classifier expects."""
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT, "tideblock.io": None})
+        fetched: list[str] = []
+
+        def _cache_aware_classify_all(
+            candidates, *, client=None, pause_seconds=1.0, config=None,
+            excerpt_cache=None,
+        ):
+            cache = excerpt_cache or {}
+            counts = {c: 0 for c in (*sc.VALID_CATEGORIES, sc.UNKNOWN_CATEGORY)}
+            for record in candidates:
+                name = record.get("name", "")
+                cached = cache.get(name)
+                if cc.is_usable_excerpt(cached):
+                    excerpt = cached
+                else:
+                    fetched.append(name)
+                    excerpt = {"title": f"fresh {name}"}
+                record["wayback_excerpt"] = excerpt
+                record["snapshot_category"] = "legitimate"
+                record["snapshot_classifier_version"] = sc.CLASSIFIER_VERSION
+                counts["legitimate"] += 1
+            return counts
+
+        monkeypatch.setattr(sc, "classify_all", _cache_aware_classify_all)
+
+        rc = cc.run(
+            daily_path=tmp_paths["daily"],
+            excerpts_path=tmp_paths["sidecar"],
+            force=False, only_unknown=False, limit=None,
+            dry_run=False, no_push=True,
+            today=date(2026, 9, 21),
+            config=_reuse_config(True),
+            client_factory=lambda *_a, **_k: MagicMock(),
+        )
+
+        assert rc == 0
+        # coppernest.org had content stored → no archive.org hit. tideblock.io
+        # had a remembered null → retried.
+        assert fetched == ["tideblock.io"]
+        sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))
+        assert sidecar["coppernest.org"] == STORED_EXCERPT
+        assert sidecar["tideblock.io"] == {"title": "fresh tideblock.io"}
+
+
+class TestRunAgainstOlderClassifier:
+    """The classifier's excerpt_cache kwarg may land AFTER this change. Both
+    guards — signature introspection and the TypeError fallback — must keep
+    the run working, just without the reuse benefit."""
+
+    def test_old_signature_is_never_handed_the_kwarg(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload,
+        write_sidecar, caplog,
+    ):
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        _legacy_classify_all.calls.clear()
+        monkeypatch.setattr(sc, "classify_all", _legacy_classify_all)
+
+        with caplog.at_level("WARNING"):
+            rc = cc.run(
+                daily_path=tmp_paths["daily"],
+                excerpts_path=tmp_paths["sidecar"],
+                force=False, only_unknown=False, limit=None,
+                dry_run=False, no_push=True,
+                today=date(2026, 9, 21),
+                config=_reuse_config(True),
+                client_factory=lambda *_a, **_k: MagicMock(),
+            )
+
+        assert rc == 0
+        # Called exactly once — no TypeError, so no retry, so no duplicate
+        # classification cost.
+        assert _legacy_classify_all.calls == [2]
+        assert any("older build" in m for m in caplog.messages)
+
+    def test_typeerror_naming_the_kwarg_retries_without_it(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload,
+        write_sidecar, caplog,
+    ):
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        spy = _ClassifyAllSpy(
+            excerpts={"coppernest.org": STORED_EXCERPT},
+            raise_on_cache=TypeError(
+                "classify_all() got an unexpected keyword argument "
+                "'excerpt_cache'"
+            ),
+        )
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        with caplog.at_level("WARNING"):
+            rc = cc.run(
+                daily_path=tmp_paths["daily"],
+                excerpts_path=tmp_paths["sidecar"],
+                force=False, only_unknown=False, limit=None,
+                dry_run=False, no_push=True,
+                today=date(2026, 9, 21),
+                config=_reuse_config(True),
+                client_factory=lambda *_a, **_k: MagicMock(),
+            )
+
+        assert rc == 0
+        assert len(spy.calls) == 2                       # rejected, then retried
+        assert "excerpt_cache" not in spy.calls[1]
+        assert any("retrying without reuse" in m for m in caplog.messages)
+        # The stored excerpt still survived the cache-less run.
+        sidecar = json.loads(tmp_paths["sidecar"].read_text(encoding="utf-8"))
+        assert sidecar["coppernest.org"] == STORED_EXCERPT
+
+    def test_unrelated_typeerror_is_not_swallowed(
+        self, monkeypatch, reuse_payload, tmp_paths, write_payload, write_sidecar,
+    ):
+        # A TypeError from inside the classifier must NOT trigger a blind
+        # re-run of a whole classification pass.
+        write_payload(reuse_payload)
+        write_sidecar({"coppernest.org": STORED_EXCERPT})
+        spy = _ClassifyAllSpy(
+            raise_on_cache=TypeError("'<' not supported between int and str"),
+        )
+        monkeypatch.setattr(sc, "classify_all", spy)
+
+        with pytest.raises(TypeError):
+            cc.run(
+                daily_path=tmp_paths["daily"],
+                excerpts_path=tmp_paths["sidecar"],
+                force=False, only_unknown=False, limit=None,
+                dry_run=True, no_push=True,
+                today=date(2026, 9, 21),
+                config=_reuse_config(True),
+                client_factory=lambda *_a, **_k: MagicMock(),
+            )
+        assert len(spy.calls) == 1   # no retry
 
 
 # ---------------------------------------------------------------------------

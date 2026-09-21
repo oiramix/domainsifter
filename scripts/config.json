@@ -201,6 +201,38 @@
     "enabled": true
   },
   "snapshot_classifier": {
+    "_doc_excerpt_reuse": "Excerpt reuse, added 2026-09-21. THE fix for verdict instability. Before this, snapshot_classifier._fetch_excerpt_for re-fetched every domain from archive.org on EVERY run and never consulted the sidecar, so the same domain was judged on different evidence each time - on 2026-09-21 a dry run found 9 toxic and the real run 20 minutes later found 8, overlapping by only 5, and triathlontraining.net came back toxic in one pass and legitimate in the next. archive.org is the binding constraint (184 of 289 fetches failed on the 2026-09-19 sweep), and re-asking it the same question daily is both the cause of the churn and a large share of the load. With reuse, the FIRST successful excerpt for a domain is kept and reused, so evidence is stable and a later transient failure cannot silently downgrade a domain to unknown - the same principle as the toxic denylist (remember the verdict) applied one layer earlier (remember the evidence). Note this does not make the MODEL deterministic: the claude_code backend shells out to `claude -p` which exposes no temperature or seed flag, so identical evidence can still yield a different verdict. Stable evidence plus the existing skip-already-categorised behaviour makes that academic in practice.",
+    "reuse_cached_excerpts": true,
+    "_doc_excerpt_max_age_days": "Re-fetch an excerpt whose Wayback CAPTURE is older than this many days. 0 disables ageing entirely (reuse indefinitely) and is the CORRECT setting here - it was briefly set to 90 on 2026-09-21 and that was a mistake, caught by measurement before it shipped: of the 249 usable excerpts in the sidecar only 12 fell inside 90 days, so 237 would still have been re-fetched and the stability fix would have delivered about 5% of its benefit. The reason is in the nature of the input: these are DROPPED domains. Their content stopped changing when the site went down, so the capture is old BY DEFINITION and its age says nothing about whether the evidence is still accurate. Ageing against capture time therefore re-fetches almost everything while buying nothing, and every re-fetch is another chance for archive.org to fail and silently reset a screened domain to `unknown`. If a staleness rule is ever genuinely wanted, age against the time WE fetched it, not the time archive.org captured it - that needs a new field on the excerpt.",
+    "excerpt_max_age_days": 0,
+    "_doc_parked": "Parked-page detection, added 2026-09-21. A parked/for-sale page is deterministically identifiable from its markup and needs no model call, but today it lands as `unknown` because it legitimately has no title, meta description or headings for the parser to extract - electricianyorkpa.com (2,752 bytes, data-adblockkey, no title) is the worked example, and it was published as the site FIRST EVER Clean verdict at score 87. `unknown` also means classifier-failure, so filing parked pages there both hides real coverage and inflates the unknown count. Matching is on raw snapshot HTML, case-insensitively; these are ad-network and domain-marketplace fingerprints, not content words, so a false positive would require a real site to embed a parking provider script.",
+    "parked_markers": [
+      "data-adblockkey",
+      "parkingcrew.net",
+      "sedoparking.com",
+      "bodis.com",
+      "afternic.com",
+      "dan.com",
+      "hugedomains.com",
+      "domain is for sale",
+      "buy this domain",
+      "this domain is parked",
+      "godaddy.com/forsale"
+    ],
+    "_doc_signatures": "Deterministic abuse signatures, added 2026-09-21, as a SECOND net beside the model - not a replacement. attorneysportorange.com was classified `legitimate` by the LLM while serving 9001cc金沙 casino-brand SEO dressed as an Inner Mongolia machinery company; a plain substring scan of the stored excerpt caught it instantly. Cloaking is exactly what a language model reading rendered prose is worst at and what a fingerprint match is best at. Runs over the excerpt only (title, meta description, h1, h2), costs nothing and needs no model, so it also works on days the LLM backend is down - the 2026-09-21 outage published 247 domains with NO screening whatsoever. TWO false-positive classes are already known and MUST stay fixed: `especialistas` contains `cialis` and a Marrakech beauty clinic matched `slots` (appointment slots), so latin terms are matched on WORD BOUNDARIES and the ambiguous ones are excluded entirely. CJK terms need no boundary handling. When a signature fires on a domain the model called non-toxic, the outcome is governed by signature_action.",
+    "signature_action": "toxic",
+    "signature_terms_latin": [
+      "casino", "casinos", "gacor", "judi", "togel", "sbobet", "maxwin",
+      "bandar", "taruhan", "baccarat", "sportsbook", "bookmaker",
+      "situs judi", "slot gacor", "link alternatif", "idn poker",
+      "porn", "pornhub", "xxx", "escort", "viagra", "cialis pills",
+      "bitcoin doubler", "crypto giveaway"
+    ],
+    "_doc_terms_excluded": "Terms deliberately NOT in the list, with the reason, so nobody re-adds them: `slot`/`slots` (appointment slots at a salon or clinic), `bet` (substring of dozens of words, and `bet` alone is common), `sex` (legitimate health and biology content), `cialis` bare (matches inside `especialistas`), `poker`/`betting`/`lottery` bare (legitimate news, fiction and charity-raffle content). The multi-word forms above carry the same signal with far less ambiguity.",
+    "signature_terms_cjk": [
+      "金沙", "娱乐城", "博彩", "棋牌", "彩票", "威尼斯人", "太阳城",
+      "老虎机", "百家乐", "六合彩", "色情", "情色", "成人视频"
+    ],
     "_doc": "Wayback-excerpt content classifier. Its 'toxic' verdict is the ONLY thing that trips the toxic gate in filter.keep_post_enrichment (scripts/filter.py). That gate has been open since 2026-07-23 because the classifier returned 'unknown' for every domain once API credits ran out. batch_size groups domains per model call (the old path made one call per domain, which is unusable against Claude Code's per-call overhead). shadow=true writes the verdict to snapshot_category_shadow and leaves snapshot_category='unknown', so nothing is evicted while we validate the new backend against the API-era verdicts; set false to arm it for real.",
     "batch_size": 20,
     "_shadow_armed_note": "ARMED 2026-09-19 after the first live shadow run. The screen produced 29 real verdicts and flagged 3 as toxic: brightdawnnutrition.com (Chinese gambling site behind a nutrition name), languageidentifier.com (Chinese adult content), thegreenseason.org (a genuine African safari business whose pages were injected with Chinese lottery-gambling SEO). All three were verified correct by hand, and all three had been published to the live list because shadow mode meant nothing acted on the verdicts. None would have been caught by the keyword filter — the names are innocuous, only the archived CONTENT gives them away. Set back to true only to re-validate after a prompt or backend change.",

@@ -379,3 +379,490 @@ class TestWriteSidecarExcerpts:
         assert path.exists()
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data == {"a.com": {"title": "A"}}
+
+    def test_failed_refetch_does_not_null_out_stored_excerpt(self, tmp_path):
+        """THE regression that would destroy the sidecar: 379 of 598 stored
+        entries are null and archive.org failed 184 of 289 fetches on
+        2026-09-19, so a run whose fetches fail must not overwrite the 214
+        usable excerpts with null."""
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({
+                "keepme.com": {"title": "Stored evidence"},
+                "alsonull.com": None,
+            }),
+            encoding="utf-8",
+        )
+        records = [
+            # Re-fetch failed this run.
+            {"name": "keepme.com", "wayback_excerpt": None,
+             "snapshot_classifier_version": "v1"},
+            # Still null, still null.
+            {"name": "alsonull.com", "wayback_excerpt": None,
+             "snapshot_classifier_version": "v1"},
+            # New failure with nothing stored — the None IS recorded.
+            {"name": "brandnewfail.com", "wayback_excerpt": None,
+             "snapshot_classifier_version": "v1"},
+        ]
+        pipeline._write_sidecar_excerpts(records, path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["keepme.com"] == {"title": "Stored evidence"}
+        assert data["alsonull.com"] is None
+        assert data["brandnewfail.com"] is None
+
+    def test_empty_dict_excerpt_also_does_not_clobber(self, tmp_path):
+        """An empty-dict excerpt is no more evidence than None."""
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({"keepme.com": {"title": "Stored evidence"}}),
+            encoding="utf-8",
+        )
+        records = [
+            {"name": "keepme.com", "wayback_excerpt": {},
+             "snapshot_classifier_version": "v1"},
+        ]
+        pipeline._write_sidecar_excerpts(records, path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["keepme.com"] == {"title": "Stored evidence"}
+
+    def test_successful_refetch_still_overwrites(self, tmp_path):
+        """Reuse must not freeze a stale excerpt in place: when a fetch DOES
+        return content it replaces what is stored."""
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({"movesite.com": {"title": "Old"}}), encoding="utf-8",
+        )
+        records = [
+            {"name": "movesite.com", "wayback_excerpt": {"title": "Fresh"},
+             "snapshot_classifier_version": "v1"},
+        ]
+        pipeline._write_sidecar_excerpts(records, path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["movesite.com"] == {"title": "Fresh"}
+
+
+# ---------------------------------------------------------------------------
+# _load_sidecar_excerpts / _build_excerpt_cache unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestLoadSidecarExcerpts:
+    def test_loads_dict_and_null_entries(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({
+                "coppernest.org": {"title": "Copper Nest"},
+                "tideblock.io": None,
+            }),
+            encoding="utf-8",
+        )
+        cache = pipeline._load_sidecar_excerpts(path)
+        assert cache == {
+            "coppernest.org": {"title": "Copper Nest"},
+            "tideblock.io": None,
+        }
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        assert pipeline._load_sidecar_excerpts(tmp_path / "nope.json") == {}
+
+    def test_invalid_json_returns_empty(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text("{not json at all", encoding="utf-8")
+        assert pipeline._load_sidecar_excerpts(path) == {}
+
+    def test_empty_file_returns_empty(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text("", encoding="utf-8")
+        assert pipeline._load_sidecar_excerpts(path) == {}
+
+    def test_wrong_toplevel_shape_returns_empty(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text(json.dumps(["marketglow.com"]), encoding="utf-8")
+        assert pipeline._load_sidecar_excerpts(path) == {}
+
+    def test_drops_entries_with_unexpected_value_shape(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({
+                "marketglow.com": {"title": "Market Glow"},
+                "bogus.com": "a bare string is not an excerpt",
+                "alsobogus.com": 7,
+            }),
+            encoding="utf-8",
+        )
+        cache = pipeline._load_sidecar_excerpts(path)
+        assert cache == {"marketglow.com": {"title": "Market Glow"}}
+
+    def test_unreadable_file_returns_empty(self, tmp_path, monkeypatch):
+        path = tmp_path / "sidecar.json"
+        path.write_text(json.dumps({"marketglow.com": None}), encoding="utf-8")
+
+        def boom(*_a, **_k):
+            raise OSError("permission denied")
+        monkeypatch.setattr("builtins.open", boom)
+        assert pipeline._load_sidecar_excerpts(path) == {}
+
+
+class TestBuildExcerptCache:
+    def test_returns_cache_when_reuse_enabled_by_default(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({"marketglow.com": {"title": "MG"}}), encoding="utf-8",
+        )
+        # No snapshot_classifier block at all -> reuse defaults to on.
+        assert pipeline._build_excerpt_cache({}, path) == {
+            "marketglow.com": {"title": "MG"},
+        }
+
+    def test_returns_none_when_reuse_disabled(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text(
+            json.dumps({"marketglow.com": {"title": "MG"}}), encoding="utf-8",
+        )
+        config = {"snapshot_classifier": {"reuse_cached_excerpts": False}}
+        assert pipeline._build_excerpt_cache(config, path) is None
+
+    def test_non_dict_classifier_block_falls_back_to_enabled(self, tmp_path):
+        path = tmp_path / "sidecar.json"
+        path.write_text(json.dumps({"tideblock.io": None}), encoding="utf-8")
+        cache = pipeline._build_excerpt_cache(
+            {"snapshot_classifier": "not a dict"}, path,
+        )
+        assert cache == {"tideblock.io": None}
+
+    def test_unexpected_exception_degrades_to_empty_cache(self, tmp_path, monkeypatch):
+        def boom(_path):
+            raise RuntimeError("something nobody predicted")
+        monkeypatch.setattr(pipeline, "_load_sidecar_excerpts", boom)
+        assert pipeline._build_excerpt_cache({}, tmp_path / "sidecar.json") == {}
+
+
+class TestClassifierAcceptsExcerptCache:
+    def test_true_for_keyword_only_param(self):
+        def new_sig(cands, *, client=None, pause_seconds=1.0, config=None,
+                    excerpt_cache=None):
+            return {}
+        assert pipeline._classifier_accepts_excerpt_cache(new_sig) is True
+
+    def test_false_for_old_signature(self):
+        def old_sig(cands, *, client=None, pause_seconds=1.0, config=None):
+            return {}
+        assert pipeline._classifier_accepts_excerpt_cache(old_sig) is False
+
+    def test_true_for_var_keyword(self):
+        def kwargs_sig(cands, **kwargs):
+            return {}
+        assert pipeline._classifier_accepts_excerpt_cache(kwargs_sig) is True
+
+    def test_uninspectable_callable_is_treated_as_old(self):
+        assert pipeline._classifier_accepts_excerpt_cache(object()) is False
+
+
+# ---------------------------------------------------------------------------
+# Excerpt reuse wired through main()
+# ---------------------------------------------------------------------------
+
+
+def _install_classifier(monkeypatch, fake_classify):
+    monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
+    monkeypatch.setattr(
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
+    )
+
+
+def _recording_classifier(calls, excerpt_map=None):
+    """A classify_all stand-in with the NEW signature that records what it
+    was handed. excerpt_map lets a test control the per-domain excerpt the
+    classifier ends up storing (None == fetch failed)."""
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None,
+                      excerpt_cache=None):
+        calls.append({
+            "names": [c["name"] for c in cands],
+            "config": config,
+            "excerpt_cache": excerpt_cache,
+        })
+        for c in cands:
+            c["snapshot_category"] = "legitimate"
+            c["snapshot_classifier_version"] = "v1"
+            if excerpt_map is None:
+                c["wayback_excerpt"] = {"title": "fresh-" + c["name"]}
+            else:
+                c["wayback_excerpt"] = excerpt_map.get(c["name"])
+        return {"legitimate": len(cands), "parked": 0, "toxic": 0,
+                "empty": 0, "unknown": 0}
+    return fake_classify
+
+
+def test_main_passes_sidecar_as_excerpt_cache(monkeypatch, cfg, tmp_path):
+    """The stored sidecar reaches classify_all as excerpt_cache — this is
+    what stops archive.org being re-asked the same question every day."""
+    sidecar = tmp_path / "wayback_excerpts.json"
+    sidecar.write_text(
+        json.dumps({
+            "alphasite.com": {"title": "Stored Alpha"},
+            "mysteryco.com": None,
+            "notintodays.com": {"title": "Historical"},
+        }),
+        encoding="utf-8",
+    )
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls))
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    assert len(calls) == 1
+    cache = calls[0]["excerpt_cache"]
+    assert cache is not None
+    assert cache["alphasite.com"] == {"title": "Stored Alpha"}
+    assert cache["mysteryco.com"] is None
+    # The whole sidecar is handed over, not just today's names — the
+    # classifier decides what to reuse.
+    assert cache["notintodays.com"] == {"title": "Historical"}
+
+
+def test_main_threads_config_into_classifier_stage(monkeypatch, cfg, tmp_path):
+    """Regression guard for the 2026-09-18 defect: pipeline.py failed to
+    pass `config` to classify_all, so every config.json knob for this stage
+    (including reuse_cached_excerpts) silently had no effect."""
+    cfg["snapshot_classifier"] = {
+        "reuse_cached_excerpts": True,
+        "marker_for_test": "reached-the-classifier",
+    }
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls))
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    passed_config = calls[0]["config"]
+    assert isinstance(passed_config, dict)
+    assert (
+        passed_config["snapshot_classifier"]["marker_for_test"]
+        == "reached-the-classifier"
+    )
+
+
+def test_main_omits_excerpt_cache_when_reuse_disabled(monkeypatch, cfg, tmp_path):
+    """reuse_cached_excerpts=false restores the pre-2026-09-21 behaviour
+    exactly: the kwarg is not passed at all."""
+    sidecar = tmp_path / "wayback_excerpts.json"
+    sidecar.write_text(
+        json.dumps({"alphasite.com": {"title": "Stored Alpha"}}),
+        encoding="utf-8",
+    )
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg["snapshot_classifier"] = {"reuse_cached_excerpts": False}
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls))
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    assert calls[0]["excerpt_cache"] is None
+
+
+def test_main_degrades_to_empty_cache_when_sidecar_corrupt(monkeypatch, cfg, tmp_path):
+    """A corrupt sidecar must not abort the run — it degrades to no cache
+    and the classifier re-fetches, i.e. the old behaviour."""
+    sidecar = tmp_path / "wayback_excerpts.json"
+    sidecar.write_text("{{{ truncated garbage", encoding="utf-8")
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls))
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    assert calls[0]["excerpt_cache"] == {}
+    # ...and the run still published.
+    daily = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    assert len(daily["domains"]) == 5
+
+
+def test_main_absent_sidecar_degrades_to_empty_cache(monkeypatch, cfg, tmp_path):
+    """First-ever run: no sidecar on disk, empty cache, no crash."""
+    sidecar = tmp_path / "does_not_exist.json"
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls))
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    assert calls[0]["excerpt_cache"] == {}
+
+
+def test_main_old_classifier_signature_still_runs(monkeypatch, cfg, tmp_path):
+    """The excerpt_cache kwarg is being added by a parallel change. If this
+    wiring lands first, classify_all still has the old signature and the
+    daily run must be completely unaffected."""
+    sidecar = tmp_path / "wayback_excerpts.json"
+    sidecar.write_text(
+        json.dumps({"alphasite.com": {"title": "Stored Alpha"}}),
+        encoding="utf-8",
+    )
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+
+    def old_signature_classify(cands, *, client=None, pause_seconds=1.0,
+                               config=None):
+        calls.append({"config": config})
+        for c in cands:
+            c["snapshot_category"] = "legitimate"
+            c["snapshot_classifier_version"] = "v1"
+            c["wayback_excerpt"] = {"title": "fresh"}
+        return {"legitimate": len(cands), "parked": 0, "toxic": 0,
+                "empty": 0, "unknown": 0}
+    _install_classifier(monkeypatch, old_signature_classify)
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    assert len(calls) == 1
+    daily = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    assert len(daily["domains"]) == 5
+
+
+def test_main_keeps_stored_excerpt_when_this_runs_fetch_fails(monkeypatch, cfg, tmp_path):
+    """End-to-end version of the write-back guard: a domain whose fetch
+    failed this run keeps the excerpt stored by an earlier run."""
+    sidecar = tmp_path / "wayback_excerpts.json"
+    sidecar.write_text(
+        json.dumps({
+            "alphasite.com": {"title": "Stored Alpha"},
+            "parkedhome.com": {"title": "Stored Parked"},
+        }),
+        encoding="utf-8",
+    )
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    # Every fetch failed this run (the 2026-09-19 archive.org scenario).
+    excerpt_map = {
+        "alphasite.com": None,
+        "parkedhome.com": None,
+        "toxicpage.com": None,
+        "emptypage.com": None,
+        "mysteryco.com": None,
+    }
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls, excerpt_map))
+
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    after = json.loads(sidecar.read_text(encoding="utf-8"))
+    assert after["alphasite.com"] == {"title": "Stored Alpha"}
+    assert after["parkedhome.com"] == {"title": "Stored Parked"}
+    assert after["toxicpage.com"] is None
+
+
+def test_main_logs_reuse_summary(monkeypatch, cfg, tmp_path, caplog):
+    """One summary line so the archive.org load drop is visible in the
+    daily report."""
+    import logging
+    sidecar = tmp_path / "wayback_excerpts.json"
+    sidecar.write_text(
+        json.dumps({
+            "alphasite.com": {"title": "Stored Alpha"},
+            "parkedhome.com": {"title": "Stored Parked"},
+            "mysteryco.com": None,
+        }),
+        encoding="utf-8",
+    )
+    cfg["sidecar_excerpts_path"] = str(sidecar)
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+
+    calls: list[dict] = []
+    _install_classifier(monkeypatch, _recording_classifier(calls))
+
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        assert pipeline.main(["--config", str(cfg_path)]) == 0
+
+    reuse_lines = [
+        rec.getMessage() for rec in caplog.records
+        if "Excerpt reuse:" in rec.getMessage()
+    ]
+    assert len(reuse_lines) == 1
+    # 2 of 5 candidates had a usable stored excerpt; the cached None still
+    # counts as a fetch.
+    assert "2 of 5" in reuse_lines[0]
+    assert "3 needed an archive.org fetch" in reuse_lines[0]
+    assert "eligible for reuse" in reuse_lines[0]
+
+
+def test_reuse_summary_prefers_classifier_reported_counts(caplog):
+    """If classify_all ever reports the split itself, the log uses its
+    numbers rather than the pipeline's cache-hit estimate."""
+    import logging
+    candidates = [{"name": "marketglow.com"}, {"name": "tideblock.io"}]
+    cache = {"marketglow.com": {"title": "MG"}, "tideblock.io": {"title": "TB"}}
+    counts = {"legitimate": 2, "excerpts_reused": 1, "excerpts_fetched": 1}
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_excerpt_reuse_summary(counts, candidates, cache, True)
+    line = [r.getMessage() for r in caplog.records if "Excerpt reuse:" in r.getMessage()]
+    assert len(line) == 1
+    assert "1 of 2" in line[0]
+
+
+def test_reuse_summary_never_raises():
+    """Not even on nonsense input — it is a log line, not a stage."""
+    class Exploding(dict):
+        def get(self, *_a, **_k):
+            raise RuntimeError("boom")
+
+    pipeline._log_excerpt_reuse_summary(None, [{"name": "x.com"}], Exploding(), True)
+    pipeline._log_excerpt_reuse_summary({}, [], None, True)
+    pipeline._log_excerpt_reuse_summary({}, [], None, False)
+
+
+def test_main_survives_exception_anywhere_in_reuse_wiring(monkeypatch, cfg, tmp_path):
+    """The overriding constraint: the 09:00 UTC run must publish. Nothing in
+    the excerpt-reuse wiring may abort it, however it fails."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    def boom(*_a, **_k):
+        raise RuntimeError("this helper exploded")
+
+    for target in [
+        "_load_sidecar_excerpts",
+        "_build_excerpt_cache",
+        "_classifier_accepts_excerpt_cache",
+        "_log_excerpt_reuse_summary",
+    ]:
+        with pytest.MonkeyPatch.context() as mp:
+            _wire_minimal_pipeline_for_classifier(mp, date.today())
+            calls: list[dict] = []
+            mp.setattr(
+                pipeline.snapshot_classifier, "classify_all",
+                _recording_classifier(calls),
+            )
+            mp.setattr(
+                pipeline.snapshot_classifier, "make_default_client",
+                lambda *_a, **_k: None,
+            )
+            mp.setattr(pipeline, target, boom)
+            assert pipeline.main(["--config", str(cfg_path)]) == 0, target
+            # The classifier stage itself still ran and the day still published.
+            assert len(calls) == 1, target
+            daily = json.loads(
+                (tmp_path / "daily.json").read_text(encoding="utf-8"),
+            )
+            assert len(daily["domains"]) == 5, target

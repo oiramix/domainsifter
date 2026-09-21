@@ -25,6 +25,50 @@ scripts/llm_backend.py for the full story):
    evicts nothing while the new backend is validated against API-era
    verdicts. Set it false to arm the gate for real.
 
+2026-09-21 — THREE CHANGES, all aimed at ONE defect: the verdict was
+unstable because the EVIDENCE was unstable. _fetch_excerpt_for re-fetched
+every domain from archive.org on every run and never consulted the excerpt
+sidecar, so each run judged a domain on whatever archive.org happened to
+return that minute. Measured that day: a dry run found 9 toxic domains, the
+real run 20 minutes later found 8, overlapping by only 5 — one domain came
+back toxic in one pass and legitimate in the next. Because "unknown" means
+BOTH "not abusive" and "the fetch failed", a transient archive.org failure
+silently downgraded an already-screened domain back to unscreened; that is
+the mechanism that published a gambling site on 2026-09-20 and the reason
+scripts/toxic_denylist.py exists. The denylist remembers the VERDICT; these
+changes remember the EVIDENCE, one layer earlier.
+
+3. EXCERPT REUSE. classify_all takes `excerpt_cache` (domain → excerpt |
+   None, e.g. src/data/wayback_excerpts.json). A usable cached excerpt is
+   reused and the network call is skipped entirely; a cached None is a
+   remembered FAILURE and always retried, because retrying failures is how
+   coverage improves. Critical invariant: a fresh fetch that FAILS never
+   replaces a usable cached excerpt with None. `excerpt_max_age_days` caps
+   reuse; `reuse_cached_excerpts: false` restores the old re-fetch-everything
+   behaviour exactly.
+
+4. PARKED-PAGE DETECTION WITHOUT A MODEL CALL. A parking/for-sale page has
+   no title, meta description or headings, so wayback_excerpt.fetch_excerpt
+   returns None for it and it lands on "unknown" — indistinguishable from a
+   classifier failure. Such pages are trivially identifiable from raw markup
+   (`data-adblockkey`, parking-provider hostnames, "buy this domain"), so
+   when `parked_markers` is configured the fetch pass keeps the raw snapshot
+   HTML and a marker hit sets "parked" deterministically, no model call.
+
+5. DETERMINISTIC ABUSE SIGNATURES. scripts/spam_signatures.py scans the
+   excerpt for abuse fingerprints the model misses when content is cloaked
+   (a casino-brand SEO page presenting as a machinery company was labelled
+   `legitimate`). When a signature fires on a domain the model did NOT call
+   toxic, `signature_action` (default "toxic") is applied and the override is
+   logged by name, so "the model missed this, the signature caught it" is
+   visible in the daily report. Costs nothing and needs no model, so it also
+   screens on days the LLM backend is down.
+
+Note none of this makes the MODEL deterministic — the `claude_code` backend
+shells out to `claude -p`, which exposes no temperature or seed flag.
+Stabilising the evidence is the only available lever, and combined with the
+existing skip-already-categorised behaviour it is sufficient.
+
 Persisted fields written onto each candidate dict by classify_all:
     wayback_excerpt                — dict | None (the content the model saw,
                                      or None if fetch failed / no snapshot)
@@ -62,6 +106,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 from scripts.llm_backend import (
@@ -69,6 +114,7 @@ from scripts.llm_backend import (
     get_backend,
     parse_json_array,
 )
+from scripts.spam_signatures import scan_excerpt
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +129,14 @@ logger = logging.getLogger(__name__)
 # v1 → v2 (2026-09-18): per-domain one-word replies became batched JSON, the
 # prompt gained batch-output rules, and the default backend moved from the
 # metered API to Claude Code. All three can move a borderline label.
-CLASSIFIER_VERSION = "v2"
+#
+# v2 → v3 (2026-09-21): two label sources were added ALONGSIDE the model —
+# deterministic parked-marker detection (a page that used to land on
+# "unknown" can now be "parked" with no model call) and spam_signatures
+# (a model "legitimate" can now be overridden to signature_action). Both can
+# produce a different label for identical input, so entries stamped v2 or
+# earlier were never screened by either.
+CLASSIFIER_VERSION = "v3"
 
 VALID_CATEGORIES: tuple[str, ...] = ("legitimate", "parked", "toxic", "empty")
 UNKNOWN_CATEGORY = "unknown"
@@ -108,6 +161,24 @@ DEFAULTS: dict[str, Any] = {
     # A batch is a few hundred output tokens, so this only exists to stop a
     # hung call from multiplying across a day's batches.
     "timeout_seconds": None,
+    # Prefer a caller-supplied cached excerpt over a fresh archive.org fetch.
+    # TRUE by default: stable evidence is the whole point of the change, and
+    # a caller that passes no excerpt_cache is unaffected either way.
+    "reuse_cached_excerpts": True,
+    # Re-fetch a cached excerpt whose snapshot_timestamp is older than this.
+    # 0 disables ageing (reuse indefinitely).
+    "excerpt_max_age_days": 90,
+    # Case-insensitive substrings that identify a parking / for-sale page
+    # from its RAW snapshot HTML. EMPTY BY DEFAULT and that is deliberate:
+    # keeping the raw markup requires a different fetch path (see
+    # _fetch_snapshot_bundle), so an unconfigured deployment keeps the
+    # historical fetch_excerpt-only path and no new failure surface.
+    # scripts/config.json supplies the production markers.
+    "parked_markers": [],
+    # Category applied when spam_signatures fires on a domain the model did
+    # not call toxic. Any value outside VALID_CATEGORIES disables the
+    # override (the match is still logged).
+    "signature_action": "toxic",
 }
 
 
@@ -364,16 +435,229 @@ def _chunked(items: list[Any], size: int) -> list[list[Any]]:
     return [items[i : i + step] for i in range(0, len(items), step)]
 
 
+# --- Excerpt reuse (hard-won evidence beats a fresh coin flip) --------------
+
+
+def is_usable_excerpt(excerpt: object) -> bool:
+    """True when `excerpt` carries at least one content signal.
+
+    The bar the model actually needs: a dict with a non-empty title, meta
+    description, h1 or h2. An excerpt that is None, not a dict, or has all
+    four fields empty tells the model nothing and is treated as absent.
+    """
+    if not isinstance(excerpt, dict):
+        return False
+    if excerpt.get("title") or excerpt.get("meta_description"):
+        return True
+    return bool(excerpt.get("h1")) or bool(excerpt.get("h2"))
+
+
+def _excerpt_age_days(excerpt: dict, *, now: datetime | None = None) -> float | None:
+    """Age in days of the excerpt's Wayback capture, or None if unknowable.
+
+    `snapshot_timestamp` is Wayback's 14-digit UTC stamp ("20251215123456").
+    Parsed defensively: a missing, short, non-numeric or impossible value
+    returns None, which callers read as "do not age this out" — an
+    unparseable timestamp must never mean "re-fetch everything".
+    """
+    raw = excerpt.get("snapshot_timestamp")
+    if not isinstance(raw, str):
+        return None
+    stamp = raw.strip()
+    if len(stamp) != 14 or not stamp.isdigit():
+        return None
+    try:
+        captured = datetime.strptime(stamp, "%Y%m%d%H%M%S").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        return None
+    reference = now or datetime.now(timezone.utc)
+    return (reference - captured).total_seconds() / 86400.0
+
+
+def _max_excerpt_age_days(config: dict | None) -> float:
+    """`excerpt_max_age_days` as a non-negative float. 0 disables ageing."""
+    raw = cfg(config, "excerpt_max_age_days")
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        logger.warning(
+            "snapshot_classifier: excerpt_max_age_days=%r is not a number — "
+            "ageing disabled (cached excerpts reused indefinitely)", raw,
+        )
+        return 0.0
+
+
+def _is_stale(excerpt: dict, max_age_days: float) -> bool:
+    """True when a cached excerpt is old enough to warrant a re-fetch."""
+    if max_age_days <= 0:
+        return False
+    age = _excerpt_age_days(excerpt)
+    if age is None:
+        return False
+    return age > max_age_days
+
+
+def _cached_excerpt_for(
+    record: dict,
+    cache: dict[str, dict | None] | None,
+    *,
+    max_age_days: float,
+) -> dict | None:
+    """The reusable cached excerpt for `record`, or None.
+
+    None covers all three "go to the network" cases, which are deliberately
+    indistinguishable to the caller:
+      - no cache entry,
+      - a cached None — a REMEMBERED FAILURE, which must always be retried
+        because retrying failures is the only way coverage improves,
+      - a usable but stale entry.
+    """
+    if not cache:
+        return None
+    cached = cache.get(record.get("name", ""))
+    if not is_usable_excerpt(cached) or not isinstance(cached, dict):
+        return None
+    if _is_stale(cached, max_age_days):
+        logger.debug(
+            "snapshot_classifier: cached excerpt for %s is older than %.0f "
+            "days — re-fetching", record.get("name", ""), max_age_days,
+        )
+        return None
+    return cached
+
+
+# --- Parked-page detection (deterministic, no model call) -------------------
+
+
+def _parked_markers(config: dict | None) -> list[str]:
+    """Configured parking fingerprints, lowercased. [] disables detection."""
+    raw = cfg(config, "parked_markers")
+    if not isinstance(raw, list):
+        logger.warning(
+            "snapshot_classifier: parked_markers is not a list (%s) — "
+            "parked-page detection disabled", type(raw).__name__,
+        )
+        return []
+    return [
+        marker.strip().lower()
+        for marker in raw
+        if isinstance(marker, str) and marker.strip()
+    ]
+
+
+def matched_parked_marker(html: str | None, markers: list[str]) -> str | None:
+    """The first configured marker found in the raw snapshot HTML, else None.
+
+    Case-insensitive substring match. These are ad-network and
+    domain-marketplace fingerprints, not content words, so a false positive
+    needs a real site to embed a parking provider's script.
+    """
+    if not html or not markers:
+        return None
+    haystack = html.lower()
+    for marker in markers:
+        if marker in haystack:
+            return marker
+    return None
+
+
 # --- Excerpt fetching -------------------------------------------------------
 
 
-def _fetch_excerpt_for(record: dict) -> dict | None:
-    """Fetch one record's excerpt. Never raises; None on every failure.
+def raw_markup_supported() -> bool:
+    """True when wayback_excerpt still exposes the helpers that
+    _fetch_snapshot_bundle composes.
 
-    Unchanged behaviour from the per-domain era: no snapshot date means no
-    Availability-API lookup at all (the common path for wayback_unknown
-    candidates), and a fetch_excerpt that raises despite its contract is
-    defended against rather than trusted.
+    Checked once per run so a rename in that module (not ours) costs one log
+    line and parked-page detection, never the pipeline and never one warning
+    per domain.
+    """
+    from scripts import wayback_excerpt as we
+
+    needed = (
+        "_fetch_availability",
+        "_extract_closest_snapshot",
+        "_fetch_snapshot_html",
+        "_parse_content_signals",
+    )
+    return all(getattr(we, helper, None) is not None for helper in needed)
+
+
+def _fetch_snapshot_bundle(
+    name: str, target_date: str
+) -> tuple[dict | None, str | None]:
+    """One snapshot GET yielding BOTH the excerpt and the raw markup.
+
+    Why this exists: parked-page detection needs the raw HTML, but
+    wayback_excerpt.fetch_excerpt discards it and returns None for exactly
+    the pages we care about (no title, no meta, no headings → no signals).
+    Rather than edit that module or pay a SECOND archive.org round trip for
+    every failed fetch — archive.org is the binding constraint; 184 of 289
+    fetches failed on the 2026-09-19 sweep — this composes the same four
+    helpers fetch_excerpt itself composes, so no fetching or parsing logic is
+    duplicated here and the returned dict has fetch_excerpt's exact shape.
+
+    Never raises. Returns (None, None) on any failure, and (None, html) for a
+    page that was fetched but carries no content signal — that second case is
+    the parked page.
+
+    Degrades to fetch_excerpt if those helpers are ever renamed, so a
+    refactor of wayback_excerpt costs us parked detection, not the pipeline.
+    """
+    from scripts import wayback_excerpt as we
+
+    if not raw_markup_supported():
+        # Already logged once per run by classify_all; belt and braces here so
+        # a direct caller still degrades instead of raising AttributeError.
+        return _fetch_excerpt_only(name, target_date), None
+
+    try:
+        closest = we._extract_closest_snapshot(
+            we._fetch_availability(name, target_date)
+        )
+        if not closest:
+            return None, None
+        raw_html = we._fetch_snapshot_html(closest["url"])
+        if not raw_html:
+            return None, None
+        signals = we._parse_content_signals(raw_html)
+        excerpt: dict | None = {
+            "snapshot_timestamp": closest.get("timestamp"),
+            "snapshot_url": closest["url"],
+            **signals,
+        }
+        if not is_usable_excerpt(excerpt):
+            excerpt = None
+        return excerpt, _decode_html(raw_html)
+    except Exception as exc:  # defence-in-depth (hard rule 11)
+        logger.warning(
+            "snapshot_classifier: snapshot fetch raised for %s: %s — "
+            "treating as unknown", name, exc,
+        )
+        return None, None
+
+
+def _decode_html(raw_html: object) -> str | None:
+    """Raw snapshot body as text for marker matching.
+
+    wayback_excerpt._fetch_snapshot_html returns BYTES on purpose (it defers
+    charset sniffing to bs4). Markers are ASCII, so a permissive UTF-8 decode
+    is enough and mojibake in other regions of the page cannot hide them.
+    """
+    if isinstance(raw_html, str):
+        return raw_html
+    if isinstance(raw_html, (bytes, bytearray)):
+        return bytes(raw_html).decode("utf-8", "replace")
+    return None
+
+
+def _fetch_excerpt_only(name: str, target_date: str) -> dict | None:
+    """The historical path: wayback_excerpt.fetch_excerpt, no raw markup.
+
+    Unchanged behaviour from the per-domain era: a fetch_excerpt that raises
+    despite its contract is defended against rather than trusted.
     """
     # Local import keeps tests free to monkeypatch fetch_excerpt at the
     # scripts.wayback_excerpt module path without a hard top-of-file
@@ -381,18 +665,32 @@ def _fetch_excerpt_for(record: dict) -> dict | None:
     # never need them.)
     from scripts.wayback_excerpt import fetch_excerpt
 
-    name = record.get("name", "")
-    last_snapshot = record.get("wayback_last_snapshot")
-    if not last_snapshot:
-        return None
     try:
-        return fetch_excerpt(name, last_snapshot)
+        return fetch_excerpt(name, target_date)
     except Exception as exc:  # defence-in-depth
         logger.warning(
             "snapshot_classifier: fetch_excerpt raised for %s: %s — treating as unknown",
             name, exc,
         )
         return None
+
+
+def _fetch_excerpt_for(
+    record: dict, *, want_html: bool = False
+) -> tuple[dict | None, str | None]:
+    """Fetch one record's excerpt (and optionally its raw markup).
+
+    Never raises; (None, None) on every failure. No snapshot date means no
+    Availability-API lookup at all — the common path for wayback_unknown
+    candidates.
+    """
+    name = record.get("name", "")
+    last_snapshot = record.get("wayback_last_snapshot")
+    if not last_snapshot:
+        return None, None
+    if want_html:
+        return _fetch_snapshot_bundle(name, last_snapshot)
+    return _fetch_excerpt_only(name, last_snapshot), None
 
 
 # --- Verdict application ----------------------------------------------------
@@ -475,12 +773,44 @@ def _classify_batch(
     return verdicts
 
 
+def _apply_signature_override(
+    record: dict, verdict: str, config: dict | None
+) -> tuple[str, list[str]]:
+    """Let spam_signatures override a non-toxic verdict. Returns
+    (verdict, matched_terms).
+
+    The point of the distinct log line: the daily report must show WHICH
+    domains the model missed and the signature caught, because that is the
+    evidence for whether the second net earns its place.
+    """
+    matches = scan_excerpt(record.get("wayback_excerpt"), config or {})
+    if not matches or verdict == "toxic":
+        return verdict, matches
+    action = cfg(config, "signature_action")
+    action = str(action or "").strip().lower()
+    name = str(record.get("name", ""))
+    if action not in VALID_CATEGORIES:
+        logger.warning(
+            "snapshot_classifier: SIGNATURE matched %s on %s but "
+            "signature_action=%r is not a category — verdict left at %r",
+            ", ".join(matches), name, action, verdict,
+        )
+        return verdict, matches
+    logger.warning(
+        "snapshot_classifier: SIGNATURE override — %s: model said %r, "
+        "signature matched %s → %r",
+        name, verdict, ", ".join(matches), action,
+    )
+    return action, matches
+
+
 def classify_all(
     candidates: list[dict],
     *,
     client: Any | None = None,
     pause_seconds: float = 1.0,
     config: dict | None = None,
+    excerpt_cache: dict[str, dict | None] | None = None,
 ) -> dict[str, int]:
     """Classify every candidate. Mutates each in place. Returns a count
     dict {legitimate, parked, toxic, empty, unknown} of the EFFECTIVE
@@ -492,13 +822,30 @@ def classify_all(
         Every candidate gets snapshot_category="unknown" + the version
         stamp WITHOUT any fetch_excerpt or model call. Saves Wayback
         bandwidth and the pipeline still produces a valid daily list on a
-        backend-misconfigured day.
+        backend-misconfigured day. `excerpt_cache` is ignored here — the
+        only no-backend condition this path covers is an unknown
+        `llm.backend` NAME, which is a config typo, not an outage. A real
+        outage (expired token, missing binary) fails per-batch instead, and
+        on that path cached excerpts ARE reused and the deterministic
+        signature net still screens every one of them.
 
     pause_seconds: courtesy pacing between archive.org Availability +
     snapshot fetches. Defaults to 1.0 to match scripts.archive_generator;
-    tests should pass 0.0 to avoid wall-clock cost. The sleep happens AFTER
-    each fetch but is skipped on the final one. Model calls are NOT paced —
+    tests should pass 0.0 to avoid wall-clock cost. One sleep per REAL
+    network fetch, skipped before the first; a reused cached excerpt never
+    sleeps, which is most of the speed win. Model calls are NOT paced —
     they are few (one per batch_size domains) and hit a different host.
+
+    excerpt_cache: optional {domain: excerpt-dict | None} of previously
+    fetched excerpts (src/data/wayback_excerpts.json is the production
+    source). A USABLE cached excerpt is reused and the network call skipped
+    entirely, so the same domain is judged on the same evidence every run.
+    A cached None is a remembered FAILURE and is always retried. A fresh
+    fetch that fails never replaces a usable cached excerpt — a transient
+    archive.org outage can no longer erase good evidence. Reuse is capped by
+    `excerpt_max_age_days` and switched off entirely by
+    `reuse_cached_excerpts: false` (which restores the pre-2026-09-21
+    re-fetch-everything behaviour exactly).
     """
     counts = _empty_counts()
     if not candidates:
@@ -508,6 +855,15 @@ def classify_all(
     batch_size = max(1, int(cfg(config, "batch_size")))
     timeout_raw = cfg(config, "timeout_seconds")
     timeout_seconds = int(timeout_raw) if timeout_raw else None
+    reuse = bool(cfg(config, "reuse_cached_excerpts")) and bool(excerpt_cache)
+    max_age_days = _max_excerpt_age_days(config)
+    markers = _parked_markers(config)
+    if markers and not raw_markup_supported():
+        logger.warning(
+            "snapshot_classifier: wayback_excerpt no longer exposes the helpers "
+            "needed for raw markup — parked-page detection is off for this run",
+        )
+        markers = []
 
     if client is None:
         logger.warning(
@@ -523,26 +879,83 @@ def classify_all(
 
     logger.info(
         "snapshot_classifier: classifying %d candidates "
-        "(batch_size=%d, shadow=%s, fetch pause=%.1fs)",
-        len(candidates), batch_size, shadow, pause_seconds,
+        "(batch_size=%d, shadow=%s, fetch pause=%.1fs, reuse=%s, "
+        "parked_markers=%d)",
+        len(candidates), batch_size, shadow, pause_seconds, reuse, len(markers),
     )
 
-    # --- Pass 1: fetch excerpts (paced, one host) ---------------------------
+    # --- Pass 1: acquire evidence (cache first, then paced fetches) ---------
     pending: list[tuple[str, dict]] = []   # (name, excerpt) for records to send
-    fetchable = [r for r in candidates if r.get("wayback_last_snapshot")]
-    last_index = len(fetchable) - 1
+    parked_by_marker: dict[str, str] = {}  # name → the marker that matched
+    reused = 0
     fetched = 0
+    preserved = 0
+    network_fetches = 0
     for record in candidates:
+        name = record.get("name", "")
         if not record.get("wayback_last_snapshot"):
             record["wayback_excerpt"] = None
             continue
-        excerpt = _fetch_excerpt_for(record)
-        record["wayback_excerpt"] = excerpt
-        if excerpt:
-            pending.append((record.get("name", ""), excerpt))
-        if pause_seconds > 0 and fetched < last_index:
+
+        cached = (
+            _cached_excerpt_for(record, excerpt_cache, max_age_days=max_age_days)
+            if reuse else None
+        )
+        if cached is not None:
+            # Stable evidence, zero network, and deliberately NO pause.
+            record["wayback_excerpt"] = cached
+            pending.append((name, cached))
+            reused += 1
+            continue
+
+        # Pace BEFORE each real fetch except the first, so reused excerpts
+        # never pay for archive.org's courtesy interval.
+        if pause_seconds > 0 and network_fetches > 0:
             time.sleep(pause_seconds)
-        fetched += 1
+        network_fetches += 1
+        excerpt, html = _fetch_excerpt_for(record, want_html=bool(markers))
+
+        if is_usable_excerpt(excerpt):
+            fetched += 1
+        else:
+            excerpt = None
+            # THE INVARIANT: a failed fetch must never downgrade a domain we
+            # already have good evidence for. Staleness is ignored here — a
+            # stale excerpt beats no excerpt, because "no excerpt" means
+            # "unknown", which means "unscreened".
+            fallback = (
+                _cached_excerpt_for(record, excerpt_cache, max_age_days=0.0)
+                if reuse else None
+            )
+            if fallback is not None:
+                excerpt = fallback
+                preserved += 1
+                logger.debug(
+                    "snapshot_classifier: re-fetch failed for %s — keeping the "
+                    "cached excerpt rather than downgrading to unknown", name,
+                )
+
+        record["wayback_excerpt"] = excerpt
+
+        marker = matched_parked_marker(html, markers)
+        if marker:
+            # Deterministic: a parking/for-sale page is identifiable from its
+            # markup, needs no model call, and must not sit in "unknown"
+            # alongside genuine classifier failures.
+            parked_by_marker[name] = marker
+            logger.info(
+                "snapshot_classifier: %s is a parked page (markup marker %r) "
+                "— no model call", name, marker,
+            )
+        elif excerpt:
+            pending.append((name, excerpt))
+
+    logger.info(
+        "snapshot_classifier: evidence — %d excerpt(s) reused from cache, "
+        "%d fetched from archive.org, %d preserved after a failed re-fetch, "
+        "%d parked by markup",
+        reused, fetched, preserved, len(parked_by_marker),
+    )
 
     # --- Pass 2: classify in batches ---------------------------------------
     verdicts: dict[str, str] = {}
@@ -556,11 +969,26 @@ def classify_all(
         verdicts.update(_classify_batch(client, batch, timeout_seconds=timeout_seconds))
 
     # --- Pass 3: apply -----------------------------------------------------
+    overridden: list[str] = []
     for record in candidates:
+        name = record.get("name", "")
         verdict = UNKNOWN_CATEGORY
-        if record.get("wayback_excerpt"):
-            verdict = verdicts.get(record.get("name", ""), UNKNOWN_CATEGORY)
+        if name in parked_by_marker:
+            verdict = "parked"
+        elif record.get("wayback_excerpt"):
+            verdict = verdicts.get(name, UNKNOWN_CATEGORY)
+        model_verdict = verdict
+        verdict, _matches = _apply_signature_override(record, verdict, config)
+        if verdict != model_verdict:
+            overridden.append(name)
         _tally(counts, _apply_verdict(record, verdict, shadow=shadow))
+
+    if overridden:
+        logger.warning(
+            "snapshot_classifier: deterministic signatures fired on %d domain(s) "
+            "the model did not call toxic — %s",
+            len(overridden), ", ".join(sorted(overridden)),
+        )
 
     _log_summary(counts, candidates, shadow=shadow)
     return counts
