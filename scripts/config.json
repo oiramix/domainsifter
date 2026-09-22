@@ -289,6 +289,10 @@
     "default_workers_per_host": 1,
     "per_host": {}
   },
+  "_doc_api_timeout_seconds": "Per-source HTTP timeout overrides, falling back to the global request_timeout_seconds (10). Added 2026-09-22 for OpenPageRank after it migrated to Keywords Everywhere: the new POST /v1/domains/bulk endpoint is much slower and far more variable than the old DomCop GET. Measured on the box over 10 single-domain calls - min 2.56s, median 6.57s, max 29.91s, with 3 of 10 exceeding the global 10s. Left at 10 it would fail roughly a third of calls, and 5 consecutive failures open the circuit breaker for 15 minutes, taking OPR dark for the rest of the run - the very outage the migration fix exists to end. 45 covers the observed maximum with margin. NOTE the endpoint accepts 100 domains per request; batching would turn a day of 25-80 slow serial calls into one and is the real answer to this latency, but it needs the per-domain plugin contract (hard rule 8) revisited, so it is deliberately deferred.",
+  "api_timeout_seconds": {
+    "open_page_rank": 45
+  },
   "api_min_interval_seconds": {
     "_doc": "Minimum interval between requests to each API host. With max_concurrent_enrichments=1 (sequential) and multiplicative 0.75-1.25× jitter applied per call, actual rates are ~25% slower than the nominal value. Tightened 2026-04-30 after 503/502 storms with the previous 1.0s/0.4s/0.2s settings. RDAP global default raised 0.4 → 2.0 on 2026-05-05 after multiple registries banned us (identitydigital 24h, PIR 1h) under the previous default — a new/unknown registry must default to a safe rate.",
     "wayback": 3.0,

@@ -209,3 +209,41 @@ def test_default_endpoint_points_at_the_migrated_host():
     assert "domcop" not in opr._DEFAULT_ENDPOINT
     assert opr._DEFAULT_ENDPOINT.endswith("/v1/domains/bulk")
     assert opr._HOST == "openpagerank.keywordseverywhere.com"
+
+
+@responses.activate
+def test_per_source_timeout_override_is_used(monkeypatch):
+    """The migrated API is slow and variable (median 6.6s, max 29.9s measured
+    2026-09-22), so a 10s global timeout failed ~30% of calls and would open
+    the breaker mid-run. A per-source override must win over the global."""
+    captured = {}
+    real_post = opr.requests.post
+
+    def spy(*args, **kwargs):
+        captured["timeout"] = kwargs.get("timeout")
+        return real_post(*args, **kwargs)
+
+    monkeypatch.setenv("OPENPAGERANK_KEY", "sekret")
+    monkeypatch.setattr(opr.requests, "post", spy)
+    responses.add(responses.POST, ENDPOINT, json=_payload(1.0), status=200)
+    cfg = dict(CONFIG)
+    cfg["request_timeout_seconds"] = 10
+    cfg["api_timeout_seconds"] = {"open_page_rank": 45}
+    opr.enrich("marketglow.com", cfg)
+    assert captured["timeout"] == 45
+
+
+@responses.activate
+def test_falls_back_to_global_timeout_when_no_override(monkeypatch):
+    captured = {}
+    real_post = opr.requests.post
+
+    def spy(*args, **kwargs):
+        captured["timeout"] = kwargs.get("timeout")
+        return real_post(*args, **kwargs)
+
+    monkeypatch.setenv("OPENPAGERANK_KEY", "sekret")
+    monkeypatch.setattr(opr.requests, "post", spy)
+    responses.add(responses.POST, ENDPOINT, json=_payload(1.0), status=200)
+    opr.enrich("marketglow.com", CONFIG)
+    assert captured["timeout"] == CONFIG["request_timeout_seconds"]

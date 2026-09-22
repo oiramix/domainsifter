@@ -118,7 +118,16 @@ def enrich(domain: str, config: dict) -> dict:
         return {}
 
     endpoint = config.get("api_endpoints", {}).get("open_page_rank", _DEFAULT_ENDPOINT)
-    timeout = config.get("request_timeout_seconds", 10)
+    # Per-source timeout, falling back to the global. The new API is much
+    # slower and far more variable than the old DomCop one: measured on the
+    # box 2026-09-22 over 10 single-domain calls, min 2.56s / median 6.57s /
+    # max 29.91s, with 3 of 10 exceeding the global 10s. At that rate the
+    # breaker (5 consecutive failures) would open and take OPR dark for the
+    # rest of a run -- which is the exact outage this migration fix exists to
+    # end. Mirrors the existing api_min_interval_seconds per-source dict.
+    timeout = config.get("api_timeout_seconds", {}).get(
+        "open_page_rank", config.get("request_timeout_seconds", 10),
+    )
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
