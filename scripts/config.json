@@ -271,7 +271,7 @@
     "czds_auth_base": "https://account-api.icann.org",
     "czds_api_base": "https://czds-api.icann.org",
     "wayback_cdx": "https://web.archive.org/cdx/search/cdx",
-    "open_page_rank": "https://openpagerank.com/api/v1.0/getPageRank",
+    "open_page_rank": "https://openpagerank.keywordseverywhere.com/v1/domains/bulk",
     "safe_browsing": "https://safebrowsing.googleapis.com/v4/threatMatches:find",
     "crtsh": "https://crt.sh",
     "rdap_bootstrap": "https://data.iana.org/rdap/dns.json"
