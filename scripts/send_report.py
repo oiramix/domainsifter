@@ -42,6 +42,7 @@ import smtplib
 import sqlite3
 import subprocess
 import sys
+import textwrap
 import time
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -751,6 +752,395 @@ def _format_cc_freshness(cc: CCFreshness) -> str:
     return ", ".join(parts)
 
 
+# --- per-source enrichment coverage (added 2026-09-23) ---------------------
+#
+# Why this exists: every incident in this project has the same shape. A source
+# fails soft, returns empty, the next step treats empty as a legitimate value,
+# and nobody learns until published output visibly drops. LLM credits died and
+# went unnoticed for ~8 weeks; Common Crawl sat 4 months stale; OpenPageRank
+# migrated to a new API and cost 2 days of zero publishing (2026-09-21 and
+# 2026-09-22 rejected EVERY new domain at the publish completeness gate because
+# `open_page_rank` was missing for all of them — and the daily email said
+# nothing at all). Fail-soft is right for uptime; it was implemented as
+# fail-SILENT.
+#
+# pipeline.py now logs one line per run:
+#
+#   Enrichment coverage (25 candidates): wayback_snapshots=25/25 \
+#       open_page_rank=0/25 cert_history=0/25 cc_source_domain_count=23/25
+#
+# We parse it out of the captured journal (same idiom as _rdap_429_strikes and
+# friends), report every source's coverage in the body, and escalate the
+# subject when a source listed in config's `enrichment_coverage.alarm_sources`
+# produced NOTHING. `open_page_rank 0/25` in the subject line on 2026-09-21
+# would have cost one minute instead of two days.
+
+_COVERAGE_LINE_RE = re.compile(
+    r"Enrichment coverage\s*\(\s*(\d+)\s+candidates?\s*\)\s*:\s*(.+)"
+)
+# One `field=value` token per source. The name is matched strictly (identifier
+# shape) and the value loosely (any non-space run), so a garbage value degrades
+# that ONE source to "unparseable" instead of losing the whole line.
+_COVERAGE_TOKEN_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=(\S+)")
+_COVERAGE_VALUE_RE = re.compile(r"^(\d+)/(\d+)$")
+
+# Only used when config is missing/unreadable — the real values live in
+# config.json under enrichment_coverage.* (hard rule 9).
+_COVERAGE_DEFAULT_ALARM_SOURCES = ("wayback_snapshots", "open_page_rank")
+_COVERAGE_DEFAULT_WARN_BELOW_RATIO = 0.5
+
+# What a dead source actually breaks, named in the banner so the operator does
+# not have to remember. Sources absent from this map get a generic sentence.
+_COVERAGE_IMPACT = {
+    "open_page_rank": (
+        "starves the publish completeness gate — a candidate missing this "
+        "field is rejected, so a dead OpenPageRank publishes NOTHING while "
+        "the pipeline still exits 0 (2026-09-21 / 2026-09-22)"
+    ),
+    "wayback_snapshots": (
+        "feeds both the min_wayback_snapshots filter threshold and a 0.30 "
+        "scoring weight — at zero coverage the day is either rejected "
+        "wholesale or ranked on a missing signal"
+    ),
+}
+
+_COVERAGE_CHECKS = {
+    "open_page_rank": (
+        "OPENPAGERANK_KEY present? endpoint moved again (the DomCop migration "
+        "did exactly that)? per-domain errors in the log below?"
+    ),
+    "wayback_snapshots": (
+        "web.archive.org reachable from the box? circuit breaker [wayback] "
+        "open for the whole run?"
+    ),
+}
+
+
+class SourceCoverage(NamedTuple):
+    """One `field=N/M` token from the pipeline's coverage line.
+
+    `have`/`total` are None when the token's value could not be read as N/M;
+    that degrades to "unparseable" for this one source and nothing else.
+    """
+
+    name: str
+    have: int | None
+    total: int | None
+    raw: str
+
+    @property
+    def parsed(self) -> bool:
+        return self.have is not None and self.total is not None
+
+    @property
+    def ratio(self) -> float | None:
+        """Coverage fraction, or None when unknown or the total is 0.
+
+        `N/0` is a legitimately-unknowable ratio (zero candidates), never a
+        ZeroDivisionError and never a 0% "failure"."""
+        if self.have is None or not self.total:
+            return None
+        return self.have / self.total
+
+    @property
+    def dead(self) -> bool:
+        """True only for a real 0-of-N-with-N>0 — the dead-source signal."""
+        return self.have == 0 and bool(self.total)
+
+    def degraded(self, warn_below_ratio: float) -> bool:
+        """Below the warn ratio but not outright dead (dead reads louder)."""
+        ratio = self.ratio
+        return ratio is not None and ratio < warn_below_ratio and not self.dead
+
+
+class CoverageReport(NamedTuple):
+    """Structured verdict on per-source enrichment coverage for one run."""
+
+    enabled: bool
+    candidates: int | None
+    sources: tuple[SourceCoverage, ...]
+    alarm_sources: tuple[str, ...]
+    warn_below_ratio: float
+    note: str | None
+
+    @property
+    def unknown(self) -> bool:
+        """True when no usable per-source numbers were found at all."""
+        return not self.sources
+
+    @property
+    def dead_alarm_sources(self) -> tuple[str, ...]:
+        """Dead sources the config says must reach the subject line."""
+        return tuple(s.name for s in self.sources if s.dead and s.name in self.alarm_sources)
+
+    @property
+    def dead_other_sources(self) -> tuple[str, ...]:
+        """Dead sources that deliberately do NOT escalate (crt.sh 502s in
+        bursts most days; cc_source_domain_count is legitimately absent for
+        domains outside the Common Crawl graph)."""
+        return tuple(
+            s.name for s in self.sources if s.dead and s.name not in self.alarm_sources
+        )
+
+    @property
+    def degraded_sources(self) -> tuple[str, ...]:
+        return tuple(s.name for s in self.sources if s.degraded(self.warn_below_ratio))
+
+    @property
+    def escalates(self) -> bool:
+        return self.enabled and bool(self.dead_alarm_sources)
+
+
+def _coverage_unknown(
+    note: str,
+    *,
+    enabled: bool = True,
+    alarm_sources: tuple[str, ...] = _COVERAGE_DEFAULT_ALARM_SOURCES,
+    warn_below_ratio: float = _COVERAGE_DEFAULT_WARN_BELOW_RATIO,
+    candidates: int | None = None,
+) -> CoverageReport:
+    """A no-signal CoverageReport carrying the reason coverage is unknown."""
+    return CoverageReport(
+        enabled=enabled,
+        candidates=candidates,
+        sources=(),
+        alarm_sources=alarm_sources,
+        warn_below_ratio=warn_below_ratio,
+        note=note,
+    )
+
+
+def _coverage_settings(config: dict) -> tuple[bool, tuple[str, ...], float]:
+    """(enabled, alarm_sources, warn_below_ratio) from config, with defaults.
+
+    Every malformed shape falls back to the module default rather than raising:
+    the reporter degrades, it does not fail."""
+    section = config.get("enrichment_coverage")
+    if not isinstance(section, dict):
+        section = {}
+    enabled = section.get("enabled", True)
+    enabled = True if not isinstance(enabled, bool) else enabled
+
+    raw_alarms = section.get("alarm_sources")
+    if isinstance(raw_alarms, list):
+        alarm_sources = tuple(s for s in raw_alarms if isinstance(s, str) and s.strip())
+    else:
+        alarm_sources = _COVERAGE_DEFAULT_ALARM_SOURCES
+
+    warn = section.get("warn_below_ratio")
+    if isinstance(warn, (int, float)) and not isinstance(warn, bool) and 0 <= warn <= 1:
+        warn_below_ratio = float(warn)
+    else:
+        warn_below_ratio = _COVERAGE_DEFAULT_WARN_BELOW_RATIO
+    return enabled, alarm_sources, warn_below_ratio
+
+
+def enrichment_coverage(log: str, config: dict | None = None) -> CoverageReport:
+    """Per-source enrichment coverage for this run, parsed from the journal.
+
+    Never raises. A missing line, a malformed line, non-numeric values, `N/0`
+    and an unreadable config all degrade to a readable report whose `note` says
+    what was missing — the email must always go out (hard rule 17).
+    """
+    try:
+        config = _load_config() if config is None else config
+        if not isinstance(config, dict):
+            config = {}
+        enabled, alarm_sources, warn_below_ratio = _coverage_settings(config)
+        if not enabled:
+            return _coverage_unknown(
+                "enrichment_coverage.enabled is false in config",
+                enabled=False,
+                alarm_sources=alarm_sources,
+                warn_below_ratio=warn_below_ratio,
+            )
+
+        # Last match wins, mirroring _extract_domain_count.
+        matches = _COVERAGE_LINE_RE.findall(log or "")
+        if not matches:
+            return _coverage_unknown(
+                "no 'Enrichment coverage' line in this run's log",
+                alarm_sources=alarm_sources,
+                warn_below_ratio=warn_below_ratio,
+            )
+        raw_candidates, tokens_text = matches[-1]
+        try:
+            candidates = int(raw_candidates)
+        except ValueError:  # unreachable via the regex, kept for safety
+            candidates = None
+
+        sources: list[SourceCoverage] = []
+        for name, value in _COVERAGE_TOKEN_RE.findall(tokens_text):
+            value_match = _COVERAGE_VALUE_RE.match(value)
+            if value_match is None:
+                sources.append(SourceCoverage(name, None, None, value))
+                continue
+            sources.append(
+                SourceCoverage(
+                    name,
+                    int(value_match.group(1)),
+                    int(value_match.group(2)),
+                    value,
+                )
+            )
+        if not sources:
+            return _coverage_unknown(
+                "coverage line present but no 'field=N/M' token could be read "
+                f"from it: {tokens_text.strip()[:120]!r}",
+                alarm_sources=alarm_sources,
+                warn_below_ratio=warn_below_ratio,
+                candidates=candidates,
+            )
+        unparseable = [s.name for s in sources if not s.parsed]
+        note = (
+            "unparseable value(s) for: " + ", ".join(unparseable) if unparseable else None
+        )
+        return CoverageReport(
+            enabled=True,
+            candidates=candidates,
+            sources=tuple(sources),
+            alarm_sources=alarm_sources,
+            warn_below_ratio=warn_below_ratio,
+            note=note,
+        )
+    except Exception as exc:  # belt and braces: the reporter never raises
+        return _coverage_unknown(
+            f"coverage check failed ({type(exc).__name__}: {exc})"
+        )
+
+
+def _format_coverage_value(source: SourceCoverage, warn_below_ratio: float) -> str:
+    """Render one source's coverage cell, with its degradation marker."""
+    if not source.parsed:
+        return f"(unparseable: {source.raw!r})"
+    text = f"{source.have}/{source.total}"
+    ratio = source.ratio
+    if ratio is None:
+        return f"{text} (no candidates — coverage unknown)"
+    text += f" ({ratio * 100:.0f}%)"
+    if source.dead:
+        return text + " 🚨 NO DATA AT ALL"
+    if source.degraded(warn_below_ratio):
+        return text + f" ⚠ DEGRADED (below {warn_below_ratio:.0%})"
+    return text
+
+
+def _format_coverage_summary(coverage: CoverageReport) -> str:
+    """Render the one-line coverage verdict for the quick-glance header."""
+    if not coverage.enabled:
+        return "(disabled in config)"
+    if coverage.unknown:
+        return f"(unknown — {coverage.note or 'no signal'})"
+    parts = [f"{len(coverage.sources)} source(s)"]
+    dead_alarm = coverage.dead_alarm_sources
+    if dead_alarm:
+        parts.append("🚨 NO DATA: " + ", ".join(dead_alarm))
+    if coverage.dead_other_sources:
+        parts.append("no data (non-alarm): " + ", ".join(coverage.dead_other_sources))
+    if coverage.degraded_sources:
+        parts.append("degraded: " + ", ".join(coverage.degraded_sources))
+    if not dead_alarm and not coverage.dead_other_sources and not coverage.degraded_sources:
+        parts.append("all healthy")
+    return ", ".join(parts)
+
+
+def _coverage_section(coverage: CoverageReport) -> str:
+    """The per-source coverage block that sits under the header.
+
+    Returns "" when the check is disabled in config, so an operator who turns
+    it off gets the pre-2026-09-23 email back unchanged.
+    """
+    if not coverage.enabled:
+        return ""
+    count = (
+        f"{coverage.candidates} candidates" if coverage.candidates is not None
+        else "candidate count unknown"
+    )
+    title = f"Enrichment coverage ({count})"
+    lines = [f"\n{title}", "-" * len(title)]
+    if coverage.unknown:
+        lines.append(f"Coverage         : (unknown — {coverage.note or 'no signal'})")
+        return "\n".join(lines) + "\n"
+    # Align on the longest source name, but never narrower than the 17-column
+    # header block above, so the two read as one document.
+    width = max(17, *(len(s.name) for s in coverage.sources))
+    for source in coverage.sources:
+        lines.append(
+            f"{source.name:<{width}}: "
+            f"{_format_coverage_value(source, coverage.warn_below_ratio)}"
+        )
+    if coverage.note:
+        lines.append(f"{'Note':<{width}}: {coverage.note}")
+    return "\n".join(lines) + "\n"
+
+
+def _wrap(text: str, *, bullet: str = "", indent: str = "") -> str:
+    """Hard-wrap one banner sentence to the ~78 columns the rest of the email
+    uses, so a long impact note stays readable in a plain-text mail client."""
+    return textwrap.fill(
+        text, width=78, initial_indent=bullet, subsequent_indent=indent,
+    ) + "\n"
+
+
+def _coverage_alert_block(coverage: CoverageReport) -> str:
+    """The loud banner for a source that produced nothing at all."""
+    dead = coverage.dead_alarm_sources
+    if not dead:
+        return ""
+    title = "🚨🚨 ENRICHMENT SOURCE PRODUCED NOTHING 🚨🚨"
+    total = next(
+        (s.total for s in coverage.sources if s.name == dead[0] and s.total), None
+    )
+    of_n = f"{total} candidate(s)" if total else "every candidate"
+    block = (
+        f"\n{title}\n"
+        + "-" * len(title) + "\n"
+        + f"Dead source(s)   : {', '.join(dead)}\n"
+        + f"Each returned a value for 0 of {of_n} this run. Zero is not a quiet\n"
+        "day — it is a dead source. Enrichment fails SOFT, so the pipeline still\n"
+        "exits 0 and every downstream step reads the missing field as a\n"
+        "legitimate absence.\n"
+    )
+    for name in dead:
+        impact = _COVERAGE_IMPACT.get(
+            name, "carries filter and/or scoring weight; at zero the day is unsound"
+        )
+        block += _wrap(f"{name} {impact}.", bullet="  - ", indent="    ")
+        check = _COVERAGE_CHECKS.get(name)
+        if check:
+            block += _wrap(f"Check: {check}", bullet="    ", indent="      ")
+    block += (
+        "Also check: the source's circuit breaker, its API key env var, and its\n"
+        "own log lines below. Then re-run and confirm the coverage line moves.\n"
+    )
+    return block
+
+
+def _coverage_missing_block(coverage: CoverageReport, candidates_ran: bool) -> str:
+    """Make the ABSENCE of the coverage line visible.
+
+    Silence is the exact failure mode this whole section exists to eliminate,
+    so a run that clearly processed candidates but logged no coverage line gets
+    said out loud instead of quietly reporting nothing. It does not escalate the
+    subject: a missing line is a reporting defect, not proof of a dead source.
+    """
+    if not coverage.enabled or not coverage.unknown or not candidates_ran:
+        return ""
+    title = "⚠️  NO ENRICHMENT COVERAGE LINE IN THIS RUN'S LOG"
+    return (
+        f"\n{title}\n"
+        + "-" * len(title) + "\n"
+        + f"Reason           : {coverage.note or 'no signal'}\n"
+        + "This run processed candidates, so pipeline.py should have logged one\n"
+        "'Enrichment coverage (N candidates): field=N/M ...' line. Without it\n"
+        "this email cannot tell a fully-enriched day from a day where a source\n"
+        "returned nothing for every candidate — which is the silence that cost\n"
+        "8 weeks of unscreened output and 2 days of zero publishing.\n"
+        "Check that the coverage log line still exists in pipeline.py and that\n"
+        "the journal capture is not truncating it.\n"
+    )
+
+
 def _truncate(log: str, max_bytes: int = _MAX_LOG_BYTES) -> str:
     """If log exceeds max_bytes, keep head + tail and replace middle with a
     notice. Preserves the most-useful portions (start: config + first errors;
@@ -801,6 +1191,10 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
     # Not parsed from the log: read from the CC data itself (local cache only)
     # plus the refresh result file. See the section above.
     cc = cc_backlink_freshness()
+    # Per-source enrichment coverage: the meta-check for the fail-silent shape
+    # every incident in this project shares. Parsed from the log, thresholds
+    # from config.
+    coverage = enrichment_coverage(log)
     # In shadow mode the screen genuinely isn't evicting, so this still alarms
     # — but as a DELIBERATE state with a different banner, not as a breakage.
     # A permanent identical banner across a validation window is how an
@@ -830,6 +1224,12 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         alarms.append("🚨 CC DATA STALE")
     elif cc.refresh_failed:
         alarms.append("🚨 CC REFRESH FAILED")
+    # A source at 0-of-N is dead, and a dead source that feeds the publish
+    # completeness gate silently publishes nothing. Naming the source in the
+    # subject is the whole point — "open_page_rank" there on 2026-09-21 would
+    # have cost one minute instead of two days.
+    if coverage.escalates:
+        alarms.append(f"🚨 SOURCE DEAD ({', '.join(coverage.dead_alarm_sources)})")
     # " / " between alarms keeps the single-alarm subject byte-identical to
     # the pre-2026-09-18 format ("🚨 RDAP 403 BLOCK — Daily run ...").
     alarm_prefix = " / ".join(alarms) + " — " if alarms else ""
@@ -855,6 +1255,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"Toxic evicted    : {toxic_live} by today's check, "
         f"{toxic_remembered} from memory (denylist)",
         f"CC backlink data : {_format_cc_freshness(cc)}",
+        f"Enrich. coverage : {_format_coverage_summary(coverage)}",
     ]
     if credit_errors:
         header.append(f"Credit errors    : {credit_errors} ('credit balance is too low')")
@@ -945,6 +1346,14 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
             "  systemctl status domainsifter-cc-refresh.timer\n"
             "  journalctl -u domainsifter-cc-refresh.service\n"
         )
+    alert_blocks += _coverage_alert_block(coverage)
+    # Evidence that the run actually had candidates to enrich: either output
+    # wrote a count, or the classifier logged a tally. Without either, a missing
+    # coverage line is just a quiet/aborted run and needs no notice.
+    alert_blocks += _coverage_missing_block(
+        coverage,
+        candidates_ran=domain_count is not None or classifier_counts is not None,
+    )
     if rdap_stops:
         alert_blocks += (
             "\n⚠️  RDAP hosts that backed off this run (429/403 stop-on-edge):\n"
@@ -958,6 +1367,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         "=============================\n"
         + "\n".join(header)
         + "\n"
+        + _coverage_section(coverage)
         + alert_blocks
         + "\n"
         + "Full run log (journalctl, this invocation only):\n"

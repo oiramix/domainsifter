@@ -156,7 +156,21 @@
     "site_url": "https://domainsifter.com"
   },
   "max_candidates_for_publication": 300,
+  "enrichment_coverage": {
+    "_doc": "Per-source enrichment coverage, surfaced in the daily operational email. Added 2026-09-23 as the META-FIX for the failure shape every incident in this project shares: a source fails soft, returns empty, the next step treats empty as a legitimate value, and nobody learns until output visibly drops. LLM credits died and went unnoticed for 8 WEEKS; Common Crawl went 4 MONTHS stale; OpenPageRank migrated and cost 2 DAYS of zero publishing; crt.sh 502s most days and nobody tracks it. Fail-soft is correct for uptime but it was implemented as fail-SILENT. The pipeline now reports, for every enrichment source, how many candidates it produced a value for, and the report escalates when a source listed in alarm_sources returns NOTHING. A line reading `open_page_rank 0/25` on 2026-09-21 would have cost one minute instead of two days.",
+    "enabled": true,
+    "_doc_alarm_sources": "Sources whose TOTAL failure (0 of N candidates) escalates the email subject. Deliberately not every source: cert_history (crt.sh) 502s in bursts most days and would cry wolf, and cc_source_domain_count is legitimately absent for domains outside the CC graph. These two are the ones whose absence silently breaks the publish gate.",
+    "alarm_sources": ["wayback_snapshots", "open_page_rank"],
+    "_doc_warn_below_ratio": "Coverage below this fraction is reported as degraded in the email body but does NOT escalate the subject. 0.5 is chosen so the normal crt.sh failure rate (185/216 = 0.86 on 2026-09-23) stays quiet while a real collapse is visible.",
+    "warn_below_ratio": 0.5
+  },
   "publish_min_score": 30,
+  "_doc_publish_completeness": "Publish completeness gate, REWORKED 2026-09-23 after it cost two days of output. It previously counted five FIELDS: wayback_snapshots, wayback_last_snapshot, open_page_rank, cert_history, previous_registrar. Two things were wrong with that. (1) `previous_registrar` is present in 0 of 216 published rows and always will be - RDAP returns not-found for an AVAILABLE domain, and available is the only kind we publish, so the gate was scoring against a field that is impossible by construction. (2) `wayback_snapshots` and `wayback_last_snapshot` are ONE SOURCE counted twice, so Wayback alone scored 2 of 5 and a single source could carry 40% of the gate. Now it counts distinct SOURCES that produced at least one signal. Three are countable: wayback, open_page_rank, cert_history. `cc_source_domain_count` stays deliberately excluded - absence from the CC graph is informational, not a quality deficit (see the cc_backlinks _doc). At the unchanged 0.50 threshold this means 2 of 3 sources, which matches observed normal operation: on 2026-09-23, 215/216 published rows had OPR and 185/216 had cert_history. NOTE this does NOT make the gate outage-proof, and that is deliberate: if OpenPageRank dies again, candidates fall to 1 of 3 and publishing stops. That is the CORRECT behaviour - we genuinely do not know enough about them - and the real defect was never that we published nothing, it was that nobody knew why for two days. The `enrichment_coverage` alarm below is what makes that visible the same morning.",
+  "publish_completeness_sources": {
+    "wayback": ["wayback_snapshots", "wayback_last_snapshot"],
+    "open_page_rank": ["open_page_rank"],
+    "cert_history": ["cert_history"]
+  },
   "publish_min_enrichment_completeness": 0.50,
   "phase2": {
     "_doc": "LLM-based name-quality ranker (Haiku) inserted between the lexical filter and the RDAP availability check. Replaces the per-host random-shuffle trim with quality-ordered selection. Wires LIVE in tomorrow's production run (enabled=true on 2026-06-02). Fallback is wired to FAILURE ONLY — never to thin yield. Triggers: API error, cost-ceiling-hit-before-min-eligible, uncaught exception, missing ANTHROPIC_API_KEY. Per product policy 'smaller but cleaner is better', min_eligible defaults to 10 so a thin-but-valid day publishes a short quality list rather than reverting to a longer mechanical one. Budget enforcement is two-layer: (a) planned, via target_n = floor(daily_budget_usd / cost_per_1000_planning_usd * 1000); (b) runtime, a thread-safe cost meter halts further batches at 95% of daily_budget_usd. Pricing constants in scripts/phase2_ranker.py PRICE_*_PER_MTOK; cost_per_1000_planning_usd is the BUDGETED rate (with retry-pass + drift headroom over the diagnostic-measured ~$0.19/1k). Overflow (above-gate candidates that don't fit any RDAP bucket) is persisted to R2 at state/phase2_overflow.jsonl with first_seen_date, aged out at 14 days — same rolling window as carryover. NOT committed to the repo: this is the public domainsifter repo and overflow is private pick-pool data. Tunable: daily_budget_eur (cap), score_gate (eligibility threshold), min_eligible (fallback floor — keep low to honor thin-but-quality days), batch_size (smaller batches reduce Haiku JSON truncation; 15 is post-diagnostic calibration). Diagnostic that validated the prompt + cost + quality lives in scratch/haiku_ranker_diagnostic/ (untracked).",
@@ -248,7 +262,10 @@
     "promising_min_score": 40,
     "promising_min_wayback_snapshots": 1000,
     "promising_min_open_page_rank": 1.5,
-    "promising_min_cc_source_domain_count": 10
+    "promising_min_cc_source_domain_count": 10,
+    "_doc_min_real_signals": "Verdict floor on EVIDENCE, added 2026-09-23. Scoring excludes null signals from the weighted average and renormalises the rest, so a domain we know LESS about can outscore one we know more about. This was not theoretical: on 2026-09-22 the single highest-scoring row on the live site was electricianyorkpa.com at 87 - the ONLY Clean ever published - and it got there because open_page_rank and cert_history were both missing, while every fully-enriched domain topped out at 61. The top of the list, the part a buyer reads first, was selected partly for our own ignorance, and archive pages get minted from those verdicts. The score maths is deliberately left ALONE (changing it re-ranks everything and needs recalibration against real runs); instead a verdict now requires a minimum number of SOURCES that actually returned a value, counted exactly like publish_completeness_sources. A domain cannot be Clean on 1 of 3 sources however well the present one scores. Set either to 0 to disable that tier check.",
+    "clean_min_real_signals": 3,
+    "promising_min_real_signals": 2
   },
   "enrichment_time_budget_seconds": 3000,
   "availability_budget_seconds": 7200,

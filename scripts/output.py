@@ -48,6 +48,50 @@ PLAN.md Principle 5 with three schema migrations applied:
     one Python implementation than to replicate the rule (and the
     soft-signal config lookup) in two places. Frontend / email fall
     back to score-only if the field is absent (sample data, old JSON).
+  - 2026-09-23: the publish completeness gate counts SOURCES, not FIELDS.
+    Not a schema change — nothing in the payload moved.
+    `publish_min_enrichment_completeness` is still 0.50, but its
+    denominator is now the three countable enrichment SOURCES listed in
+    config.publish_completeness_sources (wayback, open_page_rank,
+    cert_history) instead of five fields, and a source counts when AT
+    LEAST ONE of its fields is non-null. Why: `previous_registrar` was
+    present in 0 of 216 published rows and always will be — RDAP returns
+    not-found for an AVAILABLE domain and available is the only kind we
+    publish — so the gate scored against a field impossible by
+    construction; and `wayback_snapshots` + `wayback_last_snapshot` are
+    ONE source that was counted twice, letting Wayback alone carry 40% of
+    the gate. Together those cost two days of ZERO published domains on
+    2026-09-21/22: when OpenPageRank's API migrated, every candidate
+    scored 2/5 = 0.40 against the 0.50 threshold and was rejected on
+    completeness while the filters behaved normally. 0.50 now means 2 of
+    3. Deliberately NOT outage-proof — lose OPR again and candidates fall
+    to 1 of 3 and publishing stops, which is the correct answer because we
+    genuinely would not know enough about them; the enrichment_coverage
+    alarm is what makes that visible the same morning. A missing /
+    malformed config key falls back to the old five-field counting rather
+    than crashing.
+  - 2026-09-23: `verdict` VALUES may now differ for sparse rows. This is a
+    BEHAVIOUR change, NOT a schema change — same field, same three
+    strings, same place in the contract, so no consumer needs a code
+    change. `_compute_verdict` now also requires a minimum number of
+    sources that actually returned a value
+    (verdict_thresholds.clean_min_real_signals = 3,
+    promising_min_real_signals = 2), counted with the same source map as
+    the completeness gate above. A candidate failing a tier's floor
+    demotes one tier: Clean → Promising if it clears that floor, else
+    Caution. Why: scoring excludes null signals from the weighted average
+    and renormalises the rest, so a domain we know LESS about can outscore
+    one we know more about. Live case, not theory: one 2026-09-22 row
+    scored 87 — the highest on the site and the ONLY Clean ever published
+    — precisely because open_page_rank and cert_history were both missing,
+    while every fully-enriched domain topped out at 61. The score maths is
+    deliberately left ALONE (changing it re-ranks everything and needs
+    recalibration against real runs); the floor is an ADDITIONAL necessary
+    condition and can only ever demote, never promote. Frontend and
+    newsletter read the field instead of recomputing it, so they inherit
+    this for free — but their score-only FALLBACK (sample data,
+    pre-2026-05-17 JSON) does not, and would still paint a sparse high
+    scorer as Clean.
 
 Output shape:
     {
@@ -79,8 +123,9 @@ Quality floor (added 2026-04-28 in response to day-3 publishing 300 random-
 letter domains with mean score 12.1):
   - publish_min_score                       — drop candidates below this
   - publish_min_enrichment_completeness     — drop candidates with too few
-                                               enrichment fields populated
-                                               (fraction in [0.0, 1.0])
+                                               enrichment SOURCES reporting
+                                               (fraction in [0.0, 1.0]; see
+                                               the 2026-09-23 note above)
 
 The floor is applied BEFORE the publication cap, so the cap is still a
 CEILING (never pads with weak rows) and the floor is the lower bound.
@@ -141,15 +186,16 @@ CONTRACT_FIELDS = (
     # Common Crawl backlinks (added 2026-05-14). Integer count of distinct
     # source domains observed linking to the apex in the latest CC release;
     # null when the apex isn't in that release's graph at all. Deliberately
-    # NOT added to _ENRICHMENT_FIELDS_FOR_COMPLETENESS — absence from the CC
-    # graph is informational, not a quality deficit.
+    # NOT a completeness source (see `_completeness_sources`) and not part of
+    # the verdict evidence floor — absence from the CC graph is
+    # informational, not a quality deficit.
     "cc_source_domain_count",
     # Common Crawl backlink history (added 2026-09-20). Newest-release-first
     # list of {"release": str, "source_domain_count": int | None} across the
     # monthly CC releases we hold; null when unavailable. DISPLAY ONLY — no
     # filter, score or verdict reads it. Like cc_source_domain_count it is
-    # deliberately NOT in _ENRICHMENT_FIELDS_FOR_COMPLETENESS: a domain that
-    # predates our CC archive isn't a lower-quality domain.
+    # deliberately NOT a completeness source: a domain that predates our CC
+    # archive isn't a lower-quality domain.
     "cc_backlink_history",
     # Server-computed verdict (added 2026-05-17). See `_compute_verdict`.
     "verdict",
@@ -187,8 +233,9 @@ CONTRACT_FIELDS = (
 # not a justification, so it must never reach the site.
 _PHASE2_REASON_PLACEHOLDER = "missing from response"
 
-# Enrichment fields used to compute completeness ratio. A candidate's
-# completeness = (count of these fields that are not null) / len(this tuple).
+# LEGACY (pre-2026-09-23) completeness fields. Kept only as the fallback
+# used when config.publish_completeness_sources is absent or malformed, so an
+# old config still produces exactly the old numbers instead of crashing.
 # Excludes pipeline-mandatory fields (name, tld, dropped_date, score) which
 # are never null in valid candidates.
 _ENRICHMENT_FIELDS_FOR_COMPLETENESS = (
@@ -198,6 +245,104 @@ _ENRICHMENT_FIELDS_FOR_COMPLETENESS = (
     "cert_history",
     "previous_registrar",
 )
+
+# The same tuple as a source map: one field per source, which reproduces the
+# old field-counting arithmetic exactly (5 sources, denominator 5).
+_LEGACY_COMPLETENESS_SOURCES: dict[str, tuple[str, ...]] = {
+    f: (f,) for f in _ENRICHMENT_FIELDS_FOR_COMPLETENESS
+}
+
+
+def _completeness_sources(config: dict | None) -> dict[str, tuple[str, ...]]:
+    """Read config.publish_completeness_sources as {source: (field, ...)}.
+
+    Added 2026-09-23. The gate counts distinct enrichment SOURCES that
+    reported something, not raw fields — see the module docstring for why
+    (`previous_registrar` is unreachable by construction; the two wayback
+    fields are one source that was counted twice).
+
+    Fails soft to `_LEGACY_COMPLETENESS_SOURCES` when the key is missing or
+    unusable: the publish gate must not be the thing that crashes a run over
+    a config typo. Keys beginning with `_` are skipped so a `_doc` note can
+    live inside the block like everywhere else in config.json.
+    """
+    raw = (config or {}).get("publish_completeness_sources")
+    if raw is None:
+        return _LEGACY_COMPLETENESS_SOURCES
+    if not isinstance(raw, dict):
+        logger.warning(
+            "publish_completeness_sources is %s, not an object - falling back "
+            "to legacy field counting",
+            type(raw).__name__,
+        )
+        return _LEGACY_COMPLETENESS_SOURCES
+
+    sources: dict[str, tuple[str, ...]] = {}
+    for source, fields in raw.items():
+        if not isinstance(source, str) or source.startswith("_"):
+            continue
+        if isinstance(fields, str):
+            fields = [fields]
+        if not isinstance(fields, (list, tuple)):
+            continue
+        clean = tuple(f for f in fields if isinstance(f, str) and f)
+        if clean:
+            sources[source] = clean
+
+    if not sources:
+        logger.warning(
+            "publish_completeness_sources defines no usable source - falling "
+            "back to legacy field counting"
+        )
+        return _LEGACY_COMPLETENESS_SOURCES
+    return sources
+
+
+def _is_wayback_source(source: str, fields: tuple[str, ...]) -> bool:
+    """True when this source IS the Wayback source, under either shape.
+
+    Matches the configured name (`wayback`) and, for the legacy one-field-
+    per-source fallback, any source whose every field is a wayback_* field.
+    """
+    return source == "wayback" or all(f.startswith("wayback") for f in fields)
+
+
+def _count_signal_sources(
+    candidate: dict,
+    config: dict | None,
+    *,
+    count_unknown_wayback: bool = True,
+) -> tuple[int, int]:
+    """(sources that reported a signal, total countable sources).
+
+    A source counts when AT LEAST ONE of its fields is not None, so a
+    multi-field source can never score more than 1. 'Not None' is the whole
+    test: empty string, 0 and False all count as reported — they ARE data.
+
+    `count_unknown_wayback` selects the Wayback exemption (2026-05-17): when
+    a candidate carries `wayback_unknown=True` the breaker was open or the
+    call failed, so its two wayback fields are null through no fault of the
+    candidate. The PUBLISH gate credits the source anyway (True) — a flaky
+    Wayback day must not silently drop good domains. The VERDICT floor does
+    NOT (False): that floor exists precisely to stop us advertising a domain
+    we know little about, and a failed fetch is not evidence.
+
+    `cc_source_domain_count` is deliberately absent from every source map —
+    absence from the CC graph is informational, not a quality deficit.
+    """
+    sources = _completeness_sources(config)
+    wayback_unknown = bool(candidate.get("wayback_unknown"))
+    with_signal = 0
+    for source, fields in sources.items():
+        if any(candidate.get(f) is not None for f in fields):
+            with_signal += 1
+        elif (
+            count_unknown_wayback
+            and wayback_unknown
+            and _is_wayback_source(source, fields)
+        ):
+            with_signal += 1
+    return with_signal, len(sources)
 
 
 def _build_registrars(name: str, configured: list[dict]) -> list[dict]:
@@ -233,16 +378,36 @@ def _compute_verdict(candidate: dict, config: dict) -> str:
         `toxic` is not handled here because filter.keep_post_enrichment
         rejects it upstream; `legitimate` / `unknown` pass through to
         normal scoring.
-      - score >= clean_min_score (default 70) → "Clean".
+      - score >= clean_min_score (default 70) AND real signals >=
+        clean_min_real_signals → "Clean".
       - score >= promising_min_score (default 40) AND wayback >=
         promising_min_wayback_snapshots (default 1000) AND (OPR >=
         promising_min_open_page_rank OR cc_source_domain_count >=
-        promising_min_cc_source_domain_count) → "Promising".
+        promising_min_cc_source_domain_count) AND real signals >=
+        promising_min_real_signals → "Promising".
       - Anything else that survived filters → "Caution".
 
     None / missing wayback/opr/cc fields coerce to 0 (failing the strict
     Promising gate; demoting to Caution is the conservative call when an
     enrichment source was down).
+
+    Evidence floor (added 2026-09-23, config.verdict_thresholds
+    ._doc_min_real_signals): "real signals" is the number of enrichment
+    SOURCES that actually returned a value, counted over the same source map
+    as the publish completeness gate. It is an ADDITIONAL necessary condition
+    on each tier, never a way to promote: a tier whose floor fails falls
+    through to the tier below and is re-tested there on ITS full condition
+    set, so Clean → Promising only when the candidate genuinely earns
+    Promising, else Caution. Why: the score renormalises over present signals
+    only, so a domain we know less about can outscore one we know more about,
+    and the highest-scoring row ever published (87, the only Clean) got there
+    by missing two of three sources. Either threshold at 0 / absent disables
+    that tier's check — absent is the default so old configs behave exactly
+    as before.
+
+    Unlike the publish gate, this counting does NOT credit `wayback_unknown`
+    candidates for wayback they never returned: a failed fetch is a reason to
+    keep a domain out of the top tier, not a substitute for evidence.
     """
     name = candidate.get("name", "")
     if filter_mod.has_soft_signal(name, config):
@@ -261,12 +426,20 @@ def _compute_verdict(candidate: dict, config: dict) -> str:
     promising_min_cc = float(
         thresholds.get("promising_min_cc_source_domain_count", 10)
     )
+    # Default 0 = disabled, so a config predating 2026-09-23 verdicts exactly
+    # as it used to.
+    clean_min_signals = int(thresholds.get("clean_min_real_signals") or 0)
+    promising_min_signals = int(thresholds.get("promising_min_real_signals") or 0)
+
+    real_signals, _total_sources = _count_signal_sources(
+        candidate, config, count_unknown_wayback=False
+    )
 
     score = float(candidate.get("score") or 0)
-    if score >= clean_min:
+    if score >= clean_min and real_signals >= clean_min_signals:
         return "Clean"
 
-    if score >= promising_min_score:
+    if score >= promising_min_score and real_signals >= promising_min_signals:
         wayback = float(candidate.get("wayback_snapshots") or 0)
         opr = float(candidate.get("open_page_rank") or 0)
         cc = float(candidate.get("cc_source_domain_count") or 0)
@@ -404,25 +577,25 @@ def _project(candidate: dict, registrars_config: list[dict], config: dict) -> di
     }
 
 
-def _enrichment_completeness(candidate: dict) -> float:
-    """Fraction in [0.0, 1.0] of enrichment fields that are populated.
-    'Populated' means: key present AND value not None. Empty string and 0
-    count as populated (they ARE data — just zero / empty).
+def _enrichment_completeness(candidate: dict, config: dict | None = None) -> float:
+    """Fraction in [0.0, 1.0] of enrichment SOURCES that reported a signal.
 
-    Wayback exemption (2026-05-17): when a candidate carries
-    `wayback_unknown=True` (the breaker was open / call failed during its
-    enrichment), the two wayback fields are counted as populated here. The
-    absence is upstream's fault, not the candidate's; penalizing it in the
-    completeness gate would silently drop good domains on flaky-Wayback days.
+    Source-based since 2026-09-23 (was field-based; see the module
+    docstring). A source counts when at least one of its fields is not None,
+    so the two wayback fields together are worth 1, not 2. With the shipped
+    config that makes this one of {0.0, 0.33, 0.67, 1.0} and the unchanged
+    0.50 threshold means "2 of 3 sources".
+
+    `config` is optional so pre-2026-09-23 callers still work: None falls
+    back to the legacy five-field counting, which is also what a config
+    missing `publish_completeness_sources` gets.
+
+    Wayback exemption (2026-05-17) still applies — see `_count_signal_sources`.
     """
-    wayback_unknown = bool(candidate.get("wayback_unknown"))
-    populated = 0
-    for f in _ENRICHMENT_FIELDS_FOR_COMPLETENESS:
-        if candidate.get(f) is not None:
-            populated += 1
-        elif wayback_unknown and f.startswith("wayback_"):
-            populated += 1
-    return populated / len(_ENRICHMENT_FIELDS_FOR_COMPLETENESS)
+    with_signal, total = _count_signal_sources(candidate, config)
+    if not total:  # unreachable with either source map; never divide by zero
+        return 0.0
+    return with_signal / total
 
 
 def apply_quality_floor(
@@ -434,6 +607,10 @@ def apply_quality_floor(
     Returns (survivors, rejection_counts). The thresholds come from config:
         publish_min_score                          (default 30)
         publish_min_enrichment_completeness        (default 0.50, fraction)
+        publish_completeness_sources               (the source map the
+                                                    fraction is counted
+                                                    over; see
+                                                    `_completeness_sources`)
 
     Either threshold = 0 (or absent) means "no floor on this dimension."
 
@@ -451,7 +628,7 @@ def apply_quality_floor(
         if score < min_score:
             rejected_score += 1
             continue
-        completeness = _enrichment_completeness(c)
+        completeness = _enrichment_completeness(c, config)
         if completeness < min_completeness:
             rejected_completeness += 1
             continue

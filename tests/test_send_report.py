@@ -1414,3 +1414,531 @@ def test_parse_iso8601_utc_accepts_the_shapes_cc_refresh_writes(value, expected)
 ])
 def test_parse_iso8601_utc_returns_none_for_junk(value):
     assert send_report._parse_iso8601_utc(value) is None
+
+
+# --- per-source enrichment coverage (added 2026-09-23) ----------------------
+#
+# Regression guard for the shape every incident in this project shares: a
+# source fails soft, returns empty, downstream reads empty as legitimate, and
+# nobody learns until output visibly drops. On 2026-09-21 and 2026-09-22 EVERY
+# new domain was rejected at the publish completeness gate because
+# `open_page_rank` was missing for all of them, and the daily email said
+# nothing. These tests pin the line that makes that visible the same morning.
+# Config lives in the cc_sandbox's config.json; all domains invented (rule 1).
+# ---------------------------------------------------------------------------
+
+_COV_PREFIX = "2026-09-23 06:35:12 INFO scripts.pipeline "
+
+_COV_HEALTHY = _COV_PREFIX + (
+    "Enrichment coverage (25 candidates): wayback_snapshots=25/25 "
+    "wayback_last_snapshot=25/25 open_page_rank=24/25 cert_history=21/25 "
+    "previous_registrar=19/25 cc_source_domain_count=23/25"
+)
+# The 2026-09-21 shape: OpenPageRank migrated, returned nothing for everything.
+_COV_OPR_DEAD = _COV_PREFIX + (
+    "Enrichment coverage (25 candidates): wayback_snapshots=25/25 "
+    "wayback_last_snapshot=25/25 open_page_rank=0/25 cert_history=18/25 "
+    "previous_registrar=17/25 cc_source_domain_count=23/25"
+)
+# crt.sh 502ing for a whole run: real, common, deliberately NOT an alarm.
+_COV_CRTSH_DEAD = _COV_PREFIX + (
+    "Enrichment coverage (25 candidates): wayback_snapshots=25/25 "
+    "open_page_rank=24/25 cert_history=0/25 cc_source_domain_count=23/25"
+)
+_COV_OPR_DEGRADED = _COV_PREFIX + (
+    "Enrichment coverage (25 candidates): wayback_snapshots=25/25 "
+    "open_page_rank=8/25 cert_history=21/25 cc_source_domain_count=23/25"
+)
+_COV_WIDTH = 22  # aligned on the longest source name, cc_source_domain_count
+
+
+def _write_coverage_config(
+    sandbox: Path,
+    *,
+    enabled: object = True,
+    alarm_sources: object = ("wayback_snapshots", "open_page_rank"),
+    warn_below_ratio: object = 0.5,
+    omit_section: bool = False,
+) -> Path:
+    """Merge an `enrichment_coverage` section into the sandbox config.
+
+    Merges rather than overwrites so a test can combine this with
+    `_write_cc_config`. Sentinel `None` for any key omits that key, so the
+    module default (used only when config is missing) can be exercised too.
+    """
+    path = sandbox / "repo" / "scripts" / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing: dict = {}
+    if path.is_file():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            existing = loaded if isinstance(loaded, dict) else {}
+        except ValueError:
+            existing = {}
+    if omit_section:
+        existing.pop("enrichment_coverage", None)
+    else:
+        section: dict = {}
+        if enabled is not None:
+            section["enabled"] = enabled
+        if alarm_sources is not None:
+            section["alarm_sources"] = list(alarm_sources)
+        if warn_below_ratio is not None:
+            section["warn_below_ratio"] = warn_below_ratio
+        existing["enrichment_coverage"] = section
+    path.write_text(json.dumps(existing), encoding="utf-8")
+    return path
+
+
+# --- parsing ---------------------------------------------------------------
+
+
+def test_coverage_parses_well_formed_line(cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage(_COV_HEALTHY + "\n")
+
+    assert report.enabled is True
+    assert report.candidates == 25
+    assert [s.name for s in report.sources] == [
+        "wayback_snapshots",
+        "wayback_last_snapshot",
+        "open_page_rank",
+        "cert_history",
+        "previous_registrar",
+        "cc_source_domain_count",
+    ]
+    by_name = {s.name: s for s in report.sources}
+    assert (by_name["open_page_rank"].have, by_name["open_page_rank"].total) == (24, 25)
+    assert by_name["open_page_rank"].ratio == pytest.approx(0.96)
+    assert report.unknown is False
+    assert report.note is None
+    assert report.dead_alarm_sources == ()
+    assert report.degraded_sources == ()
+    assert report.escalates is False
+
+
+def test_coverage_last_line_wins(cc_sandbox):
+    """Mirrors _extract_domain_count: if a run logs twice, the last is current."""
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage(_COV_OPR_DEAD + "\n" + _COV_HEALTHY + "\n")
+    assert {s.name: s.have for s in report.sources}["open_page_rank"] == 24
+    assert report.escalates is False
+
+
+def test_coverage_renders_every_source_in_the_body(required_env, cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_COV_HEALTHY + "\n", duration_sec=42.0,
+    )
+    body = msg.get_content()
+
+    assert "Enrichment coverage (25 candidates)" in body
+    assert f"{'wayback_snapshots':<{_COV_WIDTH}}: 25/25 (100%)" in body
+    assert f"{'open_page_rank':<{_COV_WIDTH}}: 24/25 (96%)" in body
+    assert f"{'cc_source_domain_count':<{_COV_WIDTH}}: 23/25 (92%)" in body
+    assert "Enrich. coverage : 6 source(s), all healthy" in body
+
+
+def test_coverage_healthy_day_does_not_escalate(required_env, cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_COV_HEALTHY + "\n", duration_sec=42.0,
+    )
+    assert "SOURCE DEAD" not in msg["Subject"]
+    assert "\U0001f6a8" not in msg["Subject"]
+    assert "ENRICHMENT SOURCE PRODUCED NOTHING" not in msg.get_content()
+
+
+# --- dead alarm source: escalates ------------------------------------------
+
+
+def test_coverage_dead_alarm_source_escalates_subject_and_fires_banner(
+    required_env, cc_sandbox,
+):
+    """The 2026-09-21 regression: open_page_rank 0/25 must reach the subject."""
+    _write_coverage_config(cc_sandbox)
+    log = (
+        "Wrote 0 domains to src/data/daily-domains.json\n" + _COV_OPR_DEAD + "\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=42.0)
+
+    assert "\U0001f6a8 SOURCE DEAD (open_page_rank)" in msg["Subject"]
+    body = msg.get_content()
+    assert "ENRICHMENT SOURCE PRODUCED NOTHING" in body
+    assert "Dead source(s)   : open_page_rank" in body
+    assert "publish completeness gate" in body
+    assert (
+        f"{'open_page_rank':<{_COV_WIDTH}}: 0/25 (0%) \U0001f6a8 NO DATA AT ALL" in body
+    )
+    assert "Enrich. coverage : 6 source(s), \U0001f6a8 NO DATA: open_page_rank" in body
+
+
+def test_coverage_dead_wayback_escalates_and_names_what_it_breaks(
+    required_env, cc_sandbox,
+):
+    _write_coverage_config(cc_sandbox)
+    log = _COV_PREFIX + (
+        "Enrichment coverage (30 candidates): wayback_snapshots=0/30 "
+        "open_page_rank=29/30 cert_history=25/30\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=1.0)
+
+    assert "\U0001f6a8 SOURCE DEAD (wayback_snapshots)" in msg["Subject"]
+    assert "min_wayback_snapshots" in msg.get_content()
+
+
+def test_coverage_two_dead_alarm_sources_both_named(required_env, cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    log = _COV_PREFIX + (
+        "Enrichment coverage (12 candidates): wayback_snapshots=0/12 "
+        "open_page_rank=0/12 cert_history=9/12\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=1.0)
+    assert (
+        "\U0001f6a8 SOURCE DEAD (wayback_snapshots, open_page_rank)" in msg["Subject"]
+    )
+
+
+def test_coverage_alarm_coexists_with_the_other_subject_alarms(
+    required_env, cc_sandbox,
+):
+    _write_coverage_config(cc_sandbox)
+    log = _403_LINE + "\n" + _CLASSIFIER_ALL_UNKNOWN + "\n" + _COV_OPR_DEAD + "\n"
+    subject = send_report._build_email(
+        pipeline_exit=0, log=log, duration_sec=1.0,
+    )["Subject"]
+    assert "\U0001f6a8 RDAP 403 BLOCK" in subject
+    assert "\U0001f6a8 TOXIC SCREEN OFF" in subject
+    assert "\U0001f6a8 SOURCE DEAD (open_page_rank)" in subject
+
+
+def test_coverage_alarm_fires_on_failed_run_too(required_env, cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    msg = send_report._build_email(
+        pipeline_exit=1, log=_COV_OPR_DEAD + "\n", duration_sec=1.0,
+    )
+    assert "\U0001f6a8 SOURCE DEAD (open_page_rank)" in msg["Subject"]
+    assert "FAILED" in msg["Subject"]
+
+
+# --- dead NON-alarm source: reported, never escalates ----------------------
+
+
+def test_coverage_dead_non_alarm_source_does_not_escalate(required_env, cc_sandbox):
+    """crt.sh 502s in bursts most days - reporting it is right, crying wolf in
+    the subject is not."""
+    _write_coverage_config(cc_sandbox)
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_COV_CRTSH_DEAD + "\n", duration_sec=1.0,
+    )
+
+    assert "\U0001f6a8" not in msg["Subject"]
+    body = msg.get_content()
+    assert "ENRICHMENT SOURCE PRODUCED NOTHING" not in body
+    assert (
+        f"{'cert_history':<{_COV_WIDTH}}: 0/25 (0%) \U0001f6a8 NO DATA AT ALL" in body
+    )
+    assert "no data (non-alarm): cert_history" in body
+
+
+def test_coverage_alarm_sources_come_from_config_not_hardcoded(cc_sandbox):
+    """Hard rule 9: which sources escalate is a config decision."""
+    log = _COV_CRTSH_DEAD + "\n"
+
+    _write_coverage_config(cc_sandbox, alarm_sources=["wayback_snapshots"])
+    assert send_report.enrichment_coverage(log).escalates is False
+
+    _write_coverage_config(cc_sandbox, alarm_sources=["cert_history"])
+    report = send_report.enrichment_coverage(log)
+    assert report.escalates is True
+    assert report.dead_alarm_sources == ("cert_history",)
+
+    _write_coverage_config(cc_sandbox, alarm_sources=[])
+    assert send_report.enrichment_coverage(log).escalates is False
+
+
+# --- degraded (below warn_below_ratio): body only --------------------------
+
+
+def test_coverage_below_warn_ratio_is_degraded_without_escalating(
+    required_env, cc_sandbox,
+):
+    _write_coverage_config(cc_sandbox, warn_below_ratio=0.5)
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_COV_OPR_DEGRADED + "\n", duration_sec=1.0,
+    )
+
+    assert "\U0001f6a8" not in msg["Subject"]
+    body = msg.get_content()
+    assert (
+        f"{'open_page_rank':<{_COV_WIDTH}}: 8/25 (32%) ⚠ DEGRADED (below 50%)"
+        in body
+    )
+    assert "degraded: open_page_rank" in body
+    assert "ENRICHMENT SOURCE PRODUCED NOTHING" not in body
+
+
+def test_coverage_warn_ratio_comes_from_config_not_hardcoded(cc_sandbox):
+    log = _COV_OPR_DEGRADED + "\n"  # open_page_rank at 32%
+
+    _write_coverage_config(cc_sandbox, warn_below_ratio=0.25)
+    assert send_report.enrichment_coverage(log).degraded_sources == ()
+
+    _write_coverage_config(cc_sandbox, warn_below_ratio=0.9)
+    assert "open_page_rank" in send_report.enrichment_coverage(log).degraded_sources
+
+
+def test_coverage_missing_config_falls_back_to_documented_defaults(cc_sandbox):
+    """No config file at all (the sandbox default): OpenPageRank still alarms."""
+    report = send_report.enrichment_coverage(_COV_OPR_DEAD + "\n")
+    assert report.alarm_sources == send_report._COVERAGE_DEFAULT_ALARM_SOURCES
+    assert report.warn_below_ratio == send_report._COVERAGE_DEFAULT_WARN_BELOW_RATIO
+    assert report.dead_alarm_sources == ("open_page_rank",)
+
+
+# --- absent line: unknown, visible, never escalating ----------------------
+
+
+def test_coverage_absent_line_reports_unknown_and_does_not_escalate(
+    required_env, cc_sandbox,
+):
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage("nothing relevant here\n")
+    assert report.unknown is True
+    assert report.candidates is None
+    assert report.escalates is False
+    assert "no 'Enrichment coverage' line" in (report.note or "")
+
+    msg = send_report._build_email(
+        pipeline_exit=0, log="nothing relevant here\n", duration_sec=1.0,
+    )
+    assert "\U0001f6a8" not in msg["Subject"]
+    body = msg.get_content()
+    assert "Enrich. coverage : (unknown — no 'Enrichment coverage' line" in body
+    assert "Coverage         : (unknown —" in body
+
+
+def test_coverage_absent_line_on_a_run_with_candidates_is_said_out_loud(
+    required_env, cc_sandbox,
+):
+    """Silence is the failure mode this whole section exists to eliminate."""
+    _write_coverage_config(cc_sandbox)
+    log = (
+        "Wrote 12 domains to src/data/daily-domains.json\n"
+        + _CLASSIFIER_HEALTHY
+        + "\n"
+    )
+    msg = send_report._build_email(pipeline_exit=0, log=log, duration_sec=1.0)
+
+    body = msg.get_content()
+    assert "NO ENRICHMENT COVERAGE LINE IN THIS RUN'S LOG" in body
+    assert "This run processed candidates" in body
+    # A missing line is a reporting defect, not proof of a dead source.
+    assert "\U0001f6a8" not in msg["Subject"]
+
+
+def test_coverage_quiet_run_without_candidates_gets_no_missing_line_notice(
+    required_env, cc_sandbox,
+):
+    _write_coverage_config(cc_sandbox)
+    msg = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0)
+    body = msg.get_content()
+    assert "NO ENRICHMENT COVERAGE LINE" not in body
+    assert "Coverage         : (unknown —" in body
+
+
+# --- malformed input: degrade, never raise --------------------------------
+
+
+@pytest.mark.parametrize("malformed", [
+    "Enrichment coverage (25 candidates):\n",
+    "Enrichment coverage (25 candidates): open_page_rank\n",
+    "Enrichment coverage (25 candidates): open_page_rank=banana\n",
+    "Enrichment coverage (25 candidates): open_page_rank=24/\n",
+    "Enrichment coverage (25 candidates): open_page_rank=/25\n",
+    "Enrichment coverage (25 candidates): open_page_rank=24/25/26\n",
+    "Enrichment coverage (25 candidates): open_page_rank=-4/25\n",
+    "Enrichment coverage (25 candidates): open_page_rank=1e3/25\n",
+    "Enrichment coverage (0 candidates): open_page_rank=0/0\n",
+    "Enrichment coverage (25 candidates): open_page_rank=30/25\n",
+    "Enrichment coverage (candidates): open_page_rank=0/25\n",
+    "Enrichment coverage: open_page_rank=0/25\n",
+    "Enrichment coverage (99999999999999999999 candidates): a=1/2\n",
+    "Enrichment coverage (25 candidates): a=99999999999999999999/25\n",
+    "\x00\x01 Enrichment coverage binary junk \udcff\n",
+    "",
+])
+def test_coverage_parser_never_raises_on_malformed_input(cc_sandbox, malformed):
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage(malformed)
+    # Whatever came back must be renderable without raising, too.
+    send_report._format_coverage_summary(report)
+    send_report._coverage_section(report)
+    send_report._coverage_alert_block(report)
+    send_report._coverage_missing_block(report, candidates_ran=True)
+
+
+def test_coverage_zero_total_degrades_to_unknown_not_zero_percent(cc_sandbox):
+    """`N/0` is an unknowable ratio (no candidates), not a 0% failure - and
+    definitely not a ZeroDivisionError."""
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage(
+        "Enrichment coverage (0 candidates): open_page_rank=0/0 wayback_snapshots=0/0\n"
+    )
+    source = report.sources[0]
+    assert source.ratio is None
+    assert source.dead is False
+    assert report.escalates is False
+    assert report.degraded_sources == ()
+    assert "no candidates" in send_report._coverage_section(report)
+
+
+def test_coverage_non_numeric_value_degrades_only_that_source(cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage(
+        "Enrichment coverage (25 candidates): open_page_rank=banana "
+        "wayback_snapshots=25/25\n"
+    )
+    by_name = {s.name: s for s in report.sources}
+    assert by_name["open_page_rank"].parsed is False
+    assert by_name["open_page_rank"].ratio is None
+    assert by_name["wayback_snapshots"].have == 25
+    # Unparseable is not proof of death, so it must not escalate.
+    assert report.escalates is False
+    assert "unparseable value(s) for: open_page_rank" in (report.note or "")
+    assert "(unparseable: 'banana')" in send_report._coverage_section(report)
+
+
+def test_coverage_line_with_no_readable_token_reports_unknown(cc_sandbox):
+    _write_coverage_config(cc_sandbox)
+    report = send_report.enrichment_coverage(
+        "Enrichment coverage (25 candidates): ??? ***\n"
+    )
+    assert report.unknown is True
+    assert report.escalates is False
+    assert "no 'field=N/M' token" in (report.note or "")
+
+
+def test_coverage_never_raises_even_if_config_load_explodes(cc_sandbox):
+    with patch.object(
+        send_report, "_load_config", MagicMock(side_effect=RuntimeError("boom")),
+    ):
+        report = send_report.enrichment_coverage(_COV_OPR_DEAD + "\n")
+    assert report.unknown is True
+    assert report.escalates is False
+    assert "coverage check failed (RuntimeError: boom)" in (report.note or "")
+
+
+@pytest.mark.parametrize("junk_section", ["not-a-dict", 42, [], None])
+def test_coverage_malformed_config_section_falls_back_to_defaults(
+    cc_sandbox, junk_section,
+):
+    path = cc_sandbox / "repo" / "scripts" / "config.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"enrichment_coverage": junk_section}), encoding="utf-8")
+
+    report = send_report.enrichment_coverage(_COV_OPR_DEAD + "\n")
+    assert report.enabled is True
+    assert report.alarm_sources == send_report._COVERAGE_DEFAULT_ALARM_SOURCES
+    assert report.warn_below_ratio == send_report._COVERAGE_DEFAULT_WARN_BELOW_RATIO
+
+
+@pytest.mark.parametrize("junk_ratio", ["half", True, -1, 2, None, []])
+def test_coverage_malformed_warn_ratio_falls_back_to_default(cc_sandbox, junk_ratio):
+    _write_coverage_config(cc_sandbox, warn_below_ratio=None)
+    path = cc_sandbox / "repo" / "scripts" / "config.json"
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    loaded["enrichment_coverage"]["warn_below_ratio"] = junk_ratio
+    path.write_text(json.dumps(loaded), encoding="utf-8")
+
+    report = send_report.enrichment_coverage(_COV_HEALTHY + "\n")
+    assert report.warn_below_ratio == send_report._COVERAGE_DEFAULT_WARN_BELOW_RATIO
+
+
+# --- disabled -------------------------------------------------------------
+
+
+def test_coverage_disabled_suppresses_the_section_entirely(required_env, cc_sandbox):
+    _write_coverage_config(cc_sandbox, enabled=False)
+    report = send_report.enrichment_coverage(_COV_OPR_DEAD + "\n")
+    assert report.enabled is False
+    assert report.escalates is False
+
+    msg = send_report._build_email(
+        pipeline_exit=0, log=_COV_OPR_DEAD + "\n", duration_sec=1.0,
+    )
+    assert "\U0001f6a8" not in msg["Subject"]
+    body = msg.get_content()
+    assert "Enrichment coverage (25 candidates)\n---" not in body
+    assert "ENRICHMENT SOURCE PRODUCED NOTHING" not in body
+    assert "NO ENRICHMENT COVERAGE LINE" not in body
+    assert "Enrich. coverage : (disabled in config)" in body
+
+
+def test_coverage_disabled_still_reports_every_other_signal(required_env, cc_sandbox):
+    """Turning the check off must not cost the rest of the email."""
+    _write_coverage_config(cc_sandbox, enabled=False)
+    body = send_report._build_email(
+        pipeline_exit=0,
+        log=_COV_OPR_DEAD + "\nWrote 3 domains to src/data/daily-domains.json\n",
+        duration_sec=1.0,
+    ).get_content()
+    assert "Domains published: 3" in body
+
+
+# --- exit-0 invariant (hard rule 17) --------------------------------------
+
+
+def _run_main_with_log(monkeypatch, log: str) -> list[EmailMessage]:
+    """Drive main() with a canned journal and a mocked send. Never sends mail."""
+    monkeypatch.setenv("INVOCATION_ID", "coverage-test")
+    monkeypatch.setattr(send_report, "_capture_journal", MagicMock(return_value=log))
+    sent: list[EmailMessage] = []
+    monkeypatch.setattr(send_report, "_send", lambda msg: sent.append(msg))
+    assert send_report.main(["--pipeline-exit", "0"]) == 0
+    return sent
+
+
+def test_main_exits_zero_when_coverage_alarm_fires(
+    required_env, cc_sandbox, monkeypatch,
+):
+    _write_coverage_config(cc_sandbox)
+    sent = _run_main_with_log(monkeypatch, _COV_OPR_DEAD + "\n")
+    assert "\U0001f6a8 SOURCE DEAD (open_page_rank)" in sent[0]["Subject"]
+
+
+def test_main_exits_zero_on_healthy_coverage(required_env, cc_sandbox, monkeypatch):
+    _write_coverage_config(cc_sandbox)
+    sent = _run_main_with_log(monkeypatch, _COV_HEALTHY + "\n")
+    assert "\U0001f6a8" not in sent[0]["Subject"]
+    assert "all healthy" in sent[0].get_content()
+
+
+def test_main_exits_zero_when_coverage_line_is_absent(
+    required_env, cc_sandbox, monkeypatch,
+):
+    _write_coverage_config(cc_sandbox)
+    sent = _run_main_with_log(
+        monkeypatch, "Wrote 12 domains to src/data/daily-domains.json\n",
+    )
+    assert "NO ENRICHMENT COVERAGE LINE" in sent[0].get_content()
+
+
+def test_main_exits_zero_when_coverage_line_is_malformed(
+    required_env, cc_sandbox, monkeypatch,
+):
+    _write_coverage_config(cc_sandbox)
+    sent = _run_main_with_log(
+        monkeypatch,
+        "Enrichment coverage (banana candidates): open_page_rank=??/??\n",
+    )
+    assert sent[0]["Subject"]
+    assert "\U0001f6a8" not in sent[0]["Subject"]
+
+
+def test_main_exits_zero_when_coverage_is_disabled(
+    required_env, cc_sandbox, monkeypatch,
+):
+    _write_coverage_config(cc_sandbox, enabled=False)
+    sent = _run_main_with_log(monkeypatch, _COV_OPR_DEAD + "\n")
+    assert "(disabled in config)" in sent[0].get_content()

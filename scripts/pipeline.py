@@ -112,6 +112,26 @@ ENRICHMENT_MODULES = (
 )
 
 
+# Enrichment fields the coverage line ALWAYS reports, in this order, even
+# when not one candidate carries them. The `0/N` case is the entire point of
+# that line: a field that silently vanishes from it teaches nothing, and
+# these are the fields whose silent disappearance has already cost real days
+# (open_page_rank on 2026-09-21/22, cc_source_domain_count when Common Crawl
+# went stale). `previous_registrar` is in the list although it comes from the
+# availability stage rather than an enricher, because the publish gate used
+# to score against it. Every OTHER field an enrichment module returns is
+# discovered at runtime and appended, so a new source appears on the line
+# without this tuple being edited.
+ENRICHMENT_COVERAGE_FIELDS = (
+    "wayback_snapshots",
+    "wayback_last_snapshot",
+    "open_page_rank",
+    "cert_history",
+    "previous_registrar",
+    "cc_source_domain_count",
+)
+
+
 def _load_enrichers() -> list[tuple[str, Callable[[str, dict], dict]]]:
     enrichers: list[tuple[str, Callable[[str, dict], dict]]] = []
     for name in ENRICHMENT_MODULES:
@@ -245,6 +265,7 @@ def _enrich_one(
     candidate: dict,
     config: dict,
     enrichers: list[tuple[str, Callable[[str, dict], dict]]],
+    field_sink: set[str] | None = None,
 ) -> dict:
     """Apply all enrichers to one candidate and merge results in-place.
 
@@ -252,6 +273,12 @@ def _enrich_one(
     `SpamCheckConfigError`, which is fatal — it means the operator's secrets
     are misconfigured and we must not produce a daily list with degraded
     malware filtering. We re-raise it so the orchestrator aborts the run.
+
+    `field_sink`, when given, collects the names of every key any enricher
+    returned — including keys whose value was None. That is how the coverage
+    line learns the field list from the modules instead of hardcoding it.
+    Keys are added, never read, so concurrent workers sharing one set is
+    safe; `set.add` is atomic under the GIL.
     """
     from scripts.enrichment.spam_check import SpamCheckConfigError
 
@@ -265,7 +292,71 @@ def _enrich_one(
             result = {}
         if isinstance(result, dict):
             candidate.update(result)
+            if field_sink is not None:
+                try:
+                    field_sink.update(k for k in result if isinstance(k, str))
+                except Exception:  # pragma: no cover — reporting must not bite
+                    pass
     return candidate
+
+
+def _enrichment_coverage_enabled(config: object) -> bool:
+    """Coverage reporting is on unless config turns it off.
+
+    Absent block, absent key, or a config that is not even a dict all mean
+    "on" — this line's absence must signal "the stage did not run", so it
+    must not go missing because of a config shape.
+    """
+    block = config.get("enrichment_coverage") if isinstance(config, dict) else None
+    if not isinstance(block, dict):
+        return True
+    return bool(block.get("enabled", True))
+
+
+def _log_enrichment_coverage(
+    candidates: list[dict] | None,
+    observed_fields: set[str] | None,
+    config: dict,
+) -> None:
+    r"""One line per run saying, per enrichment field, how many candidates got
+    a non-null value out of how many.
+
+    Why this exists: every incident in this project has the same shape — a
+    source fails soft, returns empty, the next step treats empty as a
+    legitimate value, and nobody learns until output visibly drops. On
+    2026-09-21/22 every new domain was rejected at the publish gate because
+    `open_page_rank` was missing for all of them, and nothing anywhere said
+    so. `open_page_rank=0/25` is the line that would have cost one minute.
+
+    The format is a CONTRACT — the daily report parses it out of the journal:
+
+        Enrichment coverage (25 candidates): wayback_snapshots=25/25
+            open_page_rank=0/25 cc_source_domain_count=23/25   (all one line)
+
+    One `field=N/M` token per field, single space separated, `M` identical in
+    every token and equal to the count in the prefix. "candidates" is never
+    pluralised away, including at 0 and 1, so `\((\d+) candidates\)` always
+    matches. Emitted even for an empty candidate set, so the line's absence
+    always means the stage did not run rather than "nothing to say".
+
+    Never raises — it is a log line, not a stage, and it must not be able to
+    break a three-hour run.
+    """
+    try:
+        if not _enrichment_coverage_enabled(config):
+            return
+        records = [c for c in (candidates or []) if isinstance(c, dict)]
+        total = len(records)
+        fields = list(ENRICHMENT_COVERAGE_FIELDS)
+        discovered = {f for f in (observed_fields or ()) if isinstance(f, str)}
+        fields.extend(sorted(discovered.difference(fields)))
+        tokens = " ".join(
+            f"{field}={sum(1 for rec in records if rec.get(field) is not None)}/{total}"
+            for field in fields
+        )
+        logger.info("Enrichment coverage (%d candidates): %s", total, tokens)
+    except Exception as exc:  # pragma: no cover — logging must never break a run
+        logger.warning("Enrichment coverage unavailable (%s).", exc)
 
 
 def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
@@ -283,6 +374,12 @@ def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
     Per project guidance: 200 properly-enriched > 0 because of timeout.
     """
     if not candidates:
+        # Still report: "0 candidates" is information, and the line's absence
+        # has to mean the stage did not run.
+        try:
+            _log_enrichment_coverage([], set(), config)
+        except Exception as exc:  # pragma: no cover — reporting is never fatal
+            logger.warning("Enrichment coverage unavailable (%s).", exc)
         return list(candidates)
 
     max_workers = max(1, int(config.get("max_concurrent_enrichments", 10)))
@@ -297,6 +394,9 @@ def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
 
     queue = list(candidates)
     enriched: list[dict] = []
+    # Field names the enrichers actually returned this run; feeds the coverage
+    # line so a newly added source shows up without editing a list here.
+    observed_fields: set[str] = set()
     spam_check_error: BaseException | None = None
     start = time.monotonic()
     deadline = start + budget
@@ -309,7 +409,9 @@ def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
 
         def _submit_one() -> None:
             cand = queue.pop(0)
-            in_flight.add(pool.submit(_enrich_one, cand, config, enrichers))
+            in_flight.add(
+                pool.submit(_enrich_one, cand, config, enrichers, observed_fields)
+            )
 
         # Prime the pool.
         while queue and len(in_flight) < max_workers:
@@ -371,6 +473,15 @@ def enrich_all(candidates: list[dict], config: dict) -> list[dict]:
             "Enrichment summary: %d enriched (all candidates), elapsed %.1fs",
             len(enriched), time.monotonic() - start,
         )
+    # Per-source coverage, adjacent to the summary above. Counted over the
+    # records that actually went THROUGH enrichment; the budget/grace skips
+    # are already accounted for by the summary line.
+    # Belt AND braces: the helper swallows its own errors, and the call site
+    # swallows the helper. A reporting line may not end a three-hour run.
+    try:
+        _log_enrichment_coverage(enriched, observed_fields, config)
+    except Exception as exc:  # pragma: no cover — reporting is never fatal
+        logger.warning("Enrichment coverage unavailable (%s).", exc)
     return enriched
 
 

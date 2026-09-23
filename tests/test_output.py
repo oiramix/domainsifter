@@ -1131,3 +1131,360 @@ def test_cc_backlink_history_round_trips_through_write_output(tmp_path):
     # Second pass: the reloaded row is what carryover feeds back in.
     again = output.build_payload([reloaded], CONFIG)["domains"][0]
     assert again["cc_backlink_history"] == HISTORY
+# --- source-based completeness + verdict evidence floor (2026-09-23) --------
+#
+# Two changes, one counting rule. (1) The publish gate counts enrichment
+# SOURCES that reported, not fields: `previous_registrar` is impossible for an
+# available domain and the two wayback fields were one source counted twice,
+# which published ZERO domains for two days when OpenPageRank's API migrated.
+# (2) `_compute_verdict` additionally requires a minimum number of sources
+# that actually returned a value, because the score renormalises over present
+# signals only — so the sparsest row on the site was also its highest-scoring
+# one and its only Clean.
+
+SOURCES = {
+    "wayback": ["wayback_snapshots", "wayback_last_snapshot"],
+    "open_page_rank": ["open_page_rank"],
+    "cert_history": ["cert_history"],
+}
+
+# Publish gate with the source map wired in. 0.50 now means "2 of 3 sources".
+SOURCES_CFG = {
+    **CONFIG,
+    "publish_completeness_sources": SOURCES,
+    "publish_min_score": 0,
+    "publish_min_enrichment_completeness": 0.50,
+}
+
+# Verdict config with both evidence floors at their shipped values.
+FLOOR_CFG = {
+    **VERDICT_CFG,
+    "publish_completeness_sources": SOURCES,
+    "verdict_thresholds": {
+        **VERDICT_CFG["verdict_thresholds"],
+        "clean_min_real_signals": 3,
+        "promising_min_real_signals": 2,
+    },
+}
+
+
+def _sourced(name: str, score: int = 50, **present) -> dict:
+    """Candidate with EVERY enrichment field null unless named in `present`.
+
+    Deliberately explicit: these tests are about which sources reported, so a
+    builder that quietly supplies defaults (like `_cand`) would hide the thing
+    under test.
+    """
+    cand = {
+        "name": name,
+        "tld": name.rsplit(".", 1)[-1],
+        "dropped_date": "2026-09-22",
+        "score": score,
+        "wayback_snapshots": None,
+        "wayback_last_snapshot": None,
+        "open_page_rank": None,
+        "cert_history": None,
+        "previous_registrar": None,
+        "cc_source_domain_count": None,
+    }
+    cand.update(present)
+    return cand
+
+
+# --- Change 1: the gate counts sources -------------------------------------
+
+
+def test_one_field_of_a_multi_field_source_counts_the_source():
+    """Either wayback field alone is enough for the wayback source to count."""
+    snapshots_only = _sourced("marketglow.com", wayback_snapshots=42)
+    last_only = _sourced("marketglow.com", wayback_last_snapshot="2026-09-19")
+    assert output._count_signal_sources(snapshots_only, SOURCES_CFG) == (1, 3)
+    assert output._count_signal_sources(last_only, SOURCES_CFG) == (1, 3)
+
+
+def test_both_wayback_fields_still_count_as_one_source():
+    """The old bug: one source carrying 2 of 5 points. Now it carries 1 of 3."""
+    both = _sourced("tideblock.io", wayback_snapshots=42,
+                    wayback_last_snapshot="2026-09-19")
+    assert output._count_signal_sources(both, SOURCES_CFG) == (1, 3)
+    assert output._enrichment_completeness(both, SOURCES_CFG) == pytest.approx(1 / 3)
+
+
+def test_previous_registrar_no_longer_affects_completeness():
+    """0 of 216 published rows have it and none ever will — RDAP returns
+    not-found for an AVAILABLE domain, and available is all we publish."""
+    without = _sourced("coppernest.org", wayback_snapshots=42,
+                       open_page_rank=2.0, cert_history=True)
+    with_reg = {**without, "previous_registrar": "Acme Registrar"}
+    assert output._enrichment_completeness(without, SOURCES_CFG) == 1.0
+    assert output._enrichment_completeness(with_reg, SOURCES_CFG) == 1.0
+
+
+def test_previous_registrar_absence_passes_the_strictest_gate():
+    """Under field counting this candidate was 4/5 = 0.80 and a 0.99 gate
+    dropped it. Under source counting it is 3/3 and publishes."""
+    cfg = {**SOURCES_CFG, "publish_min_enrichment_completeness": 0.99}
+    cand = _sourced("coppernest.org", 80, wayback_snapshots=42,
+                    wayback_last_snapshot="2026-09-19", open_page_rank=2.0,
+                    cert_history=True)
+    assert output.build_payload([cand], cfg)["domain_count"] == 1
+
+
+def test_gate_passes_two_of_three_sources_and_fails_one_of_three():
+    """The exact 2026-09-21/22 outage boundary: wayback+OPR = 0.67 publishes,
+    wayback alone = 0.33 does not, at the unchanged 0.50 threshold."""
+    two = _sourced("marketglow.com", 60, wayback_snapshots=42,
+                   open_page_rank=2.0)
+    one = _sourced("tideblock.io", 60, wayback_snapshots=42,
+                   wayback_last_snapshot="2026-09-19")
+    assert output._enrichment_completeness(two, SOURCES_CFG) == pytest.approx(2 / 3)
+    assert output._enrichment_completeness(one, SOURCES_CFG) == pytest.approx(1 / 3)
+    payload = output.build_payload([two, one], SOURCES_CFG)
+    assert [d["name"] for d in payload["domains"]] == ["marketglow.com"]
+
+
+def test_gate_counts_zero_and_false_as_reported():
+    """'Reported' is `is not None`. OPR 0.0 and cert_history False ARE data —
+    the source answered, the answer was negative."""
+    cand = _sourced("tideblock.io", 60, open_page_rank=0.0, cert_history=False)
+    assert output._count_signal_sources(cand, SOURCES_CFG) == (2, 3)
+
+
+def test_cc_source_domain_count_is_not_a_countable_source():
+    """Unchanged stance: absence from the CC graph is informational."""
+    cand = _sourced("marketglow.com", 60, wayback_snapshots=42,
+                    cc_source_domain_count=500)
+    assert output._count_signal_sources(cand, SOURCES_CFG) == (1, 3)
+
+
+def test_missing_config_key_falls_back_to_legacy_field_counting():
+    """No `publish_completeness_sources` → the pre-2026-09-23 five-field
+    arithmetic, not a crash and not a silently different denominator."""
+    assert output._completeness_sources({}) == output._LEGACY_COMPLETENESS_SOURCES
+    assert output._completeness_sources(None) == output._LEGACY_COMPLETENESS_SOURCES
+    cand = _sourced("coppernest.org", 60, wayback_snapshots=42,
+                    wayback_last_snapshot="2026-09-19")
+    # Legacy: 2 of 5 = 0.40, the value that rejected every candidate during
+    # the OpenPageRank outage.
+    assert output._count_signal_sources(cand, {}) == (2, 5)
+    assert output._enrichment_completeness(cand, {}) == pytest.approx(0.40)
+    assert output._enrichment_completeness(cand) == pytest.approx(0.40)
+
+
+@pytest.mark.parametrize(
+    "junk",
+    [
+        "wayback",                       # string instead of an object
+        [],                              # list instead of an object
+        42,                              # number
+        {},                              # object with no sources
+        {"_doc": "only a note here"},    # only underscore keys
+        {"wayback": None},               # source with no usable field list
+        {"wayback": []},                 # source with an empty field list
+        {"wayback": [None, 7]},          # field list of non-strings
+    ],
+)
+def test_malformed_config_key_falls_back_without_raising(junk):
+    cfg = {**CONFIG, "publish_completeness_sources": junk}
+    assert output._completeness_sources(cfg) == output._LEGACY_COMPLETENESS_SOURCES
+    cand = _sourced("marketglow.com", 60, wayback_snapshots=42)
+    assert output.build_payload([cand], cfg)["domain_count"] == 1
+
+
+def test_underscore_doc_key_inside_the_source_map_is_not_a_source():
+    """config.json blocks carry `_doc` notes; one must not become a 4th
+    source and silently move the denominator to 4."""
+    cfg = {**SOURCES_CFG,
+           "publish_completeness_sources": {"_doc": "why", **SOURCES}}
+    cand = _sourced("tideblock.io", 60, wayback_snapshots=42, open_page_rank=2.0)
+    assert output._count_signal_sources(cand, cfg) == (2, 3)
+
+
+def test_wayback_unknown_still_exempt_under_source_counting():
+    """The 2026-05-17 exemption survives the rework: a candidate whose
+    wayback call failed is credited the wayback source at the PUBLISH gate."""
+    cand = _sourced("coppernest.org", 60, open_page_rank=2.0, cert_history=True)
+    cand["wayback_unknown"] = True
+    assert output._count_signal_sources(cand, SOURCES_CFG) == (3, 3)
+    assert output._enrichment_completeness(cand, SOURCES_CFG) == 1.0
+
+
+# --- Change 2: verdict floor on evidence -----------------------------------
+#
+# Shape of the live 2026-09-22 top row, invented name: high score, strong
+# wayback, OPR missing. It was the only Clean ever published and got there
+# partly because its missing signals were excluded from the score average.
+
+SPARSE_HIGH_SCORER = dict(
+    score=87,
+    wayback_snapshots=578,
+    wayback_last_snapshot="2026-09-19",
+    cert_history=True,        # open_page_rank / cc stay None
+)
+
+
+def test_sparse_high_scorer_is_not_clean():
+    cand = _sourced("marketglow.com", **SPARSE_HIGH_SCORER)
+    assert output._count_signal_sources(
+        cand, FLOOR_CFG, count_unknown_wayback=False
+    ) == (2, 3)
+    assert output._compute_verdict(cand, FLOOR_CFG) != "Clean"
+
+
+def test_sparse_high_scorer_is_not_promising_either():
+    """Demotion re-tests the FULL Promising condition set; 578 snapshots is
+    under promising_min_wayback_snapshots, so it lands on Caution."""
+    cand = _sourced("marketglow.com", **SPARSE_HIGH_SCORER)
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Caution"
+    assert _verdict_of(output.build_payload([cand], FLOOR_CFG)) == "Caution"
+
+
+def test_wayback_only_high_scorer_fails_both_floors():
+    """One source of three: below clean_min_real_signals AND below
+    promising_min_real_signals, however high the score."""
+    cand = _sourced("tideblock.io", 95, wayback_snapshots=50000,
+                    wayback_last_snapshot="2026-09-19")
+    assert output._count_signal_sources(
+        cand, FLOOR_CFG, count_unknown_wayback=False
+    ) == (1, 3)
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Caution"
+
+
+def test_fully_enriched_high_scorer_is_still_clean():
+    """The floor must not cost us the verdicts we legitimately earned."""
+    cand = _sourced("coppernest.org", 75, wayback_snapshots=5000,
+                    wayback_last_snapshot="2026-09-19", open_page_rank=3.0,
+                    cert_history=True, cc_source_domain_count=200)
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Clean"
+
+
+def test_clean_min_real_signals_zero_disables_the_check():
+    """Also documents the pre-change behaviour: the same sparse row WAS
+    Clean, which is exactly what shipped to the site on 2026-09-22."""
+    cfg = {**FLOOR_CFG,
+           "verdict_thresholds": {**FLOOR_CFG["verdict_thresholds"],
+                                  "clean_min_real_signals": 0}}
+    cand = _sourced("marketglow.com", **SPARSE_HIGH_SCORER)
+    assert output._compute_verdict(cand, cfg) == "Clean"
+
+
+def test_promising_min_real_signals_zero_disables_the_check():
+    """One source (wayback), authority supplied by CC — which is NOT a counted
+    source. Promising with the floor off, Caution with it on."""
+    only_wayback = _sourced("tideblock.io", 55, wayback_snapshots=5000,
+                            cc_source_domain_count=100)
+    assert output._count_signal_sources(
+        only_wayback, FLOOR_CFG, count_unknown_wayback=False
+    ) == (1, 3)
+    off = {**FLOOR_CFG,
+           "verdict_thresholds": {**FLOOR_CFG["verdict_thresholds"],
+                                  "promising_min_real_signals": 0}}
+    assert output._compute_verdict(only_wayback, off) == "Promising"
+    assert output._compute_verdict(only_wayback, FLOOR_CFG) == "Caution"
+
+
+def test_absent_thresholds_keep_the_old_verdicts():
+    """A config predating 2026-09-23 must verdict exactly as it used to, so
+    the two new keys default to 0 rather than to their shipped values."""
+    cand = _sourced("marketglow.com", **SPARSE_HIGH_SCORER)
+    assert output._compute_verdict(cand, VERDICT_CFG) == "Clean"
+
+
+def test_clean_demotes_to_promising_when_promising_is_genuinely_earned():
+    """2 of 3 sources fails clean_min_real_signals(3) but clears
+    promising_min_real_signals(2), and the candidate also satisfies every
+    existing Promising condition — so it steps down exactly one tier."""
+    cand = _sourced("coppernest.org", 90, wayback_snapshots=5000,
+                    wayback_last_snapshot="2026-09-19", open_page_rank=3.0)
+    assert output._count_signal_sources(
+        cand, FLOOR_CFG, count_unknown_wayback=False
+    ) == (2, 3)
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Promising"
+
+
+def test_floor_never_promotes_a_low_scorer():
+    """Full evidence is a necessary condition, never a sufficient one: a
+    below-threshold score with all three sources stays where it was."""
+    below_promising = _sourced("marketglow.com", 35, wayback_snapshots=99999,
+                               wayback_last_snapshot="2026-09-19",
+                               open_page_rank=9.0, cc_source_domain_count=99999,
+                               cert_history=True)
+    assert output._count_signal_sources(
+        below_promising, FLOOR_CFG, count_unknown_wayback=False
+    ) == (3, 3)
+    assert output._compute_verdict(below_promising, FLOOR_CFG) == "Caution"
+
+    promising_scorer = _sourced("tideblock.io", 55, wayback_snapshots=5000,
+                                wayback_last_snapshot="2026-09-19",
+                                open_page_rank=3.0, cert_history=True)
+    # 3 of 3 sources and a Promising-range score: still Promising, not Clean.
+    assert output._compute_verdict(promising_scorer, FLOOR_CFG) == "Promising"
+
+
+def test_floor_does_not_rescue_a_candidate_failing_the_wayback_gate():
+    """Full evidence + Promising-range score + too little wayback = Caution,
+    unchanged from 2026-05-17."""
+    cand = _sourced("coppernest.org", 55, wayback_snapshots=500,
+                    wayback_last_snapshot="2026-09-19", open_page_rank=3.0,
+                    cert_history=True, cc_source_domain_count=100)
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Caution"
+
+
+def test_soft_signal_forced_caution_still_wins_over_the_floor():
+    """The keyword short-circuit runs first, so a fully-enriched high scorer
+    with a soft-signal token is still Caution, not Clean."""
+    cand = _sourced("datingmegahub.com", 90, wayback_snapshots=5000,
+                    wayback_last_snapshot="2026-09-19", open_page_rank=8.0,
+                    cert_history=True, cc_source_domain_count=2000)
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Caution"
+
+
+def test_parked_snapshot_forced_caution_still_wins_over_the_floor():
+    cand = _sourced("marketglow.com", 90, wayback_snapshots=5000,
+                    wayback_last_snapshot="2026-09-19", open_page_rank=8.0,
+                    cert_history=True, snapshot_category="parked")
+    assert output._compute_verdict(cand, FLOOR_CFG) == "Caution"
+
+
+def test_verdict_floor_does_not_credit_unknown_wayback():
+    """The publish gate forgives a failed Wayback call; the verdict floor must
+    not. A failed fetch is a reason to stay out of the top tier, not evidence.
+    Same candidate, same config, two different counts."""
+    cand = _sourced("tideblock.io", 90, open_page_rank=3.0, cert_history=True)
+    cand["wayback_unknown"] = True
+    assert output._count_signal_sources(cand, FLOOR_CFG) == (3, 3)
+    assert output._count_signal_sources(
+        cand, FLOOR_CFG, count_unknown_wayback=False
+    ) == (2, 3)
+    assert output._compute_verdict(cand, FLOOR_CFG) != "Clean"
+
+
+def test_verdict_stays_one_of_the_three_contract_values():
+    """Behaviour change, not a schema change: the field still only ever holds
+    one of the three strings the frontend and newsletter already handle."""
+    cands = [
+        _sourced("marketglow.com", **SPARSE_HIGH_SCORER),
+        _sourced("tideblock.io", 95, wayback_snapshots=50000),
+        _sourced("coppernest.org", 75, wayback_snapshots=5000,
+                 wayback_last_snapshot="2026-09-19", open_page_rank=3.0,
+                 cert_history=True, cc_source_domain_count=200),
+    ]
+    payload = output.build_payload(cands, {**FLOOR_CFG, "publish_min_score": 0,
+                                          "publish_min_enrichment_completeness": 0.0})
+    assert payload["domain_count"] == 3
+    for d in payload["domains"]:
+        assert d["verdict"] in ("Clean", "Promising", "Caution")
+
+
+def test_floor_survives_write_output_round_trip(tmp_path):
+    """Carryover feeds yesterday's projected rows back in, so the demotion
+    must be stable across a write/read cycle rather than flapping."""
+    target = tmp_path / "daily.json"
+    cand = _sourced("marketglow.com", **SPARSE_HIGH_SCORER)
+    cand["first_seen_date"] = "2026-09-22"
+    output.write_output([cand], {**FLOOR_CFG, "publish_min_enrichment_completeness": 0.50},
+                        output_path=target)
+    reloaded = json.loads(target.read_text(encoding="utf-8"))["domains"][0]
+    assert reloaded["verdict"] == "Caution"
+    again = output.build_payload([reloaded], FLOOR_CFG)["domains"][0]
+    assert again["verdict"] == "Caution"

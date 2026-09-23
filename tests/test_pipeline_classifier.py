@@ -866,3 +866,283 @@ def test_main_survives_exception_anywhere_in_reuse_wiring(monkeypatch, cfg, tmp_
                 (tmp_path / "daily.json").read_text(encoding="utf-8"),
             )
             assert len(daily["domains"]) == 5, target
+
+
+# ---------------------------------------------------------------------------
+# Enrichment coverage line (added 2026-09-23)
+#
+# The meta-fix for the failure shape every incident here shares: a source
+# fails soft, returns empty, the next step treats empty as a legitimate value,
+# and nobody learns until output visibly drops. The format asserted below is a
+# CONTRACT — the daily report parses it out of the journal.
+# ---------------------------------------------------------------------------
+
+_REAL_ENRICH_ALL = pipeline.enrich_all
+
+
+def _static_enricher(payload: dict):
+    """An enrichment module's `enrich` that always returns `payload`."""
+    return lambda _domain, _config: dict(payload)
+
+
+def _wire_pipeline_with_real_enrichment(monkeypatch, today, enrichers):
+    """Same five-candidate wiring, but the REAL enrich_all runs over fake
+    enrichers, so the coverage line is produced by production code."""
+    _wire_minimal_pipeline_for_classifier(monkeypatch, today)
+    monkeypatch.setattr(pipeline, "enrich_all", _REAL_ENRICH_ALL)
+    monkeypatch.setattr(pipeline, "_load_enrichers", lambda: list(enrichers))
+
+
+def _coverage_lines(caplog) -> list[str]:
+    return [
+        rec.getMessage() for rec in caplog.records
+        if rec.getMessage().startswith("Enrichment coverage (")
+    ]
+
+
+def _tokens(line: str) -> dict[str, str]:
+    _prefix, _sep, rest = line.partition(": ")
+    return dict(tok.split("=", 1) for tok in rest.split(" "))
+
+
+def test_coverage_line_reports_mixed_counts_exactly(caplog):
+    """The whole contract on one mixed set: prefix count, one token per field,
+    identical denominators, exact text."""
+    import logging
+    candidates = [
+        {
+            "name": "marketglow.com",
+            "wayback_snapshots": 12,
+            "wayback_last_snapshot": "2024-03-01",
+            "open_page_rank": 2.5,
+            "cert_history": True,
+            "cc_source_domain_count": 40,
+        },
+        {
+            "name": "tideblock.io",
+            "wayback_snapshots": 3,
+            "wayback_last_snapshot": "2023-11-02",
+            "open_page_rank": None,
+            "cert_history": False,
+            "cc_source_domain_count": None,
+        },
+        # No cert_history key at all — absent and explicit-None both read as
+        # missing, while c2's False above still counts as present.
+        {
+            "name": "coppernest.org",
+            "wayback_snapshots": 0,
+            "wayback_last_snapshot": None,
+        },
+    ]
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_enrichment_coverage(candidates, set(), {})
+
+    lines = _coverage_lines(caplog)
+    assert len(lines) == 1
+    assert lines[0] == (
+        "Enrichment coverage (3 candidates): "
+        "wayback_snapshots=3/3 wayback_last_snapshot=2/3 open_page_rank=1/3 "
+        "cert_history=2/3 previous_registrar=0/3 cc_source_domain_count=1/3"
+    )
+    # Denominator identical in every token and equal to the prefix count.
+    assert {v.split("/", 1)[1] for v in _tokens(lines[0]).values()} == {"3"}
+
+
+def test_coverage_line_keeps_a_field_absent_everywhere_as_zero_of_n(caplog):
+    """`0/N` is the entire point of this change. A field no candidate carries
+    must still appear — this is literally the 2026-09-21/22 OpenPageRank
+    outage, where nothing anywhere said open_page_rank was missing."""
+    import logging
+    candidates = [
+        {"name": "marketglow.com", "wayback_snapshots": 9, "open_page_rank": None},
+        {"name": "tideblock.io", "wayback_snapshots": 4},
+    ]
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_enrichment_coverage(candidates, set(), {})
+
+    line = _coverage_lines(caplog)[0]
+    assert "open_page_rank=0/2" in line
+    assert "cert_history=0/2" in line
+    assert "previous_registrar=0/2" in line
+
+
+def test_coverage_line_emitted_for_empty_candidate_set(caplog):
+    """Absence of the line must always mean "the stage did not run", never
+    "there was nothing to say"."""
+    import logging
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_enrichment_coverage([], set(), {})
+
+    line = _coverage_lines(caplog)[0]
+    assert line.startswith("Enrichment coverage (0 candidates): ")
+    # Every baseline field present at 0/0 — a stable line, not an empty one.
+    assert set(_tokens(line)) == set(pipeline.ENRICHMENT_COVERAGE_FIELDS)
+    assert set(_tokens(line).values()) == {"0/0"}
+
+
+def test_coverage_line_appends_fields_discovered_from_enrichers(caplog):
+    """The field list is derived from what the modules actually returned, so a
+    newly wired source appears without editing a list. Discovered extras sort
+    after the declared baseline, which keeps the order stable run to run."""
+    import logging
+    candidates = [
+        {"name": "marketglow.com", "spam_flagged": False, "surbl_listed": None},
+        {"name": "tideblock.io", "spam_flagged": False, "surbl_listed": False},
+    ]
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_enrichment_coverage(
+            candidates, {"spam_flagged", "surbl_listed", "wayback_snapshots"}, {},
+        )
+
+    line = _coverage_lines(caplog)[0]
+    # Baseline first in declared order; discovered extras appended, sorted.
+    assert line.endswith("spam_flagged=2/2 surbl_listed=1/2")
+    # A discovered field that is also in the baseline is not duplicated.
+    assert line.count("wayback_snapshots=") == 1
+
+
+def test_coverage_line_suppressed_when_disabled(caplog):
+    """enrichment_coverage.enabled: false silences it; a missing or malformed
+    block does not, because the default is on."""
+    import logging
+    candidates = [{"name": "marketglow.com", "wayback_snapshots": 1}]
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_enrichment_coverage(
+            candidates, set(), {"enrichment_coverage": {"enabled": False}},
+        )
+    assert _coverage_lines(caplog) == []
+
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        pipeline._log_enrichment_coverage(candidates, set(), {"other": 1})
+        pipeline._log_enrichment_coverage(
+            candidates, set(), {"enrichment_coverage": {}},
+        )
+        pipeline._log_enrichment_coverage(
+            candidates, set(), {"enrichment_coverage": "not a dict"},
+        )
+    assert len(_coverage_lines(caplog)) == 3
+
+
+def test_coverage_line_never_raises():
+    """Not even on nonsense input — it is a log line, not a stage."""
+    class Exploding(dict):
+        def get(self, *_a, **_k):
+            raise RuntimeError("boom")
+
+    pipeline._log_enrichment_coverage([Exploding()], {"open_page_rank"}, {})
+    pipeline._log_enrichment_coverage(None, None, {})
+    pipeline._log_enrichment_coverage([None, "nope", 7], set(), {})
+    pipeline._log_enrichment_coverage([], set(), Exploding())
+    pipeline._log_enrichment_coverage([], set(), None)
+
+
+def test_enrich_all_emits_coverage_with_fields_from_the_enrichers(cfg, caplog):
+    """End-to-end through the real enrich_all: counts come from the merged
+    records and the field list from the modules' own return keys. One enricher
+    returning {} for every domain is the 2026-09-21 outage shape."""
+    import logging
+    cands = [
+        {"name": "marketglow.com"},
+        {"name": "tideblock.io"},
+        {"name": "coppernest.org"},
+    ]
+    enrichers = [
+        ("wayback", _static_enricher(
+            {"wayback_snapshots": 7, "wayback_last_snapshot": "2024-02-02"},
+        )),
+        ("open_page_rank", _static_enricher({})),
+        ("surbl", _static_enricher({"surbl_listed": None})),
+    ]
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(pipeline, "_load_enrichers", lambda: list(enrichers))
+            enriched = pipeline.enrich_all(cands, cfg)
+
+    assert len(enriched) == 3
+    lines = _coverage_lines(caplog)
+    assert len(lines) == 1
+    assert lines[0].startswith("Enrichment coverage (3 candidates): ")
+    assert "wayback_snapshots=3/3" in lines[0]
+    # Declared-but-never-returned and returned-but-always-None both read 0/3.
+    assert "open_page_rank=0/3" in lines[0]
+    assert "surbl_listed=0/3" in lines[0]
+    # Placed adjacent to the pre-existing enrichment summary, right after it.
+    summary_idx = [
+        i for i, rec in enumerate(caplog.records)
+        if rec.getMessage().startswith("Enrichment summary:")
+    ]
+    coverage_idx = [
+        i for i, rec in enumerate(caplog.records)
+        if rec.getMessage().startswith("Enrichment coverage (")
+    ]
+    assert summary_idx and coverage_idx[0] == summary_idx[-1] + 1
+
+
+def test_enrich_all_emits_coverage_for_zero_candidates(cfg, caplog):
+    """No candidates is not a reason to go quiet."""
+    import logging
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        assert pipeline.enrich_all([], cfg) == []
+    assert _coverage_lines(caplog)[0].startswith(
+        "Enrichment coverage (0 candidates): ",
+    )
+
+
+def _publishable_enrichers() -> list[tuple[str, object]]:
+    """Enough enrichment for all five candidates to survive Stage 5 and
+    publish — notably spam_flagged, which the strict post-enrichment spam
+    check requires."""
+    return [
+        ("wayback", _static_enricher({
+            "wayback_snapshots": 5000, "wayback_last_snapshot": "2024-01-01",
+        })),
+        ("open_page_rank", _static_enricher({"open_page_rank": 3.0})),
+        ("crtsh", _static_enricher({"cert_history": True, "cert_count": 4})),
+        ("spam_check", _static_enricher({"spam_flagged": False})),
+        ("cc_backlinks", _static_enricher({"cc_source_domain_count": 500})),
+    ]
+
+
+def test_main_emits_coverage_line_and_still_publishes(monkeypatch, cfg, tmp_path, caplog):
+    """The line appears once in a full run, with that run's candidate count."""
+    import logging
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    enrichers = _publishable_enrichers()
+    _wire_pipeline_with_real_enrichment(monkeypatch, date.today(), enrichers)
+    _install_classifier(monkeypatch, _recording_classifier([]))
+
+    with caplog.at_level(logging.INFO, logger="scripts.pipeline"):
+        assert pipeline.main(["--config", str(cfg_path)]) == 0
+
+    lines = _coverage_lines(caplog)
+    assert len(lines) == 1
+    assert lines[0].startswith("Enrichment coverage (5 candidates): ")
+    assert "open_page_rank=5/5" in lines[0]
+    assert "cert_history=5/5" in lines[0]
+    assert "previous_registrar=0/5" in lines[0]
+    assert "cert_count=5/5" in lines[0]  # discovered at runtime, not declared
+    daily = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    assert len(daily["domains"]) == 5
+
+
+def test_main_survives_an_exploding_coverage_report(monkeypatch, cfg, tmp_path):
+    """The overriding constraint: the 09:00 UTC run must publish. A reporting
+    line may not be able to break a three-hour run, however it fails."""
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    enrichers = _publishable_enrichers()
+
+    def boom(*_a, **_k):
+        raise RuntimeError("coverage report exploded")
+
+    for target in ["_log_enrichment_coverage", "_enrichment_coverage_enabled"]:
+        with pytest.MonkeyPatch.context() as mp:
+            _wire_pipeline_with_real_enrichment(mp, date.today(), enrichers)
+            _install_classifier(mp, _recording_classifier([]))
+            mp.setattr(pipeline, target, boom)
+            assert pipeline.main(["--config", str(cfg_path)]) == 0, target
+            daily = json.loads(
+                (tmp_path / "daily.json").read_text(encoding="utf-8"),
+            )
+            assert len(daily["domains"]) == 5, target
