@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-09-27T12:15:48Z",
-  "domain_count": 212,
-  "today_count": 15,
+  "generated_at": "2026-09-27T18:33:05Z",
+  "domain_count": 211,
+  "today_count": 14,
   "carryover_count": 197,
   "domains": [
     {
@@ -4413,66 +4413,6 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "clear water damage service"
-    },
-    {
-      "name": "treehouse-restaurant.com",
-      "tld": "com",
-      "dropped_date": "2026-09-27",
-      "wayback_snapshots": 1252,
-      "wayback_last_snapshot": "2026-09-25",
-      "open_page_rank": 0.09,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 43,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtreehouse-restaurant.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=treehouse-restaurant.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=treehouse-restaurant.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-27T11:32:51Z",
-      "first_seen_date": "2026-09-27",
-      "last_validated_date": "2026-09-27",
-      "days_listed": 0,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-feb-mar-apr",
-          "source_domain_count": 1
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "whimsical dining venue brand"
     },
     {
       "name": "newtoninternationalcollege.com",
