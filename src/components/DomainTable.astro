@@ -614,7 +614,7 @@ const carryoverSubheader = (n: number): string => {
                       dash, no height change.
                     */}
                     <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.cc_source_domain_count)}{hv && (
-                      <span class="mt-0.5 flex items-center justify-end gap-1" title={hv.tooltip}>
+                      <span class="relative mt-0.5 flex items-center justify-end gap-1" title={hv.tooltip}>
                         <svg
                           viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
                           width={SPARK_W}
@@ -729,7 +729,7 @@ const carryoverSubheader = (n: number): string => {
                       no placeholder row, so cards without it are unchanged. */}
                   {hv && (
                     <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Backlink history</dt>
-                      <dd class="flex items-center gap-2" title={hv.tooltip}>
+                      <dd class="relative flex items-center gap-2" title={hv.tooltip}>
                         <svg
                           viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
                           width={SPARK_W}
@@ -908,7 +908,7 @@ const carryoverSubheader = (n: number): string => {
                       dash, no height change.
                     */}
                     <div role="cell" class="px-4 py-3 text-right tabular-nums text-stone-700">{fmtInt(d.cc_source_domain_count)}{hv && (
-                      <span class="mt-0.5 flex items-center justify-end gap-1" title={hv.tooltip}>
+                      <span class="relative mt-0.5 flex items-center justify-end gap-1" title={hv.tooltip}>
                         <svg
                           viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
                           width={SPARK_W}
@@ -1016,7 +1016,7 @@ const carryoverSubheader = (n: number): string => {
                       no placeholder row, so cards without it are unchanged. */}
                   {hv && (
                     <div class="flex items-center justify-between col-span-2"><dt class="text-stone-500">Backlink history</dt>
-                      <dd class="flex items-center gap-2" title={hv.tooltip}>
+                      <dd class="relative flex items-center gap-2" title={hv.tooltip}>
                         <svg
                           viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
                           width={SPARK_W}
