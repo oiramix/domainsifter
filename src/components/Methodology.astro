@@ -9,11 +9,14 @@
 // Icons are inline SVGs (Lucide-style stroke geometry) so we don't
 // need a runtime icon library; matches the existing antenna/sift/check
 // treatment from the prior 3-card version.
+import pipelineConfig from '../../scripts/config.json';
+// Derived, never hardcoded: only approved (actively scanned) TLDs count.
+const scannedTldCount = pipelineConfig.tlds.approved.length;
 const steps = [
   {
     icon: 'antenna',
     title: 'Catch the drop',
-    body: 'We monitor ICANN zone files across 15 TLDs every day. The moment a domain expires, we see it.',
+    body: `We monitor ICANN zone files across ${scannedTldCount} TLDs every day. The moment a domain expires, we see it.`,
   },
   {
     icon: 'filter',

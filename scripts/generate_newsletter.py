@@ -742,7 +742,9 @@ def _int_or_none(value: Any) -> int | None:
     return value if value >= 0 else None
 
 
-def credibility_line(payload: dict, pick_count: int) -> str | None:
+def credibility_line(
+    payload: dict, pick_count: int, *, per_tld_cap: int = 0,
+) -> str | None:
     """One sentence of provenance, built ONLY from the payload's own counts.
 
     CLAUDE.md hard rule 2: no invented numbers, no estimates, no rounding up.
@@ -768,6 +770,15 @@ def credibility_line(payload: dict, pick_count: int) -> str | None:
 
     `carryover_count` is deliberately unused: the picks are fresh-today only,
     so carryover doesn't belong in a sentence about what's below.
+
+    The closing sentence reconciles `today_count` with `pick_count`
+    (2026-09-28). The email can list FEWER fresh drops than `today_count`
+    because of `newsletter.top_n` and, more often, the per-TLD display cap
+    (`display_caps.max_per_tld_in_top_panel`): on 2026-09-28 all 12 fresh
+    drops were .com, the cap is 8, so the line said "12 dropped today" over a
+    list of 8. When fewer are listed, the tail now says so explicitly.
+    `per_tld_cap` is passed by the caller ONLY when the cap actually excluded
+    at least one fresh drop; 0 means "don't mention the cap".
     """
     total = _int_or_none(payload.get("total_candidates_evaluated"))
     published = _int_or_none(payload.get("domain_count"))
@@ -781,9 +792,26 @@ def credibility_line(payload: dict, pick_count: int) -> str | None:
     if pick_count <= 0:
         return None
 
-    tail = (
-        f"The {pick_count:,} below are the highest-scoring of those fresh drops."
-    )
+    if pick_count < fresh:
+        tail = (
+            f"{pick_count:,} of those fresh drops are listed below: "
+            f"the highest-scoring"
+        )
+        if per_tld_cap > 0:
+            tail += (
+                f", at most {per_tld_cap:,} per TLD so no single extension "
+                f"crowds out the rest"
+            )
+        tail += "."
+    elif pick_count == fresh:
+        tail = f"All {pick_count:,} are listed below."
+    else:
+        # More picks than the payload's own fresh count means the payload is
+        # internally inconsistent; don't claim "all", keep the neutral line.
+        tail = (
+            f"The {pick_count:,} below are the highest-scoring of those "
+            f"fresh drops."
+        )
     scanned = _int_or_none(payload.get("total_drops_scanned"))
     if scanned is not None and scanned < total:
         logger.warning(
@@ -1602,7 +1630,13 @@ def generate_newsletter(
     archived_names = _load_archive_names(
         _resolve_path(nl_cfg.get("archive_index_path", DEFAULT_ARCHIVE_INDEX_PATH))
     )
-    provenance = credibility_line(payload, len(top_domains))
+    # Mention the per-TLD cap in the credibility line only when it actually
+    # excluded a fresh drop — otherwise it isn't why the list is shorter.
+    cap_excluded = len(capped) < len(fresh_today)
+    provenance = credibility_line(
+        payload, len(top_domains),
+        per_tld_cap=max_per_tld if cap_excluded else 0,
+    )
 
     formatted_date = today.strftime("%B %d, %Y")
     subject = subject_template.format(n=len(top_domains), date=formatted_date)

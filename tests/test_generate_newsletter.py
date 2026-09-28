@@ -1676,7 +1676,7 @@ def test_generate_newsletter_includes_credibility_line_with_real_counts():
     assert "Evaluated 222,155 candidates today" in captured["body"]
     assert "270 made the published list" in captured["body"]
     assert "56 of them dropped today" in captured["body"]
-    assert "The 2 below" in captured["body"]
+    assert "2 of those fresh drops are listed below" in captured["body"]
 
 
 # --- Plain-text alternative part ---------------------------------------------
@@ -2379,3 +2379,86 @@ def test_generate_newsletter_degrades_intro_when_release_missing_from_config():
         assert "{cc_release}" not in part
         assert "(release )" not in part
         assert "hyperlink graph. All domains" in part
+
+
+# ---------------------------------------------------------------------------
+# Credibility line reconciles today_count with the listed count (2026-09-28)
+# ---------------------------------------------------------------------------
+
+
+def test_credibility_line_says_all_listed_when_pick_equals_fresh():
+    line = gn.credibility_line(_stats_payload(today_count=12), 12)
+    assert line.endswith("12 of them dropped today. All 12 are listed below.")
+
+
+def test_credibility_line_explains_shorter_list_without_cap():
+    line = gn.credibility_line(_stats_payload(today_count=56), 20)
+    assert line.endswith(
+        "56 of them dropped today. 20 of those fresh drops are listed "
+        "below: the highest-scoring."
+    )
+    assert "per TLD" not in line
+
+
+def test_credibility_line_names_per_tld_cap_when_it_excluded_drops():
+    line = gn.credibility_line(_stats_payload(today_count=12), 8, per_tld_cap=8)
+    assert line.endswith(
+        "12 of them dropped today. 8 of those fresh drops are listed below: "
+        "the highest-scoring, at most 8 per TLD so no single extension "
+        "crowds out the rest."
+    )
+
+
+def test_credibility_line_does_not_claim_all_when_picks_exceed_fresh():
+    """Inconsistent payload (more picks than today_count): never say "All"."""
+    line = gn.credibility_line(_stats_payload(today_count=3), 5)
+    assert "All" not in line
+    assert "The 5 below are the highest-scoring" in line
+
+
+def _capture_body(config: dict, payload: dict) -> str:
+    captured: dict = {}
+
+    def post_capture(url, headers=None, json=None, timeout=None):
+        captured["body"] = json["body"]
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {"id": "id", "subject": json["subject"]}
+        return resp
+
+    session = _fake_session([
+        {"method": "GET", "status": 200, "json": {"results": [], "next": None}},
+    ])
+    session.post.side_effect = post_capture
+    gn.generate_newsletter(
+        config, payload, api_key="KEY", today=date(2026, 9, 28), session=session,
+    )
+    return captured["body"]
+
+
+def test_generate_newsletter_line_matches_list_when_per_tld_cap_binds():
+    """The 2026-09-28 shape: 12 fresh drops, all one TLD, cap 8 -> 8 listed.
+    The line must say 8 are listed and why, not just "12 dropped today"."""
+    config = _config()
+    config["display_caps"] = {"max_per_tld_in_top_panel": 8}
+    payload = _funnel_payload(domain_count=212, today_count=12,
+                              total_drops_scanned=206703,
+                              total_candidates_evaluated=2397)
+    payload["domains"] = [_domain(f"tideblock{i:02d}.com", 90 - i) for i in range(12)]
+    body = _capture_body(config, payload)
+    assert "12 of them dropped today" in body
+    assert "8 of those fresh drops are listed below" in body
+    assert "at most 8 per TLD" in body
+
+
+def test_generate_newsletter_line_omits_cap_when_cap_did_not_bind():
+    config = _config()
+    config["display_caps"] = {"max_per_tld_in_top_panel": 8}
+    payload = _funnel_payload(domain_count=212, today_count=3)
+    payload["domains"] = [
+        _domain("marketglow.com", 80), _domain("tideblock.io", 70),
+        _domain("coppernest.org", 60),
+    ]
+    body = _capture_body(config, payload)
+    assert "All 3 are listed below." in body
+    assert "per TLD" not in body

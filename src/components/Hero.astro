@@ -1,4 +1,8 @@
 ---
+// TLD count is derived from the pipeline config so it can never drift
+// from what is actually scanned (pending/paused TLDs are not counted).
+import pipelineConfig from '../../scripts/config.json';
+const scannedTldCount = pipelineConfig.tlds.approved.length;
 ---
 
 <section class="mx-auto max-w-6xl px-4 sm:px-6 pt-16 pb-4 sm:pt-24 sm:pb-6">
@@ -7,7 +11,7 @@
       Expired domains, sifted daily.
     </h1>
     <p class="mt-6 text-lg sm:text-xl text-stone-700 max-w-2xl">
-      We scan every fresh domain drop across 15 TLDs, filter out the spam,
+      We scan every fresh domain drop across {scannedTldCount} TLDs, filter out the spam,
       malware, and junk, and publish what's left. Free, no signup required.
     </p>
 

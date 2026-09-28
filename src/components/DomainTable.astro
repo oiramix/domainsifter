@@ -62,6 +62,7 @@ interface PipelinePayload {
   domain_count: number;
   domains: PipelineDomain[];
   total_candidates_evaluated?: number;
+  total_drops_scanned?: number;    // 2026-09: whole-funnel top (all drops scanned)
   today_count?: number;
   carryover_count?: number;
 }
@@ -176,13 +177,47 @@ const lastUpdatedLabel = isPreview
 
 const tldsInData = Array.from(new Set(allDomains.map((d) => d.tld))).sort();
 
-// "Evaluated today" — the count of candidates that entered availability
-// check today (the dominant filter). Pipeline writes
-// total_candidates_evaluated; older payloads / sample data fall back to
-// the today bucket size so we still report something honest.
-const totalEvaluated = (!isPreview && payload.total_candidates_evaluated)
+// Funnel line (2026-09-28): "Scanned N dropped domains · M checked in depth
+// · K added today". Every figure comes from the payload — nothing is
+// invented (CLAUDE.md hard rule 2). Degradation:
+//   - total_drops_scanned missing / not a positive number / smaller than
+//     total_candidates_evaluated (bad data) → the scanned figure is omitted.
+//   - total_candidates_evaluated missing → the "checked in depth" figure is
+//     omitted.
+//   - today_count missing → falls back to the rendered today-bucket size.
+//   - preview/sample data, or neither funnel figure available → the legacy
+//     "Evaluated N candidates today" wording (N = today bucket size).
+const isPositiveInt = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isFinite(n) && n > 0;
+
+const funnelEvaluated = (!isPreview && isPositiveInt(payload.total_candidates_evaluated))
   ? payload.total_candidates_evaluated
-  : todayDomains.length;
+  : null;
+const funnelScanned = (
+  !isPreview
+  && isPositiveInt(payload.total_drops_scanned)
+  && (funnelEvaluated === null || payload.total_drops_scanned >= funnelEvaluated)
+)
+  ? payload.total_drops_scanned
+  : null;
+const funnelAddedToday = isPreview
+  ? null
+  : (typeof payload.today_count === 'number' && payload.today_count >= 0
+      ? payload.today_count
+      : todayDomains.length);
+
+const fmt = (n: number): string => n.toLocaleString('en-US');
+const funnelParts: string[] = [];
+if (funnelScanned !== null) funnelParts.push(`Scanned ${fmt(funnelScanned)} dropped domains`);
+if (funnelEvaluated !== null) funnelParts.push(`${fmt(funnelEvaluated)} checked in depth`);
+if (funnelParts.length > 0 && funnelAddedToday !== null) {
+  funnelParts.push(`${fmt(funnelAddedToday)} added today`);
+}
+// Legacy wording when no funnel figure is available (preview/sample data).
+const totalEvaluated = funnelEvaluated ?? todayDomains.length;
+const funnelLabel = funnelParts.length > 0
+  ? funnelParts.join(' · ')
+  : `Evaluated ${fmt(totalEvaluated)} candidates today`;
 
 // --- Display helpers ----------------------------------------------------------
 
@@ -419,8 +454,8 @@ const carryoverSubheader = (n: number): string => {
         )}
       </div>
       <p class="mt-2 text-sm text-stone-600">
-        <span data-total-evaluated={totalEvaluated}>
-          Evaluated {totalEvaluated.toLocaleString('en-US')} candidates today
+        <span data-total-evaluated={totalEvaluated} data-funnel>
+          {funnelLabel}
         </span>
         <span class="text-stone-400"> • </span>
         <span>
