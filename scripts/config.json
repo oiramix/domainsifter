@@ -231,8 +231,10 @@
       "domain is for sale",
       "buy this domain",
       "this domain is parked",
-      "godaddy.com/forsale"
+      "godaddy.com/forsale",
+      "location.href=\"/lander\""
     ],
+    "_doc_parked_lander": "Added 2026-09-28. The single commonest shape among domains stuck at `unknown` was a ~1,730-byte snapshot containing nothing but the Wayback wrapper and one script: window.location.href=\"/lander\". That redirect-to-/lander is the standard entry point of domain-parking services, so the page IS a parking page - it just carries none of the older markers above. In a 24-domain sample of unknowns, 12 were this exact shape. Matching the full `location.href=\"/lander\"` string rather than bare `/lander` keeps a real site with a /lander path from ever matching.",
     "_doc_signatures": "Deterministic abuse signatures, added 2026-09-21, as a SECOND net beside the model - not a replacement. attorneysportorange.com was classified `legitimate` by the LLM while serving 9001cc金沙 casino-brand SEO dressed as an Inner Mongolia machinery company; a plain substring scan of the stored excerpt caught it instantly. Cloaking is exactly what a language model reading rendered prose is worst at and what a fingerprint match is best at. Runs over the excerpt only (title, meta description, h1, h2), costs nothing and needs no model, so it also works on days the LLM backend is down - the 2026-09-21 outage published 247 domains with NO screening whatsoever. TWO false-positive classes are already known and MUST stay fixed: `especialistas` contains `cialis` and a Marrakech beauty clinic matched `slots` (appointment slots), so latin terms are matched on WORD BOUNDARIES and the ambiguous ones are excluded entirely. CJK terms need no boundary handling. When a signature fires on a domain the model called non-toxic, the outcome is governed by signature_action.",
     "signature_action": "toxic",
     "signature_terms_latin": [
@@ -241,15 +243,19 @@
       "situs judi", "slot gacor", "link alternatif", "idn poker",
       "porn", "pornhub", "xxx", "escort", "viagra", "cialis pills",
       "bitcoin doubler", "crypto giveaway",
-      "1xbet", "bet365", "betway", "parimatch"
+      "1xbet", "bet365", "betway", "parimatch", "pg slot", "pgslot"
     ],
     "_doc_terms_excluded": "Terms deliberately NOT in the list, with the reason, so nobody re-adds them: `slot`/`slots` (appointment slots at a salon or clinic), `bet` (substring of dozens of words, and `bet` alone is common), `sex` (legitimate health and biology content), `cialis` bare (matches inside `especialistas`), `poker`/`betting`/`lottery` bare (legitimate news, fiction and charity-raffle content). The multi-word forms above carry the same signal with far less ambiguity.",
     "signature_terms_cjk": [
       "金沙", "娱乐城", "博彩", "棋牌", "彩票", "威尼斯人", "太阳城",
       "老虎机", "百家乐", "六合彩", "色情", "情色", "成人视频",
       "买球", "赌球", "投注", "下注", "体育投注", "足球投注",
-      "真人视讯", "电子游艺", "彩金"
+      "真人视讯", "电子游艺", "彩金",
+      "开奖", "幸运飞艇", "时时彩", "北京赛车",
+      "สล็อต", "บาคาร่า", "คาสิโน", "แทงบอล", "เว็บพนัน", "เครดิตฟรี", "ค่ายตรง"
     ],
+    "_doc_terms_lottery": "Chinese lottery-gambling terms added 2026-09-28 after pharmabusiness.net was found PUBLISHED as `unknown` while its archived title read 全面168幸运飞开艇官网的开奖历史数据记录 - results for 'Lucky Airship' (幸运飞艇), a Chinese high-frequency lottery-betting game. The list had 彩票 (lottery ticket) but not 开奖 (lottery draw/results), the word that actually appears on these results-tracking gambling pages. 时时彩 and 北京赛车 are the two other high-frequency lottery games that dominate this SEO genre. All four are gambling-specific.",
+    "_doc_terms_thai": "Thai gambling terms added 2026-09-28 after mothernaturessunscreen.com - published as PROMISING with a permanent archive page - turned out to be Thai online-slot gambling (title: pg333 โค้ด สล็อตแตกง่าย ค่ายตรง ไม่มีขั้นต่ำ, roughly 'pg333 codes, slots that pay out easily, direct site, no minimum'). The LLM classifier caught it on a re-screen; this net did not, because it had Chinese and Latin terms only. Thai gambling SEO is a well-established squatting pattern alongside Chinese and Indonesian. สล็อต (slot), บาคาร่า (baccarat), คาสิโน (casino), แทงบอล (football betting), เว็บพนัน (gambling site), เครดิตฟรี (free credit, a casino-bonus hook) and ค่ายตรง (direct provider, casino jargon) are gambling-specific in Thai. Matched as plain substrings like CJK: Thai is written without spaces between words, so word boundaries do not apply.",
     "_doc_terms_sports_betting": "Sports-betting terms added 2026-09-27 after a miss. treehouse-restaurant.com reached a newsletter draft while its archived page read 线上买球APP下载(中国)科技有限公司 - 'online BALL-BETTING app download (China) Technology Co.'. Its content was fetched and scanned, and the scan passed it, because the CJK list covered casinos and lotteries (金沙, 彩票, 博彩) but not sports betting. 买球 (bet on ball games), 赌球 (football gambling), 投注/下注 (place a bet), 体育投注/足球投注 (sports/football betting), 真人视讯 (live-dealer casino), 电子游艺 (electronic gaming machines) and 彩金 (gambling bonus money) close that gap. All are gambling-specific in Chinese; none occurs incidentally on the English-language small-business sites this list publishes. Latin brand names 1xbet, bet365, betway, parimatch were added for the same reason - they are sportsbook brands, not English words, so word-boundary matching cannot misfire on them.",
     "_doc": "Wayback-excerpt content classifier. Its 'toxic' verdict is the ONLY thing that trips the toxic gate in filter.keep_post_enrichment (scripts/filter.py). That gate has been open since 2026-07-23 because the classifier returned 'unknown' for every domain once API credits ran out. batch_size groups domains per model call (the old path made one call per domain, which is unusable against Claude Code's per-call overhead). shadow=true writes the verdict to snapshot_category_shadow and leaves snapshot_category='unknown', so nothing is evicted while we validate the new backend against the API-era verdicts; set false to arm it for real.",
     "batch_size": 20,

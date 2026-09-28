@@ -1881,3 +1881,15 @@ def test_snapshot_bundle_uses_dated_then_undated_lookup(monkeypatch):
     excerpt, html = sc._fetch_snapshot_bundle("tideblock.io", "2025-09-26")
     assert seen == [("tideblock.io", "2025-09-26")]
     assert (excerpt, html) == (None, None)
+
+
+def test_lander_redirect_is_a_parking_marker():
+    """~1,730-byte snapshots that only redirect to /lander are parking pages
+    (12 of 24 sampled unknowns on 2026-09-28). The live config must know it."""
+    import json, pathlib
+    cfg = json.loads((pathlib.Path(__file__).resolve().parents[1] / "scripts" / "config.json").read_text(encoding="utf-8"))
+    markers = [m.lower() for m in cfg["snapshot_classifier"]["parked_markers"]]
+    page = '<html><head><script>window.location.href="/lander"</script></head></html>'
+    assert any(m in page.lower() for m in markers)
+    real = '<html><head><title>Acme</title></head><body><a href="/lander">Landing</a></body></html>'
+    assert not any(m in real.lower() for m in markers if "lander" in m)

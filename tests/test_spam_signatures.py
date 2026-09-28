@@ -356,3 +356,23 @@ def test_sportsbook_brands_are_caught(title, production_terms):
 
 def test_ordinary_restaurant_is_not_flagged(production_terms):
     assert ss.scan_excerpt({"title": "Treehouse Restaurant - dinner menu"}, production_terms) == []
+
+
+# --- 2026-09-28 miss: Thai online slots ----------------------------------------
+
+def test_thai_slot_gambling_is_caught(production_terms):
+    """mothernaturessunscreen.com was published as PROMISING with an archive
+    page while its archived title was Thai online-slot gambling."""
+    title = "pg333 โค้ดล่าสุด ✅ pg333 โค้ด สล็อตแตกง่าย ค่ายตรง ไม่มีขั้นต่ำ"
+    assert ss.scan_excerpt({"title": title}, production_terms)
+
+
+def test_ordinary_thai_text_is_not_flagged(production_terms):
+    assert ss.scan_excerpt({"title": "ร้านอาหารไทย เมนูอร่อย"}, production_terms) == []
+
+
+def test_chinese_lottery_results_page_is_caught(production_terms):
+    """pharmabusiness.net was published as `unknown` while serving Lucky
+    Airship (幸运飞艇) lottery-gambling draw results."""
+    t = "全面168幸运飞开艇官网的开奖历史数据记录+幸运官网直播计划查询"
+    assert ss.scan_excerpt({"title": t}, production_terms)
