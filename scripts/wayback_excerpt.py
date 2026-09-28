@@ -78,12 +78,17 @@ def _fetch_availability(domain: str, target_date: str) -> dict | None:
     """Hit the Availability API. Returns parsed JSON or None on any failure
     (network, non-200, non-JSON)."""
     try:
+        # An EMPTY `timestamp=` is not "no timestamp": since at least
+        # 2026-09-27 archive.org answers `?url=x&timestamp=` with HTTP 500,
+        # while omitting the parameter returns the latest snapshot. So the
+        # key is only sent when there is a real date to send.
+        params = {"url": domain}
+        stamp = _normalize_date_for_availability(target_date or "")
+        if stamp:
+            params["timestamp"] = stamp
         resp = requests.get(
             AVAILABILITY_API_URL,
-            params={
-                "url": domain,
-                "timestamp": _normalize_date_for_availability(target_date),
-            },
+            params=params,
             headers={"User-Agent": USER_AGENT},
             timeout=AVAILABILITY_TIMEOUT_SECONDS,
         )
@@ -100,6 +105,33 @@ def _fetch_availability(domain: str, target_date: str) -> dict | None:
         return resp.json()
     except ValueError:
         return None
+
+
+def _lookup_closest_snapshot(domain: str, target_date: str) -> dict | None:
+    """Closest usable snapshot: dated lookup first, then an UNDATED retry.
+
+    Why the retry exists (2026-09-27): the dated Availability lookup — the
+    snapshot nearest `wayback_last_snapshot` — came back EMPTY for 8 of 13
+    unscreened candidates in one run, while the same domains returned a
+    snapshot when asked without a date. An empty lookup means no excerpt,
+    no excerpt means the classifier records `unknown`, and `unknown` is
+    published unscreened. That is exactly how treehouse-restaurant.com, a
+    Chinese sports-betting site, reached a newsletter draft that day.
+
+    The undated retry returns archive.org's most recent capture rather than
+    the one nearest our date. For screening that is acceptable — the
+    alternative is no evidence at all. It costs one extra request only when
+    the dated lookup has already failed, and never when it succeeded.
+    Never raises.
+    """
+    closest = _extract_closest_snapshot(_fetch_availability(domain, target_date))
+    if closest or not (target_date or "").strip():
+        return closest
+    closest = _extract_closest_snapshot(_fetch_availability(domain, ""))
+    if closest:
+        logger.debug("Availability: dated lookup empty for %s; undated retry found %s",
+                     domain, closest.get("timestamp"))
+    return closest
 
 
 def _extract_closest_snapshot(payload: dict | None) -> dict | None:
@@ -237,8 +269,7 @@ def fetch_excerpt(domain: str, target_date: str) -> dict | None:
     Never raises on network failure — caller treats None as "no
     grounding available, omit the Historical use subsection."
     """
-    availability_payload = _fetch_availability(domain, target_date)
-    closest = _extract_closest_snapshot(availability_payload)
+    closest = _lookup_closest_snapshot(domain, target_date)
     if not closest:
         return None
 

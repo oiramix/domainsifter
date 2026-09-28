@@ -336,3 +336,23 @@ class TestCfg:
     def test_latin_pattern_is_boundary_guarded(self):
         assert ss.latin_pattern("casino").startswith("(?<![0-9A-Za-z])")
         assert ss.latin_pattern("casino").endswith("(?![0-9A-Za-z])")
+
+
+# --- 2026-09-27 miss: sports betting ------------------------------------------
+
+@pytest.mark.parametrize("title", [
+    "线上买球APP下载(中国)科技有限公司",   # the exact page that reached a draft
+    "足球投注 官方网站",
+    "真人视讯 电子游艺",
+])
+def test_chinese_sports_betting_is_caught(title, production_terms):
+    assert ss.scan_excerpt({"title": title}, production_terms)
+
+
+@pytest.mark.parametrize("title", ["Bet365 odds", "1xBet registration", "Betway sports"])
+def test_sportsbook_brands_are_caught(title, production_terms):
+    assert ss.scan_excerpt({"title": title}, production_terms)
+
+
+def test_ordinary_restaurant_is_not_flagged(production_terms):
+    assert ss.scan_excerpt({"title": "Treehouse Restaurant - dinner menu"}, production_terms) == []

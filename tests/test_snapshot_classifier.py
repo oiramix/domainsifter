@@ -1867,3 +1867,17 @@ class TestSignatureOverride:
             )
 
         assert caplog.messages[-1].startswith("snapshot_classifier: results — ")
+
+
+def test_snapshot_bundle_uses_dated_then_undated_lookup(monkeypatch):
+    """The parked-detection fetch path must share wayback_excerpt's
+    dated-then-undated lookup, or it regresses to the 2026-09-27 behaviour
+    where an empty dated lookup left a Chinese sports-betting site
+    unscreened and it reached a newsletter draft."""
+    from scripts import wayback_excerpt as we
+    seen = []
+    monkeypatch.setattr(we, "_lookup_closest_snapshot",
+                        lambda name, date: seen.append((name, date)) or None)
+    excerpt, html = sc._fetch_snapshot_bundle("tideblock.io", "2025-09-26")
+    assert seen == [("tideblock.io", "2025-09-26")]
+    assert (excerpt, html) == (None, None)

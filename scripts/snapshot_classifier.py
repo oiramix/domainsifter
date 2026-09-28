@@ -614,9 +614,16 @@ def _fetch_snapshot_bundle(
         return _fetch_excerpt_only(name, target_date), None
 
     try:
-        closest = we._extract_closest_snapshot(
-            we._fetch_availability(name, target_date)
-        )
+        # Same dated-then-undated lookup as fetch_excerpt, so the parked
+        # detection path cannot regress to the 2026-09-27 behaviour where an
+        # empty dated lookup silently left the domain unscreened.
+        lookup = getattr(we, "_lookup_closest_snapshot", None)
+        if lookup is not None:
+            closest = lookup(name, target_date)
+        else:
+            closest = we._extract_closest_snapshot(
+                we._fetch_availability(name, target_date)
+            )
         if not closest:
             return None, None
         raw_html = we._fetch_snapshot_html(closest["url"])

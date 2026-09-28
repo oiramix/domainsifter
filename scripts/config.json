@@ -240,13 +240,17 @@
       "bandar", "taruhan", "baccarat", "sportsbook", "bookmaker",
       "situs judi", "slot gacor", "link alternatif", "idn poker",
       "porn", "pornhub", "xxx", "escort", "viagra", "cialis pills",
-      "bitcoin doubler", "crypto giveaway"
+      "bitcoin doubler", "crypto giveaway",
+      "1xbet", "bet365", "betway", "parimatch"
     ],
     "_doc_terms_excluded": "Terms deliberately NOT in the list, with the reason, so nobody re-adds them: `slot`/`slots` (appointment slots at a salon or clinic), `bet` (substring of dozens of words, and `bet` alone is common), `sex` (legitimate health and biology content), `cialis` bare (matches inside `especialistas`), `poker`/`betting`/`lottery` bare (legitimate news, fiction and charity-raffle content). The multi-word forms above carry the same signal with far less ambiguity.",
     "signature_terms_cjk": [
       "金沙", "娱乐城", "博彩", "棋牌", "彩票", "威尼斯人", "太阳城",
-      "老虎机", "百家乐", "六合彩", "色情", "情色", "成人视频"
+      "老虎机", "百家乐", "六合彩", "色情", "情色", "成人视频",
+      "买球", "赌球", "投注", "下注", "体育投注", "足球投注",
+      "真人视讯", "电子游艺", "彩金"
     ],
+    "_doc_terms_sports_betting": "Sports-betting terms added 2026-09-27 after a miss. treehouse-restaurant.com reached a newsletter draft while its archived page read 线上买球APP下载(中国)科技有限公司 - 'online BALL-BETTING app download (China) Technology Co.'. Its content was fetched and scanned, and the scan passed it, because the CJK list covered casinos and lotteries (金沙, 彩票, 博彩) but not sports betting. 买球 (bet on ball games), 赌球 (football gambling), 投注/下注 (place a bet), 体育投注/足球投注 (sports/football betting), 真人视讯 (live-dealer casino), 电子游艺 (electronic gaming machines) and 彩金 (gambling bonus money) close that gap. All are gambling-specific in Chinese; none occurs incidentally on the English-language small-business sites this list publishes. Latin brand names 1xbet, bet365, betway, parimatch were added for the same reason - they are sportsbook brands, not English words, so word-boundary matching cannot misfire on them.",
     "_doc": "Wayback-excerpt content classifier. Its 'toxic' verdict is the ONLY thing that trips the toxic gate in filter.keep_post_enrichment (scripts/filter.py). That gate has been open since 2026-07-23 because the classifier returned 'unknown' for every domain once API credits ran out. batch_size groups domains per model call (the old path made one call per domain, which is unusable against Claude Code's per-call overhead). shadow=true writes the verdict to snapshot_category_shadow and leaves snapshot_category='unknown', so nothing is evicted while we validate the new backend against the API-era verdicts; set false to arm it for real.",
     "batch_size": 20,
     "_shadow_armed_note": "ARMED 2026-09-19 after the first live shadow run. The screen produced 29 real verdicts and flagged 3 as toxic: brightdawnnutrition.com (Chinese gambling site behind a nutrition name), languageidentifier.com (Chinese adult content), thegreenseason.org (a genuine African safari business whose pages were injected with Chinese lottery-gambling SEO). All three were verified correct by hand, and all three had been published to the live list because shadow mode meant nothing acted on the verdicts. None would have been caught by the keyword filter — the names are innocuous, only the archived CONTENT gives them away. Set back to true only to re-validate after a prompt or backend change.",

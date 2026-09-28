@@ -345,6 +345,9 @@ def test_fetch_excerpt_only_meta_description_still_returned(monkeypatch):
 
 def test_fetch_excerpt_returns_none_when_availability_empty(monkeypatch):
     _install_get_sequence(monkeypatch, [
+        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
+        # only when BOTH fail is there genuinely no excerpt.
+        _resp(200, json_data={"archived_snapshots": {}}),
         _resp(200, json_data={"archived_snapshots": {}}),
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
@@ -352,18 +355,31 @@ def test_fetch_excerpt_returns_none_when_availability_empty(monkeypatch):
 
 def test_fetch_excerpt_returns_none_when_available_false(monkeypatch):
     _install_get_sequence(monkeypatch, [
+        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
+        # only when BOTH fail is there genuinely no excerpt.
+        _resp(200, json_data=_avail_payload(available=False)),
         _resp(200, json_data=_avail_payload(available=False)),
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
 
 def test_fetch_excerpt_returns_none_when_availability_404(monkeypatch):
-    _install_get_sequence(monkeypatch, [_resp(404, text="not found")])
+    _install_get_sequence(monkeypatch, [
+        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
+        # only when BOTH fail is there genuinely no excerpt.
+        _resp(404, text="not found"),
+        _resp(404, text="not found"),
+    ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
 
 def test_fetch_excerpt_returns_none_when_availability_timeout(monkeypatch):
-    _install_get_sequence(monkeypatch, [requests.Timeout("avail")])
+    _install_get_sequence(monkeypatch, [
+        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
+        # only when BOTH fail is there genuinely no excerpt.
+        requests.Timeout("avail"),
+        requests.Timeout("avail"),
+    ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
 
@@ -429,3 +445,79 @@ def test_fetch_excerpt_returns_none_when_snapshot_has_no_signals(monkeypatch):
         _resp(200, text=snap_html),
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
+
+
+# --- 2026-09-27: empty timestamp + undated fallback --------------------------
+
+_SNAP = {"archived_snapshots": {"closest": {
+    "available": True, "status": "200", "timestamp": "20250425001557",
+    "url": "http://web.archive.org/web/20250425001557/http://tideblock.io/"}}}
+_EMPTY = {"archived_snapshots": {}}
+
+
+def test_availability_omits_timestamp_param_when_date_is_empty(monkeypatch):
+    """archive.org answers `timestamp=` (empty) with HTTP 500 but answers a
+    request WITHOUT the parameter normally, so it must never be sent empty."""
+    calls = []
+    monkeypatch.setattr(we.requests, "get",
+                        lambda url, params=None, **kw: calls.append(params) or _resp(json_data=_SNAP))
+    we._fetch_availability("tideblock.io", "")
+    assert "timestamp" not in calls[0]
+
+
+def test_availability_sends_timestamp_when_date_given(monkeypatch):
+    calls = []
+    monkeypatch.setattr(we.requests, "get",
+                        lambda url, params=None, **kw: calls.append(params) or _resp(json_data=_SNAP))
+    we._fetch_availability("tideblock.io", "2025-04-25")
+    assert calls[0]["timestamp"] == "20250425"
+
+
+def test_lookup_falls_back_to_undated_when_dated_is_empty(monkeypatch):
+    """The 2026-09-27 failure: dated lookup empty, undated lookup has it."""
+    calls = []
+
+    def fake(url, params=None, **kw):
+        calls.append(params)
+        return _resp(json_data=_EMPTY if "timestamp" in params else _SNAP)
+
+    monkeypatch.setattr(we.requests, "get", fake)
+    closest = we._lookup_closest_snapshot("tideblock.io", "2025-09-26")
+    assert closest and closest["timestamp"] == "20250425001557"
+    assert "timestamp" in calls[0] and "timestamp" not in calls[1]
+
+
+def test_lookup_does_not_retry_when_dated_succeeds(monkeypatch):
+    calls = []
+    monkeypatch.setattr(we.requests, "get",
+                        lambda url, params=None, **kw: calls.append(params) or _resp(json_data=_SNAP))
+    assert we._lookup_closest_snapshot("tideblock.io", "2025-04-25")
+    assert len(calls) == 1
+
+
+def test_lookup_without_date_makes_one_request(monkeypatch):
+    calls = []
+    monkeypatch.setattr(we.requests, "get",
+                        lambda url, params=None, **kw: calls.append(params) or _resp(json_data=_EMPTY))
+    assert we._lookup_closest_snapshot("tideblock.io", "") is None
+    assert len(calls) == 1
+
+
+def test_lookup_never_raises_when_both_fail(monkeypatch):
+    def boom(*a, **k):
+        raise requests.ConnectionError("down")
+    monkeypatch.setattr(we.requests, "get", boom)
+    assert we._lookup_closest_snapshot("tideblock.io", "2025-04-25") is None
+
+
+def test_fetch_excerpt_uses_undated_fallback(monkeypatch):
+    html = b"<html><head><title>Tide Block Studio</title></head><body></body></html>"
+
+    def fake(url, params=None, **kw):
+        if params is not None:
+            return _resp(json_data=_EMPTY if "timestamp" in params else _SNAP)
+        return _resp(content=html)
+
+    monkeypatch.setattr(we.requests, "get", fake)
+    exc = we.fetch_excerpt("tideblock.io", "2025-09-26")
+    assert exc and exc["title"] == "Tide Block Studio"
