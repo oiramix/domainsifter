@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-27T18:33:05Z",
-  "domain_count": 211,
+  "generated_at": "2026-09-28T03:06:59Z",
+  "domain_count": 210,
   "today_count": 14,
-  "carryover_count": 197,
+  "carryover_count": 196,
   "domains": [
     {
       "name": "electricianyorkpa.com",
@@ -60,7 +60,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
     },
@@ -198,7 +198,7 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "academic writing, clear service"
     },
@@ -297,7 +297,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "business concept clear descriptor"
     },
@@ -1442,66 +1442,6 @@
       "phase2_reason": "clear community, support focus"
     },
     {
-      "name": "mothernaturessunscreen.com",
-      "tld": "com",
-      "dropped_date": "2026-09-24",
-      "wayback_snapshots": 7834,
-      "wayback_last_snapshot": "2026-04-30",
-      "open_page_rank": 0.62,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 51,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmothernaturessunscreen.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=mothernaturessunscreen.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=mothernaturessunscreen.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-09-24T11:49:24Z",
-      "first_seen_date": "2026-09-24",
-      "last_validated_date": "2026-09-27",
-      "days_listed": 3,
-      "cc_source_domain_count": 28,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 28
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 29
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 33
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 37
-        },
-        {
-          "release": "cc-main-2026-feb-mar-apr",
-          "source_domain_count": 32
-        }
-      ],
-      "verdict": "Promising",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "suncare brand, memorable branding"
-    },
-    {
       "name": "pedigreeparadise.com",
       "tld": "com",
       "dropped_date": "2026-09-20",
@@ -1692,7 +1632,7 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "tech brand, simulation and AI clear"
     },
@@ -2460,7 +2400,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
     },
@@ -2658,7 +2598,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "marketing service, personal brand"
     },
@@ -2853,7 +2793,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "frontend explorer clear, dev fit"
     },
@@ -5529,7 +5469,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "photography or design"
     },
@@ -5568,7 +5508,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
     },
@@ -5685,7 +5625,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
     },
@@ -5745,7 +5685,7 @@
       "verdict": "Promising",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "wine retail populist positioning clear"
     },
@@ -6783,7 +6723,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
     },
@@ -6822,7 +6762,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
     },
@@ -8430,7 +8370,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "clear healthcare service"
     },
@@ -8550,7 +8490,7 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "unknown",
+      "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "shine online web design clear service"
     },
