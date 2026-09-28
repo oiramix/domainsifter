@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import socket
+
 import pytest
 import responses
 
@@ -651,3 +653,151 @@ def test_check_availability_403_alarms_and_stops_host(_no_sleep_backoff, caplog)
     r2 = rdap.check_availability("next.com", cfg)
     assert r2["rdap_http"] is None
     assert r2["rdap_skipped_reason"] == "host_stopped"
+
+
+# --- IPv6-only transport for rdap_force_ipv6_hosts (added 2026-09-28) --------
+
+GMO_BOOTSTRAP = {
+    "services": [
+        [["shop"], ["https://rdap.gmoregistry.net/rdap/"]],
+        [["com", "net"], ["https://rdap.verisign.example/com/v1/"]],
+    ]
+}
+
+
+def _ipv6_config():
+    return {
+        **_config(),
+        "rdap_force_ipv6_hosts": {"hosts": ["rdap.gmoregistry.net"]},
+        "api_min_interval_seconds": {"rdap": 0.0, "rdap_per_host": {}},
+    }
+
+
+def test_force_ipv6_hosts_lookup():
+    assert rdap._force_ipv6_hosts({}) == frozenset()
+    assert rdap._force_ipv6_hosts({"rdap_force_ipv6_hosts": {"_doc": "x"}}) == frozenset()
+    cfg = {"rdap_force_ipv6_hosts": {"hosts": ["RDAP.GMORegistry.net", 7]}}
+    assert rdap._force_ipv6_hosts(cfg) == frozenset({"rdap.gmoregistry.net"})
+
+
+def test_ipv6_adapter_uses_ipv6_only_connection_classes():
+    adapter = rdap.IPv6OnlyAdapter()
+    pool = adapter.poolmanager.connection_from_url("https://rdap.gmoregistry.net/rdap/")
+    assert pool.ConnectionCls is rdap._IPv6OnlyHTTPSConnection
+    plain = adapter.poolmanager.connection_from_url("http://rdap.gmoregistry.net/rdap/")
+    assert plain.ConnectionCls is rdap._IPv6OnlyHTTPConnection
+
+
+def test_create_ipv6_connection_requests_only_af_inet6(monkeypatch):
+    families: list[int] = []
+    connected: list[tuple] = []
+
+    def fake_getaddrinfo(host, port, family=0, type=0, *_a, **_k):
+        families.append(family)
+        return [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:db8::1", port, 0, 0))]
+
+    class FakeSocket:
+        def __init__(self, family, socktype, proto):
+            assert family == socket.AF_INET6
+        def setsockopt(self, *a): pass
+        def settimeout(self, t): pass
+        def bind(self, a): pass
+        def connect(self, sockaddr): connected.append(sockaddr)
+        def close(self): pass
+
+    monkeypatch.setattr(rdap.socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(rdap.socket, "socket", FakeSocket)
+    rdap._create_ipv6_connection(("tideblock.example", 443), 5.0)
+    assert families == [socket.AF_INET6]
+    assert connected == [("2001:db8::1", 443, 0, 0)]
+
+
+def test_create_ipv6_connection_skips_ipv4_results(monkeypatch):
+    """Even if a resolver misbehaves and returns an AF_INET entry, it is never
+    connected to — the call fails instead of falling back to IPv4."""
+    monkeypatch.setattr(
+        rdap.socket, "getaddrinfo",
+        lambda *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", 443))],
+    )
+
+    def no_socket(*_a, **_k):
+        raise AssertionError("an IPv4 socket must never be opened")
+
+    monkeypatch.setattr(rdap.socket, "socket", no_socket)
+    with pytest.raises(socket.gaierror):
+        rdap._create_ipv6_connection(("tideblock.example", 443), 5.0)
+
+
+def test_check_availability_ipv6_failure_is_unknown_without_ipv4_fallback(
+    monkeypatch, _no_sleep_backoff
+):
+    """IPv6 resolution failure for a forced host -> is_available=None, and no
+    IPv4 lookup / connection is ever attempted."""
+    families: list[int] = []
+
+    def fake_getaddrinfo(host, port, family=0, *_a, **_k):
+        families.append(family)
+        raise socket.gaierror("no AAAA")
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+    monkeypatch.setattr(rdap, "_load_bootstrap", lambda *_a: {"shop": ("https://rdap.gmoregistry.net/rdap/",)})
+
+    def no_plain_get(*_a, **_k):
+        raise AssertionError("forced-IPv6 host must not use plain requests.get")
+
+    monkeypatch.setattr(rdap.requests, "get", no_plain_get)
+    result = rdap.check_availability("coppernest.shop", _ipv6_config())
+    assert result["is_available"] is None
+    assert result["rdap_http"] is None
+    assert families and all(f == socket.AF_INET6 for f in families)
+
+
+@responses.activate
+def test_check_availability_forced_ipv6_host_404_is_available(monkeypatch, _no_sleep_backoff):
+    """Forced host goes through the IPv6 session path (not requests.get) and the
+    normal 404 -> available decision still applies, with our User-Agent."""
+    responses.add(responses.GET, "https://data.iana.org/rdap/dns.json", json=GMO_BOOTSTRAP, status=200)
+    responses.add(responses.GET, "https://rdap.gmoregistry.net/rdap/domain/marketglow.shop", status=404)
+    real_get = rdap.requests.get
+
+    def guarded_get(url, *a, **k):
+        assert "gmoregistry" not in url, "forced-IPv6 host must not use plain requests.get"
+        return real_get(url, *a, **k)
+
+    monkeypatch.setattr(rdap.requests, "get", guarded_get)
+    result = rdap.check_availability("marketglow.shop", _ipv6_config())
+    assert result["is_available"] is True
+    assert result["rdap_http"] == 404
+    assert responses.calls[-1].request.headers["User-Agent"] == rdap.USER_AGENT
+
+
+@responses.activate
+def test_check_availability_other_hosts_keep_plain_requests_get(monkeypatch):
+    responses.add(responses.GET, "https://data.iana.org/rdap/dns.json", json=GMO_BOOTSTRAP, status=200)
+    responses.add(responses.GET, "https://rdap.verisign.example/com/v1/domain/tideblock.com", status=404)
+    used: list[str] = []
+    real_get = rdap.requests.get
+
+    def spy_get(url, *a, **k):
+        used.append(url)
+        return real_get(url, *a, **k)
+
+    monkeypatch.setattr(rdap.requests, "get", spy_get)
+    result = rdap.check_availability("tideblock.com", _ipv6_config())
+    assert result["is_available"] is True
+    assert "https://rdap.verisign.example/com/v1/domain/tideblock.com" in used
+
+
+@responses.activate
+def test_check_availability_forced_ipv6_host_429_still_arms_cooldown(_no_sleep_backoff):
+    """The existing 429 cooldown/strike logic is unchanged on the IPv6 path."""
+    responses.add(responses.GET, "https://data.iana.org/rdap/dns.json", json=GMO_BOOTSTRAP, status=200)
+    responses.add(
+        responses.GET, "https://rdap.gmoregistry.net/rdap/domain/coppernest.shop",
+        status=429, headers={"Retry-After": "0"},
+    )
+    cfg = {**_ipv6_config(), "rdap_429_backoff_floor_seconds": {"per_host": {"rdap.gmoregistry.net": 60}}}
+    result = rdap.check_availability("coppernest.shop", cfg)
+    assert result["is_available"] is None
+    assert result["rdap_http"] == 429
+    assert GLOBAL_HOST_COOLDOWN.is_cooling("rdap.gmoregistry.net")

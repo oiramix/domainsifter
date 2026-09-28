@@ -33,10 +33,19 @@ status that proves the registry has no record at all.
 from __future__ import annotations
 
 import logging
+import socket
 from functools import lru_cache
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.exceptions import (
+    ConnectTimeoutError,
+    NameResolutionError,
+    NewConnectionError,
+)
 
 from scripts.enrichment._circuit_breaker import (
     CircuitBreaker,
@@ -61,6 +70,139 @@ USER_AGENT = (
     "DomainSifter/1.0 (+https://domainsifter.com; contact: hello@domainsifter.com)"
 )
 _DEFAULT_HEADERS = {"User-Agent": USER_AGENT}
+
+
+# --- IPv6-only transport (added 2026-09-28) --------------------------------
+#
+# Some RDAP hosts must be reached over IPv6 ONLY. rdap.gmoregistry.net (.shop)
+# has blocked our IPv4 address since May 2026 (instant 429 at the Cloudflare
+# edge) while IPv6 still gets real answers. Any IPv4 attempt to such a host is
+# not just useless but harmful: GMO treats requests inside its 60s post-429
+# window as grounds to extend the block. So for hosts listed in
+# config.json:rdap_force_ipv6_hosts we resolve AF_INET6 addresses only and
+# NEVER fall back to IPv4 — if IPv6 fails, the domain is simply unknown.
+#
+# This is done per-connection (custom urllib3 connection class mounted on a
+# per-request Session), NOT via urllib3.util.connection.allowed_gai_family,
+# which is process-wide and would change every other source's behaviour.
+
+
+def _create_ipv6_connection(
+    address: tuple[str, int],
+    timeout: Any,
+    source_address: tuple[str, int] | None = None,
+    socket_options: Any = None,
+) -> socket.socket:
+    """socket.create_connection restricted to AF_INET6 results.
+
+    Mirrors urllib3.util.connection.create_connection, minus the address
+    family negotiation: getaddrinfo is asked for AF_INET6 only, so no IPv4
+    address can ever be tried. Raises socket.gaierror when the host has no
+    AAAA record, OSError when every IPv6 address fails to connect.
+    """
+    host, port = address
+    host = host.strip("[]")
+    err: OSError | None = None
+    for family, socktype, proto, _canon, sockaddr in socket.getaddrinfo(
+        host, port, socket.AF_INET6, socket.SOCK_STREAM
+    ):
+        if family != socket.AF_INET6:  # defensive: never touch IPv4
+            continue
+        sock = None
+        try:
+            sock = socket.socket(family, socktype, proto)
+            for opt in socket_options or ():
+                sock.setsockopt(*opt)
+            if isinstance(timeout, (int, float)) or timeout is None:
+                sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sockaddr)
+            return sock
+        except OSError as exc:
+            err = exc
+            if sock is not None:
+                sock.close()
+    if err is not None:
+        raise err
+    raise socket.gaierror(f"no IPv6 address for {host}")
+
+
+class _IPv6OnlyConnectionMixin:
+    """Overrides urllib3's _new_conn to connect via AF_INET6 only, keeping
+    urllib3's exception mapping so requests raises its usual
+    ConnectionError / ConnectTimeout (caught by check_availability)."""
+
+    def _new_conn(self) -> socket.socket:
+        try:
+            return _create_ipv6_connection(
+                (self._dns_host, self.port),
+                self.timeout,
+                source_address=self.source_address,
+                socket_options=self.socket_options,
+            )
+        except socket.gaierror as exc:
+            raise NameResolutionError(self.host, self, exc) from exc
+        except TimeoutError as exc:
+            raise ConnectTimeoutError(
+                self,
+                f"Connection to {self.host} timed out (IPv6-only, "
+                f"connect timeout={self.timeout})",
+            ) from exc
+        except OSError as exc:
+            raise NewConnectionError(
+                self, f"Failed to establish a new IPv6-only connection: {exc}"
+            ) from exc
+
+
+class _IPv6OnlyHTTPConnection(_IPv6OnlyConnectionMixin, HTTPConnection):
+    pass
+
+
+class _IPv6OnlyHTTPSConnection(_IPv6OnlyConnectionMixin, HTTPSConnection):
+    pass
+
+
+class _IPv6OnlyHTTPConnectionPool(HTTPConnectionPool):
+    ConnectionCls = _IPv6OnlyHTTPConnection
+
+
+class _IPv6OnlyHTTPSConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _IPv6OnlyHTTPSConnection
+
+
+class IPv6OnlyAdapter(HTTPAdapter):
+    """requests transport adapter whose connections use IPv6 only."""
+
+    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {
+            "http": _IPv6OnlyHTTPConnectionPool,
+            "https": _IPv6OnlyHTTPSConnectionPool,
+        }
+
+
+def _force_ipv6_hosts(config: dict) -> frozenset[str]:
+    """Hosts from config.json:rdap_force_ipv6_hosts.hosts (lower-cased)."""
+    block = config.get("rdap_force_ipv6_hosts", {}) or {}
+    hosts = block.get("hosts", []) if isinstance(block, dict) else []
+    return frozenset(h.lower() for h in hosts if isinstance(h, str))
+
+
+def _rdap_get(url: str, rdap_host: str, timeout: int, config: dict) -> requests.Response:
+    """GET an RDAP URL, over IPv6 only when `rdap_host` is configured so.
+
+    Every other host keeps default requests behaviour (requests.get). A fresh
+    Session per call keeps this free of module-level state and thread-safe;
+    requests.get does the same internally.
+    """
+    if rdap_host.lower() not in _force_ipv6_hosts(config):
+        return requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout)
+    with requests.Session() as session:
+        adapter = IPv6OnlyAdapter()
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session.get(url, headers=_DEFAULT_HEADERS, timeout=timeout)
 
 
 @lru_cache(maxsize=8)
@@ -186,7 +328,7 @@ def enrich(domain: str, config: dict) -> dict:
     min_interval = float(config.get("api_min_interval_seconds", {}).get("rdap", 0.2))
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout),
+            lambda: _rdap_get(url, rdap_host, timeout, config),
             host=rdap_host,
             min_interval=min_interval,
         )
@@ -384,7 +526,7 @@ def check_availability(domain: str, config: dict) -> dict:
 
     try:
         response = request_with_429_backoff(
-            lambda: requests.get(url, headers=_DEFAULT_HEADERS, timeout=timeout),
+            lambda: _rdap_get(url, rdap_host, timeout, config),
             host=rdap_host,
             min_interval=min_interval,
             retry_after_floor=_retry_after_floor_seconds(rdap_host, config),
