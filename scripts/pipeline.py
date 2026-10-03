@@ -42,10 +42,21 @@ Order of operations:
        Typical post-availability set is 5-50 candidates; pacing room is now
        generous.
    10. post-enrichment filter   (strict_spam_check=True)
+   10b. held queue              (held_queue.settle, added 2026-10-01)
+                                — a survivor whose screening is incomplete
+                                  (content unscreened, Wayback unknown, an
+                                  alarm-source field missing, or never
+                                  enriched) is HELD in private R2 instead of
+                                  published. Held domains re-enter at step 8
+                                  on the next runs (RDAP first, then full
+                                  enrichment) and publish only once fully
+                                  screened; after held_queue.max_held_days
+                                  they are dropped, never published.
    11. score + sort             — null components excluded from normalization
    12. publication cap          (max_candidates_for_publication, in build_payload)
                                 — CEILING, not quota; never pad with weak
    13. write_output → src/data/daily-domains.json
+   14. save the held queue back to R2 (only after the output is written)
 
 Logging: each module gets its own logger; root config writes INFO+ to stdout
 so GitHub Actions surfaces everything in the run log.
@@ -79,6 +90,7 @@ from scripts import (
     diff,
     env_check,
     filter as filter_mod,
+    held_queue,
     lexical_filter,
     output,
     phase2_ranker,
@@ -1338,12 +1350,33 @@ def main(argv: list[str] | None = None) -> int:
         total_evaluated, len(per_host_stats),
     )
 
+    # Held queue (added 2026-10-01): domains held back on earlier runs because
+    # their screening did not finish. They go through RDAP and enrichment
+    # again AHEAD of today's candidates — first in each host bucket and first
+    # in the enrichment queue, so a budget cut-off lands on today's tail, not
+    # on them. Added after the per-host caps so they are never trimmed away.
+    # held_records is None when the R2 load failed: incomplete domains are
+    # still held back today, the queue just is not written (see step 14).
+    held_enabled = held_queue.is_enabled(config)
+    held_records = held_queue.load_held() if held_enabled else []
+    held_candidates = held_queue.to_candidates(held_records or [])
+    if held_candidates:
+        held_names = {c["name"] for c in held_candidates}
+        candidates_to_evaluate = [
+            c for c in candidates_to_evaluate if c.get("name") not in held_names
+        ]
+        logger.info(
+            "Held queue: re-checking %d held domain(s) ahead of today's %d candidates",
+            len(held_candidates), len(candidates_to_evaluate),
+        )
+
     # Stage 3: AUTHORITATIVE availability check via RDAP — the gate that
     # eliminates owned/in-redemption domains BEFORE we burn enrichment
     # budget on them. Only HTTP 404 passes through. ~95% of zone-diff
     # "drops" reject here on a typical day.
     available = validate_availability(
-        candidates_to_evaluate, config, per_host_stats=per_host_stats,
+        held_candidates + candidates_to_evaluate, config,
+        per_host_stats=per_host_stats,
     )
 
     # Stage 4: enrichment (sequential, paced) — runs only on confirmed-
@@ -1457,6 +1490,25 @@ def main(argv: list[str] | None = None) -> int:
         toxic_denylist=remembered_toxic,
     )
 
+    # Stage 5b: hold back every survivor whose screening is incomplete, and
+    # release held domains whose screening completed today. Before this, an
+    # unscreened domain was published as if it were clean. With the queue
+    # disabled the survivors pass through unchanged (pre-2026-10-01).
+    next_held: list[dict] = []
+    held_outcome: dict | None = None
+    if held_enabled:
+        survivors, next_held, held_outcome = held_queue.settle(
+            held_records=held_records or [],
+            held_candidates=held_candidates,
+            new_available=[
+                c for c in available if held_queue.HELD_SINCE_FIELD not in c
+            ],
+            enriched=enriched,
+            survivors=survivors,
+            config=config,
+            today=today,
+        )
+
     # Stage 6: score + sort (null components excluded from normalization,
     # so a domain with partial enrichment scores on what's actually populated
     # rather than being artificially capped).
@@ -1482,6 +1534,16 @@ def main(argv: list[str] | None = None) -> int:
         total_evaluated=total_evaluated,
         total_drops_scanned=total_drops_scanned,
     )
+
+    # Step 14: persist the held queue only now that the output is written, so
+    # a crash in write_output can never remove released domains from the
+    # queue without publishing them. Skipped when the load failed, so a
+    # partial view never overwrites the stored queue.
+    if held_outcome is not None:
+        saved = (
+            held_queue.save_held(next_held) if held_records is not None else None
+        )
+        held_queue.log_outcome(held_outcome, saved=saved)
 
     publication_cap = int(config.get("max_candidates_for_publication", 300))
     logger.info(

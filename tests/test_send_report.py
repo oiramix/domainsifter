@@ -1942,3 +1942,47 @@ def test_main_exits_zero_when_coverage_is_disabled(
     _write_coverage_config(cc_sandbox, enabled=False)
     sent = _run_main_with_log(monkeypatch, _COV_OPR_DEAD + "\n")
     assert "(disabled in config)" in sent[0].get_content()
+
+
+# --- held queue (2026-10-01) -------------------------------------------------
+
+_HELD_LINE = (
+    "2026-10-03 09:41:02,123 INFO scripts.held_queue "
+    "Held queue: held=12 new=5 released=3 expired=2 reregistered=1 rejected=0"
+)
+
+
+def test_parse_held_queue_reads_contract_line():
+    assert send_report.parse_held_queue(_HELD_LINE + "\n") == {
+        "held": 12, "new": 5, "released": 3, "expired": 2,
+        "reregistered": 1, "rejected": 0,
+    }
+
+
+def test_parse_held_queue_none_when_absent():
+    assert send_report.parse_held_queue("nothing here\n") is None
+
+
+def test_build_email_shows_held_queue_counts(required_env):
+    msg = send_report._build_email(pipeline_exit=0, log=_HELD_LINE + "\n", duration_sec=1.0)
+    body = msg.get_content()
+    assert (
+        "Held queue       : 12 held (5 new today), 3 released, "
+        "2 expired unscreened, 1 re-registered, 0 rejected on re-check"
+    ) in body
+    assert "🚨" not in msg["Subject"]
+
+
+def test_build_email_flags_held_queue_r2_failures(required_env):
+    log = (
+        "x ERROR scripts.held_queue Held queue: LOAD FAILED (ClientError: boom)\n"
+        + _HELD_LINE + "\n"
+        + "x ERROR scripts.held_queue Held queue: SAVE FAILED — 12 held\n"
+    )
+    body = send_report._build_email(pipeline_exit=0, log=log, duration_sec=1.0).get_content()
+    assert "rejected on re-check — R2 LOAD FAILED, R2 SAVE FAILED" in body
+
+
+def test_build_email_held_queue_missing_line(required_env):
+    body = send_report._build_email(pipeline_exit=0, log="", duration_sec=1.0).get_content()
+    assert "Held queue       : (no held-queue line in log" in body

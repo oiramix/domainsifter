@@ -109,6 +109,12 @@ def cfg(tmp_path):
         # to mock dns.resolver. Tests that DO want the pre-filter active
         # override this section per-test.
         "dns_check": {"enabled": False},
+        # Held queue OFF by default in these tests (added 2026-10-01). Their
+        # fakes leave snapshot_category `unknown`, which the queue rightly
+        # holds back, and their concern is other wiring. The held-queue
+        # path has its own tests: test_main_held_queue_* below and
+        # tests/test_held_queue.py.
+        "held_queue": {"enabled": False},
     }
     return config
 
@@ -1401,3 +1407,270 @@ def test_main_writes_all_debug_export_files_when_flag_set(monkeypatch, cfg, tmp_
     assert meta["counts"]["trim_discards"] == 0
     assert meta["counts"]["published"] == 1
     assert "generated_at" in meta
+
+
+# ---------------------------------------------------------------------------
+# Held queue (2026-10-01): incomplete screening is held, never published
+# ---------------------------------------------------------------------------
+
+_COMPLETE_FIELDS = {
+    "wayback_snapshots": 50,
+    "wayback_last_snapshot": "2024-01-01",
+    "open_page_rank": 3.0,
+    "cert_history": True,
+    "spam_flagged": False,
+    "surbl_listed": False,
+    "spamhaus_listed": False,
+}
+
+
+def _days_ago(n: int) -> str:
+    return date.fromordinal(date.today().toordinal() - n).isoformat()
+
+
+def _wire_held_pipeline(
+    monkeypatch,
+    cfg,
+    tmp_path,
+    *,
+    drops: list[str],
+    held: list[dict] | None,
+    fields: dict[str, dict] | None = None,
+    categories: dict[str, str] | None = None,
+    rdap: dict[str, bool | None] | None = None,
+    held_enabled: bool = True,
+):
+    """Wire main() with every external dependency faked, held queue on.
+
+    drops       today's new drop names
+    held        what load_held returns (None = the R2 load failed)
+    fields      per-name enrichment result (default: complete)
+    categories  per-name snapshot_category (default: unknown)
+    rdap        per-name is_available (default: True)
+
+    Returns (cfg_path, saved_queues, rdap_call_order); run main() yourself.
+    """
+    cfg["held_queue"] = {
+        "enabled": held_enabled,
+        "max_held_days": 3,
+        "required_fields": ["wayback_snapshots", "open_page_rank"],
+    }
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    for k, v in {
+        "CZDS_USERNAME": "u", "CZDS_PASSWORD": "p",
+        "SAFE_BROWSING_KEY": "k", "OPENPAGERANK_KEY": "o",
+    }.items():
+        monkeypatch.setenv(k, v)
+    _set_r2_env(monkeypatch)
+
+    monkeypatch.setattr(pipeline.czds_client, "authenticate", lambda *_a, **_k: "tok")
+    monkeypatch.setattr(
+        pipeline.lexical_filter, "filter_candidates",
+        lambda cands, _cfg, rejections_out=None: list(cands),
+    )
+    monkeypatch.setattr(
+        pipeline, "collect_drops",
+        lambda _cfg, _tok, today, **_kw: (
+            [{"name": n, "tld": n.rsplit(".", 1)[-1], "dropped_date": today.isoformat()}
+             for n in drops],
+            [],
+        ),
+    )
+
+    def fake_enrich_all(cands, _cfg):
+        for c in cands:
+            c.update((fields or {}).get(c["name"], _COMPLETE_FIELDS))
+        return cands
+    monkeypatch.setattr(pipeline, "enrich_all", fake_enrich_all)
+
+    def fake_classify(cands, *, client=None, pause_seconds=1.0, config=None):
+        for c in cands:
+            c["snapshot_category"] = (categories or {}).get(c["name"], "unknown")
+            c["snapshot_classifier_version"] = "v3"
+            c["wayback_excerpt"] = None
+        return {}
+    monkeypatch.setattr(pipeline.snapshot_classifier, "classify_all", fake_classify)
+    monkeypatch.setattr(
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(pipeline.toxic_denylist, "is_enabled", lambda _c: False)
+    monkeypatch.setattr(pipeline.phase2_ranker, "record_overflow", lambda **_k: None)
+
+    rdap_calls: list[str] = []
+
+    def fake_check(name, _c):
+        rdap_calls.append(name)
+        avail = (rdap or {}).get(name, True)
+        return {"is_available": avail, "rdap_http": 404 if avail else 200,
+                "rdap_status": [], "rdap_expiration": None,
+                "previous_registrar": None}
+    from scripts.enrichment import rdap as rdap_mod
+    monkeypatch.setattr(rdap_mod, "check_availability", fake_check)
+
+    monkeypatch.setattr(pipeline.held_queue, "load_held", lambda **_k: held)
+    saved: list[list[dict]] = []
+    monkeypatch.setattr(
+        pipeline.held_queue, "save_held",
+        lambda records, **_k: saved.append(records) or True,
+    )
+    return cfg_path, saved, rdap_calls
+
+
+def _run(cfg_path, tmp_path) -> dict:
+    assert pipeline.main(["--config", str(cfg_path)]) == 0
+    return json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+
+
+def test_main_held_queue_holds_incomplete_and_publishes_screened(monkeypatch, cfg, tmp_path):
+    """A screened domain publishes. An unscreened one (content unknown, or a
+    required source missing) is held in R2 and NOT published."""
+    no_opr = {k: v for k, v in _COMPLETE_FIELDS.items() if k != "open_page_rank"}
+    cfg_path, saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["marketglow.com", "tideblock.com", "coppernest.com"],
+        held=[],
+        fields={"coppernest.com": no_opr},
+        categories={"marketglow.com": "legitimate", "coppernest.com": "legitimate"},
+    )
+    written = _run(cfg_path, tmp_path)
+
+    assert [d["name"] for d in written["domains"]] == ["marketglow.com"]
+    assert len(saved) == 1
+    by_name = {r["name"]: r for r in saved[0]}
+    assert set(by_name) == {"tideblock.com", "coppernest.com"}
+    assert by_name["tideblock.com"]["reasons"] == ["content_unscreened"]
+    assert by_name["coppernest.com"]["reasons"] == ["missing:open_page_rank"]
+    assert by_name["tideblock.com"]["first_held_date"] == date.today().isoformat()
+    assert by_name["tideblock.com"]["checks"] == 0
+
+
+def test_main_held_queue_releases_after_successful_recheck(monkeypatch, cfg, tmp_path):
+    """A held domain whose screening completes today publishes as a fresh
+    pick (days_listed 0) and leaves the queue. It is RDAP-checked BEFORE
+    today's new candidates."""
+    yesterday = _days_ago(1)
+    cfg_path, saved, rdap_calls = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["marketglow.com"],
+        held=[{"name": "tideblock.com", "tld": "com", "dropped_date": yesterday,
+               "first_held_date": yesterday, "checks": 0,
+               "reasons": ["content_unscreened"]}],
+        categories={"marketglow.com": "legitimate", "tideblock.com": "legitimate"},
+    )
+    written = _run(cfg_path, tmp_path)
+
+    published = {d["name"]: d for d in written["domains"]}
+    assert set(published) == {"marketglow.com", "tideblock.com"}
+    assert published["tideblock.com"]["days_listed"] == 0
+    assert published["tideblock.com"]["dropped_date"] == yesterday
+    assert saved == [[]]
+    assert rdap_calls[0] == "tideblock.com"
+
+
+def test_main_held_queue_drops_reregistered_domain(monkeypatch, cfg, tmp_path):
+    """A held domain RDAP now reports as registered leaves the queue and is
+    never published, even though its screening would have completed."""
+    cfg_path, saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=[],
+        held=[{"name": "tideblock.com", "tld": "com",
+               "first_held_date": _days_ago(1), "checks": 0}],
+        categories={"tideblock.com": "legitimate"},
+        rdap={"tideblock.com": False},
+    )
+    written = _run(cfg_path, tmp_path)
+
+    assert written["domains"] == []
+    assert saved == [[]]
+
+
+def test_main_held_queue_expires_after_max_days(monkeypatch, cfg, tmp_path):
+    """Still unscreened after max_held_days → dropped, never published."""
+    cfg_path, saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=[],
+        held=[
+            {"name": "tideblock.com", "tld": "com",
+             "first_held_date": _days_ago(3), "checks": 2},
+            {"name": "coppernest.com", "tld": "com",
+             "first_held_date": _days_ago(2), "checks": 1},
+        ],
+    )
+    written = _run(cfg_path, tmp_path)
+
+    assert written["domains"] == []
+    assert len(saved) == 1
+    assert [r["name"] for r in saved[0]] == ["coppernest.com"]
+    assert saved[0][0]["checks"] == 2
+    assert saved[0][0]["first_held_date"] == _days_ago(2)
+
+
+def test_main_held_queue_load_failure_still_holds_back_and_skips_save(
+    monkeypatch, cfg, tmp_path,
+):
+    """R2 load failed → unscreened domains are still NOT published, and the
+    queue is not written (a partial view must not overwrite it)."""
+    cfg_path, saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["marketglow.com", "tideblock.com"],
+        held=None,
+        categories={"marketglow.com": "legitimate"},
+    )
+    written = _run(cfg_path, tmp_path)
+
+    assert [d["name"] for d in written["domains"]] == ["marketglow.com"]
+    assert saved == []
+
+
+def test_main_held_queue_disabled_publishes_unscreened_as_before(monkeypatch, cfg, tmp_path):
+    """Kill switch: enabled=false is the pre-2026-10-01 behaviour exactly —
+    unscreened domains publish and R2 is never touched."""
+    cfg_path, _saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["tideblock.com"],
+        held=[],
+        held_enabled=False,
+    )
+
+    def _boom(*_a, **_k):
+        raise AssertionError("held queue must not be touched when disabled")
+
+    monkeypatch.setattr(pipeline.held_queue, "load_held", _boom)
+    monkeypatch.setattr(pipeline.held_queue, "save_held", _boom)
+    written = _run(cfg_path, tmp_path)
+
+    assert [d["name"] for d in written["domains"]] == ["tideblock.com"]
+    assert written["domains"][0]["snapshot_category"] == "unknown"
+
+
+def test_held_domain_never_appears_in_newsletter(monkeypatch, cfg, tmp_path):
+    """The newsletter reads daily-domains.json. A held domain is not in that
+    file, so it cannot reach subscribers; the screened one does."""
+    from scripts import generate_newsletter
+
+    cfg_path, saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["marketglow.com", "tideblock.com"],
+        held=[],
+        categories={"marketglow.com": "legitimate"},
+    )
+    written = _run(cfg_path, tmp_path)
+    assert [r["name"] for r in saved[0]] == ["tideblock.com"]
+
+    nl_cfg = {
+        "newsletter": {
+            "enabled": True,
+            "top_n": 20,
+            "sidecar_excerpts_path": str(tmp_path / "no_sidecar.json"),
+            "archive_index_path": str(tmp_path / "no_archive.json"),
+        },
+    }
+    result = generate_newsletter.generate_newsletter(
+        nl_cfg, written, today=date.today(), dry_run=True,
+    )
+    assert result["status"] == "dry_run"
+    assert result["domain_count"] == 1
+    assert "marketglow.com" in result["text_body"]
+    assert "tideblock.com" not in result["text_body"]
+    assert "tideblock.com" not in result["body"]

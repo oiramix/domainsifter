@@ -374,6 +374,51 @@ def parse_toxic_rejections(log: str) -> tuple[int, int]:
     return live, remembered
 
 
+_HELD_QUEUE_RE = re.compile(
+    r"Held queue:\s*held=(\d+)\s+new=(\d+)\s+released=(\d+)\s+expired=(\d+)"
+    r"\s+reregistered=(\d+)\s+rejected=(\d+)"
+)
+HELD_QUEUE_FIELDS = ("held", "new", "released", "expired", "reregistered", "rejected")
+
+
+def parse_held_queue(log: str) -> dict[str, int] | None:
+    """Parse held_queue.log_outcome's contract line (added 2026-10-01).
+
+        Held queue: held=12 new=5 released=3 expired=2 reregistered=1 rejected=0
+
+    None when the line is absent: the queue is disabled, or the run ended
+    before the output was written. Last match wins.
+    """
+    matches = _HELD_QUEUE_RE.findall(log)
+    if not matches:
+        return None
+    return {name: int(value) for name, value in zip(HELD_QUEUE_FIELDS, matches[-1])}
+
+
+def _format_held_queue(counts: dict[str, int] | None, log: str) -> str:
+    """Header value for the held queue. A failed R2 load or save is appended
+    because it means held domains were lost from the retry queue (never
+    published — but silently shrinking the list is still worth knowing)."""
+    if counts is None:
+        text = "(no held-queue line in log — disabled, or run ended early)"
+    else:
+        text = (
+            f"{counts['held']} held ({counts['new']} new today), "
+            f"{counts['released']} released, {counts['expired']} expired unscreened, "
+            f"{counts['reregistered']} re-registered, "
+            f"{counts['rejected']} rejected on re-check"
+        )
+    problems = [
+        label for marker, label in (
+            ("Held queue: LOAD FAILED", "R2 LOAD FAILED"),
+            ("Held queue: SAVE FAILED", "R2 SAVE FAILED"),
+        ) if marker in log
+    ]
+    if problems:
+        text += " — " + ", ".join(problems)
+    return text
+
+
 def _snapshot_classifier_counts(log: str) -> dict[str, int] | None:
     """Parse the classifier's per-category tally line.
 
@@ -1185,6 +1230,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
     ranker_outcome = _phase2_ranker_outcome(log)
     classifier_counts = _snapshot_classifier_counts(log)
     toxic_live, toxic_remembered = parse_toxic_rejections(log)
+    held_counts = parse_held_queue(log)
     credit_errors = _count_credit_balance_errors(log)
     shadow_counts = parse_shadow_verdicts(log)
     shadow_would_evict = parse_shadow_would_evict(log) if shadow_counts else 0
@@ -1254,6 +1300,7 @@ def _build_email(pipeline_exit: int, log: str, duration_sec: float | None) -> Em
         f"Snapshot classes : {_format_classifier_counts(classifier_counts)}",
         f"Toxic evicted    : {toxic_live} by today's check, "
         f"{toxic_remembered} from memory (denylist)",
+        f"Held queue       : {_format_held_queue(held_counts, log)}",
         f"CC backlink data : {_format_cc_freshness(cc)}",
         f"Enrich. coverage : {_format_coverage_summary(coverage)}",
     ]

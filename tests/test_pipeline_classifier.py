@@ -259,9 +259,41 @@ def test_main_writes_sidecar_with_classified_excerpts(monkeypatch, cfg, tmp_path
         assert sidecar_after[name] == {"title": "today-" + name}
 
 
+def test_main_no_api_key_holds_everything_back(monkeypatch, cfg, tmp_path):
+    """No LLM backend → every entry is `unknown` = unscreened. With the held
+    queue on (production default since 2026-10-01) the run still succeeds
+    but publishes NOTHING: all five are held for a re-check instead."""
+    cfg["held_queue"] = {"enabled": True, "max_held_days": 3}
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
+    monkeypatch.setattr(
+        pipeline.snapshot_classifier, "make_default_client", lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(pipeline.held_queue, "load_held", lambda **_k: [])
+    saved = []
+    monkeypatch.setattr(
+        pipeline.held_queue, "save_held",
+        lambda records, **_k: saved.append(records) or True,
+    )
+
+    rc = pipeline.main(["--config", str(cfg_path)])
+    assert rc == 0
+
+    daily = json.loads((tmp_path / "daily.json").read_text(encoding="utf-8"))
+    assert daily["domains"] == []
+    assert len(saved) == 1
+    assert {r["name"] for r in saved[0]} == {
+        "alphasite.com", "parkedhome.com", "toxicpage.com", "emptypage.com", "mysteryco.com",
+    }
+    assert all(r["reasons"] == ["content_unscreened"] for r in saved[0])
+
+
 def test_main_no_api_key_passes_through_as_unknown(monkeypatch, cfg, tmp_path):
-    """Soft-fail (design (k)): no ANTHROPIC_API_KEY → all entries unknown,
-    pipeline still publishes."""
+    """Soft-fail (design (k)) with the held queue switched OFF: no
+    ANTHROPIC_API_KEY → all entries unknown, pipeline still publishes.
+    This is the pre-2026-10-01 behaviour that `held_queue.enabled=false`
+    must restore exactly."""
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
     _wire_minimal_pipeline_for_classifier(monkeypatch, date.today())
