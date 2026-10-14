@@ -1,9 +1,1743 @@
 {
-  "generated_at": "2026-10-13T12:07:13Z",
-  "domain_count": 71,
-  "today_count": 7,
-  "carryover_count": 64,
+  "generated_at": "2026-10-14T13:13:32Z",
+  "domain_count": 126,
+  "today_count": 55,
+  "carryover_count": 71,
   "domains": [
+    {
+      "name": "cardsorting.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 746,
+      "wayback_last_snapshot": "2026-06-12",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 56,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcardsorting.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=cardsorting.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=cardsorting.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:57:25Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "card sorting game service clear"
+    },
+    {
+      "name": "creatingspaces.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 2081,
+      "wayback_last_snapshot": "2025-10-08",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 56,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcreatingspaces.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=creatingspaces.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=creatingspaces.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:59:48Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear design/real estate focus"
+    },
+    {
+      "name": "jampackaging.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 1493,
+      "wayback_last_snapshot": "2025-07-19",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 56,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Djampackaging.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=jampackaging.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=jampackaging.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:49Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "product-clear, readable"
+    },
+    {
+      "name": "millionaireblog.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 1615,
+      "wayback_last_snapshot": "2025-07-08",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 55,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmillionaireblog.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=millionaireblog.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=millionaireblog.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:58:07Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "aspirational, memorable brand"
+    },
+    {
+      "name": "thrivenutrition.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 1338,
+      "wayback_last_snapshot": "2025-07-19",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 55,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dthrivenutrition.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=thrivenutrition.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=thrivenutrition.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:25Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear nutrition brand thrive"
+    },
+    {
+      "name": "precisiontoolanddie.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 1373,
+      "wayback_last_snapshot": "2026-03-12",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 54,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dprecisiontoolanddie.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=precisiontoolanddie.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=precisiontoolanddie.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:57:01Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "adjective + noun compound clear"
+    },
+    {
+      "name": "expresslywritten.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 596,
+      "wayback_last_snapshot": "2026-08-13",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 53,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dexpresslywritten.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=expresslywritten.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=expresslywritten.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:52Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear writing service, memorable"
+    },
+    {
+      "name": "enduropartnership.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 534,
+      "wayback_last_snapshot": "2024-08-16",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 52,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Denduropartnership.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=enduropartnership.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=enduropartnership.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:56:39Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "durable partnership business brand"
+    },
+    {
+      "name": "inspiredstories.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 5841,
+      "wayback_last_snapshot": "2026-08-23",
+      "open_page_rank": 0.74,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 52,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dinspiredstories.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=inspiredstories.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=inspiredstories.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:57Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 14,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 14
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 14
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 10
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 14
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 12
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 11
+        }
+      ],
+      "verdict": "Promising",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "content platform, uplifting"
+    },
+    {
+      "name": "readingvacation.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 4747,
+      "wayback_last_snapshot": "2026-03-09",
+      "open_page_rank": 0.85,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 52,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dreadingvacation.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=readingvacation.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=readingvacation.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:57:05Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 14,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 14
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 13
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 17
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 20
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 21
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 19
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "literary retreat clear brand"
+    },
+    {
+      "name": "sweetteesandboots.com",
+      "tld": "com",
+      "dropped_date": "2026-10-13",
+      "wayback_snapshots": 587,
+      "wayback_last_snapshot": "2025-07-13",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 52,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsweetteesandboots.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=sweetteesandboots.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=sweetteesandboots.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:03:25Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clothing brand, memorable phrase"
+    },
+    {
+      "name": "creativeartshs.org",
+      "tld": "org",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 5017,
+      "wayback_last_snapshot": "2026-10-10",
+      "open_page_rank": 0.82,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 51,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcreativeartshs.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=creativeartshs.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=creativeartshs.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:21Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 7,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 7
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 7
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 10
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "creative arts school readable"
+    },
+    {
+      "name": "fleetmaintenancerepair.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 610,
+      "wayback_last_snapshot": "2025-03-16",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 51,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dfleetmaintenancerepair.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=fleetmaintenancerepair.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=fleetmaintenancerepair.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:06:23Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "commercial service very clear"
+    },
+    {
+      "name": "goodwriters.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 9048,
+      "wayback_last_snapshot": "2026-06-09",
+      "open_page_rank": 0.44,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgoodwriters.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=goodwriters.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=goodwriters.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:58:41Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 6,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 6
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 10
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 13
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 8
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 5
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear compound, writing service sense"
+    },
+    {
+      "name": "startupregister.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 6443,
+      "wayback_last_snapshot": "2026-08-14",
+      "open_page_rank": 0.68,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dstartupregister.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=startupregister.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=startupregister.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:36Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 7,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 7
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 6
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 8
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 8
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 9
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "startup focused, clear"
+    },
+    {
+      "name": "mrsteamercarpetcleaner.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 426,
+      "wayback_last_snapshot": "2023-04-05",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 49,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmrsteamercarpetcleaner.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=mrsteamercarpetcleaner.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=mrsteamercarpetcleaner.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T11:07:30Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "cleaning service brand clear"
+    },
+    {
+      "name": "woodbridgeinn.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 10688,
+      "wayback_last_snapshot": "2026-05-19",
+      "open_page_rank": 0.3,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 49,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwoodbridgeinn.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=woodbridgeinn.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=woodbridgeinn.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:35Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 5,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 8
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 7
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear hospitality compound, brandable"
+    },
+    {
+      "name": "counter-factual.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 10643,
+      "wayback_last_snapshot": "2026-06-10",
+      "open_page_rank": 0.31,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 48,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcounter-factual.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=counter-factual.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=counter-factual.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:57:29Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 5,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 6
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 5
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "real academic term, hyphenated"
+    },
+    {
+      "name": "travellersintime.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 4674,
+      "wayback_last_snapshot": "2026-05-17",
+      "open_page_rank": 0.38,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 48,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtravellersintime.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=travellersintime.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=travellersintime.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:57:09Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 4,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 4
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "noun + prep + noun recognizable"
+    },
+    {
+      "name": "travelogia.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 7045,
+      "wayback_last_snapshot": "2026-07-12",
+      "open_page_rank": 0.31,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 48,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtravelogia.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=travelogia.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=travelogia.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:28Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "travel service brand"
+    },
+    {
+      "name": "americangolf.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 93,
+      "wayback_last_snapshot": "2024-09-18",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Damericangolf.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=americangolf.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=americangolf.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:48Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "golf retail, clear national"
+    },
+    {
+      "name": "roofingmariettaga.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 651,
+      "wayback_last_snapshot": "2026-06-11",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Droofingmariettaga.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=roofingmariettaga.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=roofingmariettaga.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:58:19Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 6,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 6
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 5
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 8
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 13
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 12
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 13
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "location based service"
+    },
+    {
+      "name": "saloncheval.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 1002,
+      "wayback_last_snapshot": "2025-03-11",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsaloncheval.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=saloncheval.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=saloncheval.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:01:01Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "horse salon unclear meaning"
+    },
+    {
+      "name": "fastfoodrecipes.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 2790,
+      "wayback_last_snapshot": "2026-04-04",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dfastfoodrecipes.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=fastfoodrecipes.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=fastfoodrecipes.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:59:00Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "food content, clear niche"
+    },
+    {
+      "name": "free-workout-routines.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 7299,
+      "wayback_last_snapshot": "2026-01-15",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dfree-workout-routines.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=free-workout-routines.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=free-workout-routines.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:59:05Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 4,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "health benefit clear, keyword good"
+    },
+    {
+      "name": "mediterraneancooking.net",
+      "tld": "net",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 1133,
+      "wayback_last_snapshot": "2026-06-10",
+      "open_page_rank": 0.32,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmediterraneancooking.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=mediterraneancooking.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=mediterraneancooking.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:05:11Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "cooking school brand clear"
+    },
+    {
+      "name": "parkercreativeconcepts.com",
+      "tld": "com",
+      "dropped_date": "2026-10-13",
+      "wayback_snapshots": 2568,
+      "wayback_last_snapshot": "2026-04-19",
+      "open_page_rank": 0.25,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dparkercreativeconcepts.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=parkercreativeconcepts.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=parkercreativeconcepts.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:03:22Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 3,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "proper noun prefix limits brand flexibility"
+    },
+    {
+      "name": "scrapbookfactory.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 760,
+      "wayback_last_snapshot": "2025-07-17",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dscrapbookfactory.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=scrapbookfactory.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=scrapbookfactory.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:44Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "craft business, clear product"
+    },
+    {
+      "name": "stephenspainting.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 782,
+      "wayback_last_snapshot": "2026-06-17",
+      "open_page_rank": 0.3,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 45,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dstephenspainting.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=stephenspainting.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=stephenspainting.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:40Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "trade business, personal name"
+    },
+    {
+      "name": "familytablerestaurant.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 490,
+      "wayback_last_snapshot": "2026-05-13",
+      "open_page_rank": 0.3,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 44,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dfamilytablerestaurant.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=familytablerestaurant.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=familytablerestaurant.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:59:57Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 4,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 4
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "warm compound memorable clear"
+    },
+    {
+      "name": "offshoreadventures.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 2027,
+      "wayback_last_snapshot": "2026-07-11",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 44,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Doffshoreadventures.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=offshoreadventures.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=offshoreadventures.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:58:45Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "water sports adventure clear"
+    },
     {
       "name": "clearlinetravel.com",
       "tld": "com",
@@ -32,8 +1766,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:03:29Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -96,8 +1830,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-08T10:00:54Z",
       "first_seen_date": "2026-10-08",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 5,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -106,6 +1840,429 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "personal development brand clear"
+    },
+    {
+      "name": "grovewood.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 726,
+      "wayback_last_snapshot": "2026-06-11",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgrovewood.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=grovewood.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=grovewood.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:08Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 0,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "grove and wood both clear real"
+    },
+    {
+      "name": "screenedrenters.com",
+      "tld": "com",
+      "dropped_date": "2026-10-12",
+      "wayback_snapshots": 751,
+      "wayback_last_snapshot": "2026-03-07",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dscreenedrenters.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=screenedrenters.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=screenedrenters.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:01:58Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear service, compound readable at glance"
+    },
+    {
+      "name": "sellerblog.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 152,
+      "wayback_last_snapshot": "2026-03-08",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsellerblog.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=sellerblog.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=sellerblog.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:58:23Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 8,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 8
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 11
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 11
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "seller community content, obvious"
+    },
+    {
+      "name": "shearperfectionhair.com",
+      "tld": "com",
+      "dropped_date": "2026-10-12",
+      "wayback_snapshots": 600,
+      "wayback_last_snapshot": "2026-10-10",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dshearperfectionhair.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=shearperfectionhair.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=shearperfectionhair.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:02:03Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear service recognizable compound"
+    },
+    {
+      "name": "sweetcarolina.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 1052,
+      "wayback_last_snapshot": "2026-07-12",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsweetcarolina.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=sweetcarolina.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=sweetcarolina.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:43Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 0,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "song reference, evocative brand"
+    },
+    {
+      "name": "teelaccounting.org",
+      "tld": "org",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 55,
+      "wayback_last_snapshot": "2025-09-24",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dteelaccounting.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=teelaccounting.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=teelaccounting.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:09Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear service name, professional"
+    },
+    {
+      "name": "westconstruction.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 4478,
+      "wayback_last_snapshot": "2026-06-08",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwestconstruction.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=westconstruction.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=westconstruction.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:32Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 0,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "regional construction company"
     },
     {
       "name": "airsinternational.com",
@@ -135,8 +2292,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:58:21Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -199,8 +2356,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:30Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -238,8 +2395,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-03T10:51:16Z",
       "first_seen_date": "2026-10-03",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 10,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -277,8 +2434,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-03T10:07:05Z",
       "first_seen_date": "2026-10-03",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 10,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -316,8 +2473,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-01T10:37:09Z",
       "first_seen_date": "2026-10-01",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 12,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -326,6 +2483,109 @@
       "snapshot_category": "unknown",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "sports brand vanguard clear"
+    },
+    {
+      "name": "levelriteconcrete.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 837,
+      "wayback_last_snapshot": "2026-07-10",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 42,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dlevelriteconcrete.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=levelriteconcrete.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=levelriteconcrete.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:36:36Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 0,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "concrete contractor clear brand"
+    },
+    {
+      "name": "trinityhomecare.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 635,
+      "wayback_last_snapshot": "2025-03-24",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 42,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtrinityhomecare.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=trinityhomecare.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=trinityhomecare.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:09Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear healthcare service, brandable"
     },
     {
       "name": "desertwillowrealty.com",
@@ -355,8 +2615,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T09:59:54Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -394,8 +2654,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T10:00:16Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -458,8 +2718,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:41Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -522,8 +2782,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-10T10:03:43Z",
       "first_seen_date": "2026-10-10",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 3,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -561,8 +2821,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-03T11:17:51Z",
       "first_seen_date": "2026-10-03",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 10,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -600,8 +2860,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T10:32:05Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -637,6 +2897,148 @@
       "phase2_reason": "health supplements, clear benefit"
     },
     {
+      "name": "durangoreadyrooter.com",
+      "tld": "com",
+      "dropped_date": "2026-10-12",
+      "wayback_snapshots": 43,
+      "wayback_last_snapshot": "2025-07-10",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 41,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddurangoreadyrooter.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=durangoreadyrooter.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=durangoreadyrooter.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:01:42Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "plumbing service location"
+    },
+    {
+      "name": "joeswindowcleaningllc.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 544,
+      "wayback_last_snapshot": "2024-08-09",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 41,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Djoeswindowcleaningllc.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=joeswindowcleaningllc.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=joeswindowcleaningllc.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T11:30:50Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear service provider personal brand"
+    },
+    {
+      "name": "outcomeproductions.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 47,
+      "wayback_last_snapshot": "2026-10-09",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 41,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Doutcomeproductions.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=outcomeproductions.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=outcomeproductions.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:30Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "media production company"
+    },
+    {
       "name": "creativeconceptsagency.com",
       "tld": "com",
       "dropped_date": "2026-10-09",
@@ -664,8 +3066,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:04:01Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -703,8 +3105,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-08T10:00:44Z",
       "first_seen_date": "2026-10-08",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 5,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -742,8 +3144,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T11:12:22Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -779,6 +3181,134 @@
       "phase2_reason": "spanish restaurant name, recognizable"
     },
     {
+      "name": "ecomdealsonline.org",
+      "tld": "org",
+      "dropped_date": "2026-10-13",
+      "wayback_snapshots": 28,
+      "wayback_last_snapshot": "2025-07-14",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 40,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Decomdealsonline.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=ecomdealsonline.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=ecomdealsonline.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:42Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": null
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "ecom deals online, marketplace org clear"
+    },
+    {
+      "name": "edgepainting.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 348,
+      "wayback_last_snapshot": "2026-08-23",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 40,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dedgepainting.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=edgepainting.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=edgepainting.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:59:52Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 0,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 0
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 0
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "creative, readable"
+    },
+    {
       "name": "farmhousefrontier.com",
       "tld": "com",
       "dropped_date": "2026-10-08",
@@ -806,8 +3336,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:57Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -845,8 +3375,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:06Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -884,8 +3414,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T10:06:20Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -948,8 +3478,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T10:52:52Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -958,6 +3488,109 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "obvious glass art business"
+    },
+    {
+      "name": "common-ground.site",
+      "tld": "site",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 19,
+      "wayback_last_snapshot": "2025-07-18",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 39,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcommon-ground.site"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=common-ground.site&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=common-ground.site&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:09Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "meaningful phrase, hyphenated"
+    },
+    {
+      "name": "mgframingcompanyllc.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 31,
+      "wayback_last_snapshot": "2025-07-19",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 39,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmgframingcompanyllc.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=mgframingcompanyllc.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=mgframingcompanyllc.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T11:52:20Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "framing company service clear"
     },
     {
       "name": "atlantaroofingoutlet.com",
@@ -987,8 +3620,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T09:59:12Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1026,8 +3659,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:53Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1065,8 +3698,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-05T10:04:33Z",
       "first_seen_date": "2026-10-05",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 8,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1129,8 +3762,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:03:41Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1168,8 +3801,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T11:36:00Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1205,6 +3838,173 @@
       "phase2_reason": "location game type memorable"
     },
     {
+      "name": "hotspringsranch.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 97,
+      "wayback_last_snapshot": "2026-08-22",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 38,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhotspringsranch.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=hotspringsranch.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=hotspringsranch.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:57:44Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "hospitality property, scenic appeal"
+    },
+    {
+      "name": "shelleybean.net",
+      "tld": "net",
+      "dropped_date": "2026-10-11",
+      "wayback_snapshots": 43327,
+      "wayback_last_snapshot": "2026-07-12",
+      "open_page_rank": 0.33,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 38,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dshelleybean.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=shelleybean.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=shelleybean.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:00:33Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "creative brand whimsical"
+    },
+    {
+      "name": "theelitetransportation.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 35,
+      "wayback_last_snapshot": "2025-07-14",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 38,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtheelitetransportation.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=theelitetransportation.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=theelitetransportation.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T11:18:10Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "luxury transportation, premium brand"
+    },
+    {
       "name": "drywallcontractormiami.com",
       "tld": "com",
       "dropped_date": "2026-10-09",
@@ -1232,8 +4032,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:03:12Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1271,8 +4071,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:04:05Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1335,8 +4135,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:58:07Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1374,8 +4174,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-09T10:10:16Z",
       "first_seen_date": "2026-10-09",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 4,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1413,8 +4213,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T09:59:45Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1452,8 +4252,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-09T10:10:24Z",
       "first_seen_date": "2026-10-09",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 4,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1462,6 +4262,45 @@
       "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "restoration company clear"
+    },
+    {
+      "name": "wellnessnutraceuticals.store",
+      "tld": "store",
+      "dropped_date": "2026-10-13",
+      "wayback_snapshots": 20,
+      "wayback_last_snapshot": "2025-07-18",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 36,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwellnessnutraceuticals.store"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=wellnessnutraceuticals.store&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=wellnessnutraceuticals.store&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T09:56:45Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "health product, clear niche"
     },
     {
       "name": "onregister.org",
@@ -1491,8 +4330,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-06T09:58:24Z",
       "first_seen_date": "2026-10-06",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 7,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1530,8 +4369,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T10:02:54Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1594,8 +4433,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-05T09:57:30Z",
       "first_seen_date": "2026-10-05",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 8,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 9,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -1658,8 +4497,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T10:09:48Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -1695,6 +4534,45 @@
       "phase2_reason": "poetic travel brand, clear niche"
     },
     {
+      "name": "creatorfragrance.com",
+      "tld": "com",
+      "dropped_date": "2026-10-13",
+      "wayback_snapshots": 8,
+      "wayback_last_snapshot": "2026-10-11",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 35,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcreatorfragrance.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=creatorfragrance.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=creatorfragrance.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:02:54Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "obvious product category fragrance"
+    },
+    {
       "name": "waysidelodgeza.com",
       "tld": "com",
       "dropped_date": "2026-10-05",
@@ -1722,8 +4600,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-06T09:32:42Z",
       "first_seen_date": "2026-10-06",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 7,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1761,8 +4639,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:56:57Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": 3,
       "cc_backlink_history": [
         {
@@ -1825,8 +4703,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T10:03:24Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1864,8 +4742,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T11:03:45Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1903,8 +4781,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-01T10:46:57Z",
       "first_seen_date": "2026-10-01",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 12,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 13,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -1940,6 +4818,45 @@
       "phase2_reason": "auto service clear intent"
     },
     {
+      "name": "createforhomeless.online",
+      "tld": "online",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 7,
+      "wayback_last_snapshot": "2025-07-14",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 34,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcreateforhomeless.online"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=createforhomeless.online&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=createforhomeless.online&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:15:09Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "nonprofit mission clear cause driven"
+    },
+    {
       "name": "divineinnerhealth.com",
       "tld": "com",
       "dropped_date": "2026-10-10",
@@ -1967,8 +4884,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T09:59:57Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2031,8 +4948,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T09:59:38Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2095,8 +5012,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-10T10:03:51Z",
       "first_seen_date": "2026-10-10",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 3,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 4,
       "cc_source_domain_count": 8,
       "cc_backlink_history": [
         {
@@ -2159,8 +5076,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-03T11:34:15Z",
       "first_seen_date": "2026-10-03",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 10,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2198,8 +5115,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:04:18Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2262,8 +5179,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T10:47:55Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2301,8 +5218,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T11:35:01Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2338,6 +5255,109 @@
       "phase2_reason": "beauty services, professional"
     },
     {
+      "name": "charlieparcel.com",
+      "tld": "com",
+      "dropped_date": "2026-10-14",
+      "wayback_snapshots": 116,
+      "wayback_last_snapshot": "2026-10-12",
+      "open_page_rank": 0.0,
+      "cert_history": null,
+      "previous_registrar": null,
+      "score": 33,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcharlieparcel.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=charlieparcel.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=charlieparcel.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:27:54Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "charlie+parcel readable"
+    },
+    {
+      "name": "greenrivermaintenance.com",
+      "tld": "com",
+      "dropped_date": "2026-10-12",
+      "wayback_snapshots": 39,
+      "wayback_last_snapshot": "2023-09-18",
+      "open_page_rank": 0.25,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 33,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgreenrivermaintenance.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=greenrivermaintenance.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=greenrivermaintenance.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-10-14T10:01:15Z",
+      "first_seen_date": "2026-10-14",
+      "last_validated_date": "2026-10-14",
+      "days_listed": 0,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-feb-mar-apr",
+          "source_domain_count": null
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "recognizable, good business fit"
+    },
+    {
       "name": "wayfarertravels.studio",
       "tld": "studio",
       "dropped_date": "2026-10-06",
@@ -2365,8 +5385,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-07T10:05:51Z",
       "first_seen_date": "2026-10-07",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 6,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2404,8 +5424,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:20Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2443,8 +5463,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-10T10:03:11Z",
       "first_seen_date": "2026-10-10",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 3,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2482,8 +5502,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-08T10:00:32Z",
       "first_seen_date": "2026-10-08",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 5,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -2546,8 +5566,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-01T10:19:59Z",
       "first_seen_date": "2026-10-01",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 12,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 13,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2610,8 +5630,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T09:59:20Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2674,8 +5694,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-07T10:06:13Z",
       "first_seen_date": "2026-10-07",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 6,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2713,8 +5733,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T10:14:19Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": 4,
       "cc_backlink_history": [
         {
@@ -2777,8 +5797,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-13T10:00:20Z",
       "first_seen_date": "2026-10-13",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 0,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 1,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -2841,8 +5861,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-12T10:03:33Z",
       "first_seen_date": "2026-10-12",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 1,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 2,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2905,8 +5925,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-10T10:03:18Z",
       "first_seen_date": "2026-10-10",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 3,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 4,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2969,8 +5989,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-10T10:03:22Z",
       "first_seen_date": "2026-10-10",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 3,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 4,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -3033,8 +6053,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-01T11:18:34Z",
       "first_seen_date": "2026-10-01",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 12,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3072,8 +6092,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:34Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -3136,8 +6156,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-07T10:06:00Z",
       "first_seen_date": "2026-10-07",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 6,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3175,8 +6195,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-04T10:02:36Z",
       "first_seen_date": "2026-10-04",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 9,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3214,8 +6234,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:45Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": 8,
       "cc_backlink_history": [
         {
@@ -3278,8 +6298,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:49Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -3342,8 +6362,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-03T11:05:39Z",
       "first_seen_date": "2026-10-03",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 10,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3381,8 +6401,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-06T09:33:00Z",
       "first_seen_date": "2026-10-06",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 7,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -3445,8 +6465,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-01T10:48:33Z",
       "first_seen_date": "2026-10-01",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 12,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3484,8 +6504,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-11T09:57:01Z",
       "first_seen_date": "2026-10-11",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 2,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3523,8 +6543,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T11:07:10Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3587,8 +6607,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-10-02T11:33:27Z",
       "first_seen_date": "2026-10-02",
-      "last_validated_date": "2026-10-13",
-      "days_listed": 11,
+      "last_validated_date": "2026-10-14",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3599,6 +6619,6 @@
       "phase2_reason": "surname business, construction"
     }
   ],
-  "total_drops_scanned": 204844,
-  "total_candidates_evaluated": 2499
+  "total_drops_scanned": 198444,
+  "total_candidates_evaluated": 2528
 }
