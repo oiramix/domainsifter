@@ -273,6 +273,42 @@ def collect_drops(
     return drops_total, retained_carryover
 
 
+def _emit_drops(drops: list[dict], config: dict) -> None:
+    """Write today's full drop list to a private local handoff file.
+
+    `collect_drops` holds the drops only in memory and overwrites the R2 zone
+    snapshot, so without this the list is gone after the run. It feeds
+    scripts/rebuild_referrers.py, which needs every drop, before the
+    structural/lexical/phase2 filters. Same idiom as
+    domain_archive.emit_available_set: scripts/state/* is gitignored, the
+    write is atomic, and NO failure here may break or delay the run.
+    """
+    try:
+        path = Path(config.get("drops_handoff_path", "scripts/state/drops_latest.jsonl"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=path.name + ".", dir=str(path.parent), suffix=".tmp",
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                for d in drops:
+                    fh.write(json.dumps({
+                        "name": d.get("name"),
+                        "tld": d.get("tld"),
+                        "dropped_date": d.get("dropped_date"),
+                    }, ensure_ascii=False) + "\n")
+            os.replace(tmp_name, path)
+        except BaseException:
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            raise
+        logger.info("Drops handoff: wrote %d drops to %s", len(drops), path)
+    except Exception as exc:  # never let the handoff cost the run
+        logger.warning("Drops handoff write failed (non-fatal): %s", exc)
+
+
 def _enrich_one(
     candidate: dict,
     config: dict,
@@ -1272,6 +1308,7 @@ def main(argv: list[str] | None = None) -> int:
     drops, retained_carryover = collect_drops(
         config, access_token, today=today, carryover_candidates=fresh_carryover,
     )
+    _emit_drops(drops, config)
 
     registered_count = len(fresh_carryover) - len(retained_carryover)
     logger.info(
