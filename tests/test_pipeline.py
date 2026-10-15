@@ -91,6 +91,9 @@ def cfg(tmp_path):
         # default "src/data/wayback_excerpts.json" relative path resolves
         # against the repo root and tests pollute the real production file.
         "sidecar_excerpts_path": str(tmp_path / "wayback_excerpts.json"),
+        # Same reason: the drops handoff must not land in the real
+        # scripts/state/ when main() runs under test.
+        "drops_handoff_path": str(tmp_path / "state" / "drops_latest.jsonl"),
         "filter_thresholds": {
             "min_domain_length": 2,
             "max_domain_length": 30,
@@ -1674,3 +1677,59 @@ def test_held_domain_never_appears_in_newsletter(monkeypatch, cfg, tmp_path):
     assert "marketglow.com" in result["text_body"]
     assert "tideblock.com" not in result["text_body"]
     assert "tideblock.com" not in result["body"]
+
+
+# ---------------------------------------------------------------------------
+# Drops handoff (2026-10-15): the full drop list survives the run
+# ---------------------------------------------------------------------------
+
+
+def test_main_writes_full_drop_list_before_any_filter(monkeypatch, cfg, tmp_path):
+    """Every drop collect_drops returned is written, including ones the
+    structural filter rejects (punycode, too long) and ones RDAP rejects."""
+    cfg_path, _saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["marketglow.com", "xn--tideblock.com", "a" * 40 + ".org"],
+        held=[],
+        rdap={"marketglow.com": False},
+        held_enabled=False,
+    )
+    _run(cfg_path, tmp_path)
+
+    lines = (tmp_path / "state" / "drops_latest.jsonl").read_text(encoding="utf-8").splitlines()
+    records = [json.loads(line) for line in lines]
+    assert [r["name"] for r in records] == ["marketglow.com", "xn--tideblock.com", "a" * 40 + ".org"]
+    assert records[0] == {
+        "name": "marketglow.com", "tld": "com", "dropped_date": date.today().isoformat(),
+    }
+
+
+def test_drops_handoff_failure_never_breaks_the_run(monkeypatch, cfg, tmp_path):
+    """An unwritable handoff path is logged and ignored; the daily list is
+    still written."""
+    blocker = tmp_path / "not_a_dir"
+    blocker.write_text("x", encoding="utf-8")
+    cfg_path, _saved, _ = _wire_held_pipeline(
+        monkeypatch, cfg, tmp_path,
+        drops=["marketglow.com"],
+        held=[],
+        held_enabled=False,
+    )
+    cfg["drops_handoff_path"] = str(blocker / "drops_latest.jsonl")
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+
+    written = _run(cfg_path, tmp_path)
+    assert [d["name"] for d in written["domains"]] == ["marketglow.com"]
+    assert not (blocker / "drops_latest.jsonl").exists()
+
+
+def test_emit_drops_writes_only_identity_fields_and_overwrites(tmp_path):
+    path = tmp_path / "drops.jsonl"
+    path.write_text("stale\n", encoding="utf-8")
+    pipeline._emit_drops(
+        [{"name": "tideblock.io", "tld": "io", "dropped_date": "2026-10-15", "extra": 1}],
+        {"drops_handoff_path": str(path)},
+    )
+    assert [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()] == [
+        {"name": "tideblock.io", "tld": "io", "dropped_date": "2026-10-15"},
+    ]
