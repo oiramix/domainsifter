@@ -139,6 +139,16 @@
     "r2_derived_key_template": "cc/derived/{release}.sqlite",
     "source_url_template": "https://data.commoncrawl.org/projects/hyperlinkgraph/{release}/domain/{release}-domain-{file}.txt.gz"
   },
+  "rebuild": {
+    "_doc": "Rebuild shortlist, step 1 (2026-10-15): scripts/rebuild_referrers.py lists WHICH domains link to promising available domains, so a later step can judge whether the links are editorial and on-topic. Standalone, run by hand; not wired into the pipeline. Gate: snapshot_category == legitimate AND cc_source_domain_count >= min_cc_domains. min_cc_domains 20 is a starting point to calibrate: across the private domain archive (6528 distinct available domains, 2026-06-03..2026-10-15) only 5 legitimate domains reached 20, 9 reached 10 and 20 reached 5. max_referrers caps each list, biggest referring domains (CC num_hosts) first. distribution_buckets are reporting thresholds only. Reads raw vertices/edges from r2 cc/raw/{release}/ (only the newest cc_backlinks.refresh.prune_raw_after_releases releases are kept) and needs about raw size x disk_headroom_multiplier free in workdir (empty = system temp dir).",
+    "min_cc_domains": 20,
+    "max_referrers": 100,
+    "distribution_buckets": [1, 5, 10, 20, 50, 100],
+    "input_path": "scripts/state/available_set_latest.jsonl",
+    "output_path": "scripts/state/rebuild_referrers_latest.jsonl",
+    "workdir": "",
+    "disk_headroom_multiplier": 1.5
+  },
   "newsletter": {
     "_doc": "Daily newsletter draft generation via Buttondown. Enabled 2026-05-14 same-day as the wire-in commit — drafts are inherently safe (status=draft never reaches subscribers without a manual dashboard action), so flipping the flag on doesn't create deliverability risk. Idempotent: re-running the same day finds the existing draft by subject and skips creation. See STATE.md 'Daily newsletter — 2026-05-14' for the test-send workflow. Module: scripts/generate_newsletter.py — run-daily.sh invokes it AFTER pipeline.py succeeds, failure here is logged but never aborts the daily run. Disable by flipping enabled to false if Buttondown is misbehaving or for any reason draft creation should pause.",
     "enabled": true,
