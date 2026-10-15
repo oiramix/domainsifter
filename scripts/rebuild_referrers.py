@@ -40,8 +40,11 @@ WHAT IT DOES
    the name split into words. No length, brandability or phase2 filters.
 4. RDAP-checks the survivors, highest count first, at most
    `rebuild.max_rdap_checks` within `rebuild.rdap_budget_seconds`, through
-   pipeline.validate_availability: the same rdap enricher, per-host buckets,
-   throttles and 429 stop rules as the daily run. Keeps only available ones.
+   pipeline.validate_availability: the same rdap enricher, per-host buckets
+   and throttles as the daily run, but a strike limit of 1 (a host stops on
+   its first 429). Any 429/403 is listed in the summary with its Retry-After
+   and logged as an "RDAP REBUILD PUSHBACK" WARNING saying whether the
+   cooldown outlasts the next daily run. Keeps only available ones.
 5. Downloads the release's raw vertices + edges from R2 into a temp dir and
    lets DuckDB STREAM them: one pass over vertices for the candidates' ids,
    one pass over edges keeping only edges into those ids, one more pass over
@@ -83,7 +86,7 @@ import sqlite3
 import sys
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -270,20 +273,109 @@ def choose_release(retained: list[str], config: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+class _RateLimitCapture(logging.Handler):
+    """Collects the circuit breaker's 429 records during the rebuild RDAP pass.
+
+    The breaker keeps no record of the Retry-After value it honoured, only a
+    cooldown expiry, but its "429 from <host> ..." WARNING carries
+    (host, strikes, strike_limit, cooldown_seconds, raw_header) as log
+    arguments. Reading the arguments, not the message text, keeps this
+    independent of the wording.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.events: list[dict[str, Any]] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            args = record.args
+            if str(record.msg).startswith("429 from ") and isinstance(args, tuple) and len(args) == 5:
+                host, _strikes, _limit, cooldown, raw = args
+                self.events.append({
+                    "host": str(host),
+                    "status": 429,
+                    "retry_after_header": raw,
+                    "honored_cooldown_seconds": round(float(cooldown)),
+                })
+        except Exception:  # pragma: no cover — capture must never break the pass
+            pass
+
+
 def check_available(names: list[str], config: dict, budget_seconds: float) -> dict[str, Any]:
-    """RDAP through the daily run's own path. Returns the available names and
-    the per-outcome counts."""
+    """RDAP through the daily run's own path. Returns the available names, the
+    per-outcome counts, and every host that pushed back (`rate_limited`).
+
+    Stricter than the daily run: the strike limit is 1, so a host is stopped
+    for the rest of this pass on its FIRST 429. This pass runs in the
+    afternoon against the same registries as the 09:00 run, and a long
+    Retry-After ban (identitydigital once sent 86397s) started now would
+    still be running then; the cooldown is per-process, so the morning run
+    would not know. Hard rule 20.
+    """
     from scripts import pipeline
+    from scripts.enrichment._circuit_breaker import GLOBAL_HOST_STOP
 
     rdap_config = copy.deepcopy(config)
     rdap_config["availability_budget_seconds"] = budget_seconds
+    rdap_config["rdap_429_strike_limit"] = 1
     candidates = [{"name": n, "tld": n.rsplit(".", 1)[-1]} for n in names]
-    available = pipeline.validate_availability(candidates, rdap_config)
+
+    capture = _RateLimitCapture()
+    breaker_logger = logging.getLogger("scripts.enrichment._circuit_breaker")
+    breaker_logger.addHandler(capture)
+    try:
+        available = pipeline.validate_availability(candidates, rdap_config)
+    finally:
+        breaker_logger.removeHandler(capture)
+
+    rate_limited = list(capture.events)
+    seen = {e["host"] for e in rate_limited}
+    for host, (_when, reason) in GLOBAL_HOST_STOP.stopped_hosts().items():
+        if reason == "403" and host not in seen:
+            rate_limited.append({
+                "host": host, "status": 403,
+                "retry_after_header": None, "honored_cooldown_seconds": None,
+            })
     return {
         "available": [c["name"] for c in available],
         "not_available": sum(1 for c in candidates if c.get("is_available") is False),
         "unknown": sum(1 for c in candidates if c.get("is_available") is None),
+        "rate_limited": rate_limited,
     }
+
+
+def _warn_rate_limited(events: list[dict[str, Any]], config: dict, *, now: datetime | None = None) -> None:
+    """One WARNING per host that pushed back, saying whether its cooldown
+    still runs at the next daily run."""
+    now = now or datetime.now(timezone.utc)
+    hour = int(_rebuild_config(config).get("daily_run_utc_hour", 9))
+    next_run = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    if next_run <= now:
+        next_run += timedelta(days=1)
+    for event in events:
+        if event["status"] == 403:
+            logger.warning(
+                "RDAP REBUILD PUSHBACK: %s returned HTTP 403 (outright block, not a "
+                "rate limit) during the rebuild RDAP pass. The next daily run at "
+                "%s UTC will hit the same host. Investigate before then.",
+                event["host"], next_run.strftime("%Y-%m-%d %H:%M"),
+            )
+            continue
+        until = now + timedelta(seconds=event["honored_cooldown_seconds"] or 0)
+        logger.warning(
+            "RDAP REBUILD PUSHBACK: %s returned HTTP 429 during the rebuild RDAP "
+            "pass (Retry-After header=%r, honoured %ss, until ~%s UTC); host stopped "
+            "for the rest of the pass. %s",
+            event["host"], event["retry_after_header"], event["honored_cooldown_seconds"],
+            until.strftime("%Y-%m-%d %H:%M"),
+            (
+                f"STILL ACTIVE at the next daily run ({next_run.strftime('%Y-%m-%d %H:%M')} UTC): "
+                "that run will hit this host during the registry's stated cooldown."
+                if until > next_run else
+                f"Ends before the next daily run ({next_run.strftime('%Y-%m-%d %H:%M')} UTC)."
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +522,7 @@ def run(
     started = time.monotonic()
     rcfg = _rebuild_config(config)
     max_referrers = int(rcfg.get("max_referrers", 100))
-    max_rdap = int(rcfg.get("max_rdap_checks", 300))
+    max_rdap = int(rcfg.get("max_rdap_checks", 50))
     rdap_budget = float(rcfg.get("rdap_budget_seconds", 3600))
     buckets = [int(b) for b in rcfg.get("distribution_buckets", [1, 5, 10, 20, 50, 100])]
     summary: dict[str, Any] = {"min_cc_domains": min_cc_domains}
@@ -508,6 +600,9 @@ def run(
     summary["rdap_available"] = len(available)
     summary["rdap_not_available"] = rdap["not_available"]
     summary["rdap_unknown"] = rdap["unknown"]
+    summary["rdap_rate_limited"] = rdap.get("rate_limited", [])
+    if summary["rdap_rate_limited"]:
+        _warn_rate_limited(summary["rdap_rate_limited"], config)
 
     # 5-6. referrers
     if not available:

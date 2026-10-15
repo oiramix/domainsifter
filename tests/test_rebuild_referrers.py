@@ -371,7 +371,7 @@ def test_r2_listing_error_propagates_as_failure(tmp_path, files):
         _run(tmp_path, files, s3)
 
 
-def test_check_available_uses_daily_rdap_path_with_its_own_budget(monkeypatch):
+def test_check_available_uses_daily_rdap_path_with_its_own_budget(monkeypatch, clean_breaker_state):
     from scripts import pipeline
 
     seen = {}
@@ -387,7 +387,10 @@ def test_check_available_uses_daily_rdap_path_with_its_own_budget(monkeypatch):
     monkeypatch.setattr(pipeline, "validate_availability", fake_validate)
     config = {"availability_budget_seconds": 7200, "api_min_interval_seconds": {"rdap": 2.0}}
     result = rr.check_available(["marketglow.com", "tideblock.net", "oldmill.com"], config, 900)
-    assert result == {"available": ["marketglow.com"], "not_available": 1, "unknown": 1}
+    assert result == {
+        "available": ["marketglow.com"], "not_available": 1, "unknown": 1,
+        "rate_limited": [],
+    }
     assert seen == {"budget": 900, "names": ["marketglow.com", "tideblock.net", "oldmill.com"]}
     assert config["availability_budget_seconds"] == 7200  # caller's config untouched
 
@@ -439,3 +442,160 @@ def test_main_returns_1_on_missing_input(tmp_path, files):
         s3_factory=lambda: (_fake_s3(files), "b"),
     )
     assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# Protecting the morning run (2026-10-15 review)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def clean_breaker_state():
+    from scripts.enrichment._circuit_breaker import (
+        GLOBAL_HOST_COOLDOWN,
+        GLOBAL_HOST_STOP,
+        GLOBAL_HOST_STRIKES,
+    )
+
+    def _reset():
+        GLOBAL_HOST_COOLDOWN.reset()
+        GLOBAL_HOST_STOP.reset()
+        GLOBAL_HOST_STRIKES.reset()
+
+    _reset()
+    yield
+    _reset()
+
+
+def test_check_available_stops_a_host_on_its_first_429(monkeypatch, clean_breaker_state):
+    """Change 1: the rebuild pass runs with rdap_429_strike_limit = 1. Driven
+    through the real 429 handler, one 429 stops the host."""
+    from scripts import pipeline
+    from scripts.enrichment import _circuit_breaker as cb
+
+    seen = {}
+
+    def fake_validate(candidates, config):
+        seen["strike_limit"] = config["rdap_429_strike_limit"]
+        resp = MagicMock(status_code=429, headers={"Retry-After": "86397"})
+        cb.request_with_429_backoff(
+            lambda: resp,
+            host="rdap.identitydigital.example",
+            retry_after_floor=5.0,
+            strike_limit=config["rdap_429_strike_limit"],
+            sleep=lambda _s: None,
+        )
+        for c in candidates:
+            c["is_available"] = None
+        return []
+
+    monkeypatch.setattr(pipeline, "validate_availability", fake_validate)
+    config = {"rdap_429_strike_limit": 3}
+    rr.check_available(["marketglow.live"], config, 900)
+
+    assert seen["strike_limit"] == 1
+    assert config["rdap_429_strike_limit"] == 3  # the caller's config is untouched
+    assert cb.GLOBAL_HOST_STOP.is_stopped("rdap.identitydigital.example")
+
+
+def test_calibration_rdap_cap_is_50():
+    """Change 2: at most 50 RDAP checks per calibration run, in config and as
+    the code default."""
+    config = json.loads((Path(rr.__file__).parent / "config.json").read_text(encoding="utf-8"))
+    assert config["rebuild"]["max_rdap_checks"] == 50
+    assert config["rebuild"]["daily_run_utc_hour"] == 9
+
+
+def test_run_defaults_to_50_rdap_checks_when_config_omits_the_cap(tmp_path, files):
+    many = {f"plainname{i:03d}.com": 30 for i in range(60)}
+    conn = sqlite3.connect(files["sqlite"])
+    conn.executemany("INSERT INTO cc_apex VALUES (?, ?)", list(many.items()))
+    conn.commit()
+    conn.close()
+    cfg_rebuild = {k: v for k, v in _config(tmp_path)["rebuild"].items() if k != "max_rdap_checks"}
+    rdap = _FakeRdap(registered=set(many) | {"oldmill.com", "marketglow.com", "tideblock.net"})
+    input_path = tmp_path / "drops.jsonl"
+    input_path.write_text("".join(json.dumps({"name": n}) + "\n" for n in [*DROPS, *many]), encoding="utf-8")
+    config = {**_config(tmp_path, files), "rebuild": cfg_rebuild}
+    rr.run(
+        config, input_path=input_path, output_path=tmp_path / "out.jsonl",
+        min_cc_domains=20, release=None,
+        s3_factory=lambda: (_fake_s3(files), "b"),
+        sqlite_path_fn=lambda *_a: files["sqlite"],
+        denylist_fn=lambda *_a: set(), rdap_fn=rdap,
+    )
+    assert len(rdap.calls[0][0]) == 50
+
+
+def test_check_available_reports_429_with_retry_after_and_403(monkeypatch, clean_breaker_state):
+    """Change 3, capture: every pushing-back host comes back with its status
+    and Retry-After, read from the real 429 handler's log record."""
+    from scripts import pipeline
+    from scripts.enrichment import _circuit_breaker as cb
+
+    def fake_validate(candidates, config):
+        resp = MagicMock(status_code=429, headers={"Retry-After": "86397"})
+        cb.request_with_429_backoff(
+            lambda: resp, host="rdap.identitydigital.example", retry_after_floor=5.0,
+            strike_limit=config["rdap_429_strike_limit"], sleep=lambda _s: None,
+        )
+        cb.GLOBAL_HOST_STOP.stop("rdap.blocked.example", reason="403")
+        return []
+
+    monkeypatch.setattr(pipeline, "validate_availability", fake_validate)
+    result = rr.check_available(["marketglow.live", "tideblock.shop"], {}, 900)
+    assert result["rate_limited"] == [
+        {"host": "rdap.identitydigital.example", "status": 429,
+         "retry_after_header": "86397", "honored_cooldown_seconds": 86397},
+        {"host": "rdap.blocked.example", "status": 403,
+         "retry_after_header": None, "honored_cooldown_seconds": None},
+    ]
+    # the capture handler is removed again afterwards
+    assert not any(
+        isinstance(h, rr._RateLimitCapture)
+        for h in logging.getLogger("scripts.enrichment._circuit_breaker").handlers
+    )
+
+
+def test_run_puts_pushback_in_summary_and_warns(tmp_path, files, caplog):
+    """Change 3, reporting: the summary lists the host and Retry-After, and a
+    WARNING says the cooldown outlasts the next daily run."""
+    caplog.set_level(logging.INFO, logger="scripts.rebuild_referrers")
+    event = {"host": "rdap.identitydigital.example", "status": 429,
+             "retry_after_header": "86397", "honored_cooldown_seconds": 86397}
+
+    def rdap(names, config, budget):
+        return {"available": [], "not_available": 0, "unknown": len(names), "rate_limited": [event]}
+
+    rc, out, *_ = _run(tmp_path, files, rdap=rdap)
+    assert rc == 0 and out == []
+    assert _summary(caplog)["rdap_rate_limited"] == [event]
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    text = warnings[0].getMessage()
+    assert "RDAP REBUILD PUSHBACK" in text
+    assert "rdap.identitydigital.example" in text and "'86397'" in text
+    assert "STILL ACTIVE at the next daily run" in text
+
+
+def test_clean_rdap_pass_has_empty_pushback_and_no_warning(tmp_path, files, caplog):
+    caplog.set_level(logging.INFO, logger="scripts.rebuild_referrers")
+    rc, *_ = _run(tmp_path, files)
+    assert rc == 0
+    assert _summary(caplog)["rdap_rate_limited"] == []
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_pushback_warning_says_when_cooldown_ends_before_next_run(caplog):
+    caplog.set_level(logging.WARNING, logger="scripts.rebuild_referrers")
+    now = datetime(2026, 10, 16, 16, 30, tzinfo=timezone.utc)
+    rr._warn_rate_limited(
+        [{"host": "rdap.radix.example", "status": 429,
+          "retry_after_header": "60", "honored_cooldown_seconds": 60},
+         {"host": "rdap.blocked.example", "status": 403,
+          "retry_after_header": None, "honored_cooldown_seconds": None}],
+        {"rebuild": {"daily_run_utc_hour": 9}}, now=now,
+    )
+    messages = [r.getMessage() for r in caplog.records]
+    assert "Ends before the next daily run (2026-10-17 09:00 UTC)" in messages[0]
+    assert "HTTP 403" in messages[1] and "2026-10-17 09:00" in messages[1]
