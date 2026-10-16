@@ -1,0 +1,26 @@
+# /etc/systemd/system/domainsifter-api-snapshot.service
+# Builds /var/lib/domainsifter-api/snapshot.json for the read-only API
+# (scripts/api_snapshot.py): the private R2 domain archive + the Wayback
+# excerpt sidecar, shaped for /v1. Runs as domainsifter because it needs the
+# R2 credentials in .env; the API process itself never sees them.
+#
+# Triggered daily by domainsifter-api-snapshot.timer. A failed build exits 1
+# and leaves the previous snapshot in place; the API keeps serving it.
+#
+# Manual: systemctl start domainsifter-api-snapshot.service
+# Logs:   journalctl -u domainsifter-api-snapshot.service
+
+[Unit]
+Description=DomainSifter API snapshot build
+
+[Service]
+Type=oneshot
+User=domainsifter
+Group=domainsifter
+WorkingDirectory=/home/domainsifter/domainsifter
+EnvironmentFile=/home/domainsifter/domainsifter/.env
+ExecStart=/home/domainsifter/domainsifter/.venv/bin/python -m scripts.api_snapshot
+StateDirectory=domainsifter-api
+StateDirectoryMode=0755
+StandardOutput=journal
+StandardError=journal

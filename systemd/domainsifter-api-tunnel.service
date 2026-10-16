@@ -1,0 +1,38 @@
+# /etc/systemd/system/domainsifter-api-tunnel.service
+# Cloudflare Tunnel publishing https://api.domainsifter.com -> 127.0.0.1:8010.
+# A separate tunnel from the other projects' tunnels on this host, so it can
+# be revoked on its own.
+#
+# The tunnel and its public-hostname route are created in the Cloudflare
+# dashboard (Zero Trust -> Networks -> Tunnels -> Create, type Cloudflared,
+# public hostname api.domainsifter.com -> HTTP localhost:8010). The token
+# goes in /etc/domainsifter/api-tunnel.env (root, 600):
+#   TUNNEL_TOKEN=<token from the dashboard>
+# The unit does not start until that file exists.
+#
+# Logs: journalctl -u domainsifter-api-tunnel.service -f
+
+[Unit]
+Description=Cloudflare Tunnel for api.domainsifter.com
+After=network-online.target domainsifter-api.service
+Wants=network-online.target
+ConditionPathExists=/etc/domainsifter/api-tunnel.env
+
+[Service]
+Type=simple
+DynamicUser=yes
+EnvironmentFile=/etc/domainsifter/api-tunnel.env
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel --metrics 127.0.0.1:60124 run
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

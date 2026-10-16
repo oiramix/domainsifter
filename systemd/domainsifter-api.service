@@ -1,0 +1,50 @@
+# /etc/systemd/system/domainsifter-api.service
+# DomainSifter read-only API for Asset X-Ray (scripts/api_server.py).
+#
+# Listens on 127.0.0.1:8010 only; the public face is
+# https://api.domainsifter.com via domainsifter-api-tunnel.service.
+# Serves ONE file, /var/lib/domainsifter-api/snapshot.json, written by
+# domainsifter-api-snapshot.service. GET only.
+#
+# Isolation: DynamicUser (no relation to the domainsifter user), read-only
+# filesystem, no access to the repo's .env (mode 600, other owner), the
+# Claude credentials, or the other projects' home directories.
+#
+# Tokens: /etc/domainsifter/api.env (root, 600) holds
+#   DOMAINSIFTER_API_TOKENS=<token>[,<next-token>]
+# Two comma-separated tokens are accepted during a rotation; restart this
+# unit after editing the file (about one second).
+#
+# Logs: journalctl -u domainsifter-api.service -f
+
+[Unit]
+Description=DomainSifter read-only API (127.0.0.1:8010)
+After=network-online.target
+ConditionPathExists=/etc/domainsifter/api.env
+
+[Service]
+Type=simple
+DynamicUser=yes
+EnvironmentFile=/etc/domainsifter/api.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+WorkingDirectory=/home/domainsifter/domainsifter
+ExecStart=/home/domainsifter/domainsifter/.venv/bin/python -m scripts.api_server
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+InaccessiblePaths=-/home/domainsifter/domainsifter/.env -/home/domainsifter/.claude -/home/domainsifter/.claude.json -/home/oilroutes -/home/debian
+MemoryMax=1G
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

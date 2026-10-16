@@ -357,6 +357,93 @@
   },
   "rdap_429_strike_limit": 3,
   "_rdap_429_strike_limit_doc": "Per-host cumulative 429 strike cap for the RDAP availability stage (added 2026-06-02, replacing the 2026-06-02-morning hard-stop-on-first-429 which was over-tuned — a single transient 429 retired a host's whole bucket). On each 429 a host gets one strike: we honor Retry-After (arm GLOBAL_HOST_COOLDOWN so subsequent domains skip during the window) and then RESUME querying at the normal per-host throttle. Strikes accumulate CUMULATIVELY across the bucket for the run (a success does NOT reset the counter), so clustered-but-non-adjacent 429s still count and spacing can't evade the cap. On the Nth strike (default 3 = sustained pushback) the host is STOPPED permanently for the run (GLOBAL_HOST_STOP) — results gathered so far are kept, the rest are left unchecked-and-unverified, other hosts finish, and we publish what we have. Per RFC 7480 §5.5 a 429 is the survivable 'decrease your rate' signal, not the catastrophic one; 3 strikes is the heuristic for 'the registry means it'. ORTHOGONAL to 403: a 403 (rdap.check_availability) is an immediate hard-stop + CRITICAL alarm with no strike accounting — one is enough, it is the catastrophic IP-block. Tunable without code; lower to 1 to restore hard-stop-on-first, raise for more tolerance. Counter lives in scripts/enrichment/_circuit_breaker.py HostStrikes (GLOBAL_HOST_STRIKES).",
+  "api": {
+    "_doc": "Read-only HTTP API for Asset X-Ray (2026-10-16). scripts/api_snapshot.py (timer, runs as domainsifter with R2 access) turns the private R2 domain archive + the Wayback excerpt sidecar into one JSON snapshot at snapshot_path; scripts/api_server.py (stdlib HTTP, no R2 access, no repo secrets) serves only that snapshot on bind_host:port behind a Cloudflare Tunnel as https://api.domainsifter.com/v1. Bearer tokens come from DOMAINSIFTER_API_TOKENS (comma-separated, two during rotation) in /etc/domainsifter/api.env, never from this file. rdap_verified_since: published-list records before this date predate RDAP validation (commit 6b9a8ed, 2026-04-29), so their availability comes from the zone diff only. sources is the provenance registry served at /v1/sources; terms_status and may_display are the operator's reading of each provider's terms, not legal advice — anything not reviewed is unknown / may_display false. See docs/api/data-dictionary.md.",
+    "bind_host": "127.0.0.1",
+    "port": 8010,
+    "snapshot_path": "/var/lib/domainsifter-api/snapshot.json",
+    "rate_limit_per_second": 20,
+    "rate_limit_burst": 40,
+    "default_page_limit": 100,
+    "max_page_limit": 1000,
+    "rdap_verified_since": "2026-04-30",
+    "classifier_model": "claude-haiku-4-5",
+    "name_ranker_model": "claude-haiku-4-5",
+    "sources": [
+      {
+        "id": "icann_czds",
+        "name": "ICANN CZDS gTLD zone files, daily diff",
+        "method": "licensed_feed",
+        "terms_status": "permitted_with_conditions",
+        "may_display": true,
+        "collected_from": "2026-04-26",
+        "notes": "Domain names that disappeared from a gTLD zone file between two daily CZDS downloads, plus their drop date. Zone access is governed by the ICANN base Registry Agreement, Specification 4 section 2.1.5: use for lawful purposes; the user takes reasonable steps to protect the zone data against unauthorized access, use and disclosure; no use for marketing to entities other than the user's existing customers; no high-volume automated processes that query registry systems; no interference with registrants. may_display=true covers displaying individual available-domain names and lists of available domains derived from zone diffs (names that are no longer in the zone), as domainsifter.com does publicly. It does NOT cover redistributing zone file contents (this API never exposes them), marketing to registrants, or automated querying of registry systems. Operator's reading, not legal advice."
+      },
+      {
+        "id": "registry_rdap",
+        "name": "Registry RDAP availability lookup",
+        "method": "api",
+        "terms_status": "unknown",
+        "may_display": false,
+        "collected_from": "2026-04-30",
+        "notes": "HTTP 404 from the TLD registry's RDAP server = no registration found = available. Each registry publishes its own RDAP terms; they have not been reviewed for third-party display. domainsifter.com itself shows the resulting availability."
+      },
+      {
+        "id": "internet_archive_wayback",
+        "name": "Internet Archive Wayback Machine (CDX counts and archived page titles)",
+        "method": "api",
+        "terms_status": "unknown",
+        "may_display": false,
+        "collected_from": "2026-04-26",
+        "notes": "Snapshot count and date of the most recent capture from the CDX API; sample_title is the <title> of the most recent archived page. Internet Archive terms not reviewed for commercial display."
+      },
+      {
+        "id": "common_crawl_webgraph",
+        "name": "Common Crawl domain-level web graph",
+        "method": "licensed_feed",
+        "terms_status": "permitted_with_conditions",
+        "may_display": false,
+        "collected_from": "2026-05-14",
+        "notes": "Number of distinct domains linking to the domain in the Common Crawl release named in the observation. Common Crawl Terms of Use grant a limited, non-exclusive licence and tell users to obtain legal advice before commercial use; display is not addressed. Not reviewed by counsel, hence may_display=false."
+      },
+      {
+        "id": "open_page_rank",
+        "name": "Open PageRank API",
+        "method": "api",
+        "terms_status": "unknown",
+        "may_display": false,
+        "collected_from": "2026-04-28",
+        "notes": "Open PageRank score (0-10). Provider terms not reviewed."
+      },
+      {
+        "id": "crtsh",
+        "name": "crt.sh certificate transparency search",
+        "method": "api",
+        "terms_status": "unknown",
+        "may_display": false,
+        "collected_from": "2026-04-26",
+        "notes": "Whether any certificate was ever logged for the domain. crt.sh terms not reviewed."
+      },
+      {
+        "id": "domainsifter_content_classifier",
+        "name": "DomainSifter AI content classifier",
+        "method": "api",
+        "terms_status": "permitted",
+        "may_display": true,
+        "collected_from": "2026-05-18",
+        "notes": "Anthropic Claude Haiku reads the most recent archived page's title, description and headings and labels it legitimate, parked, empty or toxic; deterministic parking-marker and abuse-signature checks can override it. An AI opinion, to be shown labelled as such. Output belongs to DomainSifter."
+      },
+      {
+        "id": "domainsifter_name_ranker",
+        "name": "DomainSifter AI name-quality ranker",
+        "method": "api",
+        "terms_status": "permitted",
+        "may_display": true,
+        "collected_from": "2026-06-02",
+        "notes": "Anthropic Claude Haiku scores the domain NAME 0-100 for brandability before any other check. An AI opinion about the name only, not the site. Output belongs to DomainSifter."
+      }
+    ]
+  },
   "_drops_handoff_path_doc": "Private local file (scripts/state/ is gitignored) holding the run's full drop list, written by pipeline._emit_drops right after collect_drops and read by scripts/rebuild_referrers.py. Overwritten every run; a failed write never affects the run.",
   "drops_handoff_path": "scripts/state/drops_latest.jsonl",
   "output_path": "src/data/daily-domains.json"

@@ -1,0 +1,22 @@
+# Rebuilds the API snapshot daily at 15:10 UTC.
+#
+# WHY 15:10 UTC: the daily run starts 09:00 UTC and appends to the R2 domain
+# archive when it finishes (normally ~12:00-12:30); the archive timer's push
+# is at 14:00. 15:10 reads a settled archive, stays clear of both, and ends
+# well before the 16:00 UTC end of the cc_refresh blackout. Persistent=true
+# rebuilds on boot after a missed firing; the build is read-only on R2 and
+# idempotent, so a catch-up at any hour is harmless.
+#
+# INSTALL: sudo scripts/deploy_systemd.sh
+#          sudo systemctl enable --now domainsifter-api-snapshot.timer
+
+[Unit]
+Description=Rebuild the DomainSifter API snapshot at 15:10 UTC
+
+[Timer]
+OnCalendar=*-*-* 15:10:00 UTC
+Persistent=true
+Unit=domainsifter-api-snapshot.service
+
+[Install]
+WantedBy=timers.target
