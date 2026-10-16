@@ -2925,3 +2925,32 @@ Built per the 2026-10-01 plan. **Committed, not yet deployed to OVH, not yet run
 
 - No "unverified" publish path. The plan left it to the owner and nothing here builds it.
 - No public JSON contract change. The held count appears only in the private daily email.
+
+---
+
+## 2026-10-16 — Read-only API for Asset X-Ray (live on localhost; public hostname pending)
+
+Mario asked for an API that his other project, Asset X-Ray, can read. Their spec v1.0 assumed data DomainSifter does not hold: an ExpiredDomains.net scrape, per-link backlinks, DMOZ, auctions, niche. The API serves what exists and says plainly what doesn't. The contract for the consumer is docs/api/data-dictionary.md and `/v1/openapi.json`.
+
+**What runs**
+- `domainsifter-api-snapshot.timer`, daily at 15:10 UTC. `scripts/api_snapshot.py` runs as `domainsifter`, reads the private R2 domain archive and the Wayback excerpt sidecar, and writes `/var/lib/domainsifter-api/snapshot.json`. That is 7,214 domains, 15 MB, built in about 1 s. It never reads the toxic denylist or the held queue. A failed build keeps the old snapshot.
+- `domainsifter-api.service`, which runs `scripts/api_server.py` (standard library only) on 127.0.0.1:8010.
+  - It runs as a DynamicUser on a read-only filesystem. It has no R2 credentials and cannot read the repo `.env`; this was verified.
+  - Only GET is allowed.
+  - Endpoints: `/v1/health`, `sources`, `domains/{d}`, `observations`, `candidates`, `changes` and `openapi.json`. `backlinks` and `referring-domains` always return 501, by Mario's decision; Asset X-Ray has its own Common Crawl index.
+- `domainsifter-api-tunnel.service`, which publishes the API at https://api.domainsifter.com. It is enabled but waits for `/etc/domainsifter/api-tunnel.env` (TUNNEL_TOKEN). Mario creates the tunnel in the Cloudflare dashboard with public hostname api.domainsifter.com pointing to HTTP localhost:8010.
+
+**Tokens:** `/etc/domainsifter/api.env` (root, 600) holds `DOMAINSIFTER_API_TOKENS=<t1>[,<t2>]`. Two tokens are accepted during a rotation. Restart the API after editing. Tokens are never printed or committed.
+
+**Provenance (`api.sources` in config.json):**
+- ICANN CZDS is `permitted_with_conditions`, `may_display: true`. This covers displaying derived available-domain names and lists, based on the base Registry Agreement Spec 4 §2.1.5, and never zone file contents.
+- Common Crawl is `permitted_with_conditions`, `may_display: false`. Its terms say to get legal advice before commercial use.
+- RDAP, Wayback, Open PageRank and crt.sh are `unknown`, `may_display: false`, because their terms were not reviewed.
+- Our AI classifier and name ranker are `permitted`, `may_display: true`, shown as AI opinion.
+- None of these is legal advice. Flip a value only after a review.
+
+**Known limits:** archive timestamps have day precision. For referring_domains and open_page_rank, `not_checked` cannot tell "never looked up" from "lookup failed" from "not in graph", because the pipeline never recorded the reason.
+
+**Next:**
+- Mario creates the tunnel and pastes its token on the server, then the service is started.
+- The API token goes to Asset X-Ray through Mario.
