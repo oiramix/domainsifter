@@ -114,6 +114,13 @@ def _build_index(data: dict) -> dict[str, Any]:
             src, at = obs.get("source"), obs.get("observed_at")
             if src and at and at > last_by_source.get(src, ""):
                 last_by_source[src] = at
+        # Every drop_date comes from the daily CZDS zone diff, even when the
+        # availability itself was RDAP-confirmed.
+        drop = (doc.get("availability") or {}).get("drop_date")
+        if drop:
+            at = f"{drop}T00:00:00Z"
+            if at > last_by_source.get("icann_czds", ""):
+                last_by_source["icann_czds"] = at
     return {
         "by_first_seen": sorted(domains.values(), key=lambda d: (d["first_seen_at"] or "", d["domain"]), reverse=True),
         "by_changed": sorted(domains.values(), key=lambda d: (d["last_seen_at"] or "", d["domain"])),

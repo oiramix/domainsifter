@@ -132,7 +132,8 @@ def test_health_reports_freshness(setup):
     assert body["data"]["last_ingest_at"] == "2026-10-16T15:10:00Z"
     by_id = {s["id"]: s["last_run_at"] for s in body["data"]["sources"]}
     assert by_id["registry_rdap"] == "2026-10-11T00:00:00Z"
-    assert by_id["icann_czds"] is None
+    # drop dates come from the daily CZDS diff even for RDAP-confirmed domains
+    assert by_id["icann_czds"] == "2026-10-11T00:00:00Z"
 
 
 def test_health_degraded_and_data_503_without_snapshot(tmp_path):
