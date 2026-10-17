@@ -156,8 +156,9 @@ def test_sources_registry_is_valid_and_czds_is_explicit(setup):
             assert s["may_display"] is False
     czds = next(s for s in items if s["id"] == "icann_czds")
     assert czds["terms_status"] == "permitted_with_conditions"
-    assert czds["may_display"] is True
-    assert "Specification 4" in czds["notes"]
+    # Asset X-Ray's request, 2026-10-17: lists derived from zone diffs are not displayed
+    assert czds["may_display"] is False
+    assert "Appendix 3" in czds["notes"] and "Specification 4" in czds["notes"]
     used = {o["source"] for d in api_snapshot.build_snapshot(EVENTS, {}, REAL_CONFIG)["domains"].values()
             for o in d["observations"]}
     assert used <= {s["id"] for s in items}

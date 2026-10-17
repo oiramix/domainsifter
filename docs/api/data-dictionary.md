@@ -22,7 +22,7 @@ DomainSifter finds domains that disappear from gTLD zone files, confirms with th
 
 | id | method | terms_status | may_display | What it provides |
 |---|---|---|---|---|
-| `icann_czds` | licensed_feed | permitted_with_conditions | true | Domain names that left a gTLD zone between two daily CZDS downloads, and the drop date. See the conditions below. |
+| `icann_czds` | licensed_feed | permitted_with_conditions | false | Domain names that left a gTLD zone between two daily CZDS downloads, and the drop date. See the conditions below. |
 | `registry_rdap` | api | unknown | false | Availability: the registry's RDAP server answered 404 (no registration). |
 | `internet_archive_wayback` | api | unknown | false | Wayback snapshot count, year of the latest capture, and the latest archived page title (`sample_title`). |
 | `common_crawl_webgraph` | licensed_feed | permitted_with_conditions | false | Number of distinct domains linking to the domain in a Common Crawl domain-graph release. |
@@ -31,16 +31,20 @@ DomainSifter finds domains that disappear from gTLD zone files, confirms with th
 | `domainsifter_content_classifier` | api | permitted | true | AI opinion of what the archived site was: legitimate / parked / empty / toxic. |
 | `domainsifter_name_ranker` | api | permitted | true | AI opinion of the domain name's brandability, 0 to 100. |
 
-**ICANN CZDS conditions.** Zone access falls under the ICANN base Registry Agreement, Specification 4 §2.1.5. The data may be used for lawful purposes, provided that:
+**ICANN CZDS conditions.** Which agreement applies depends on the TLD:
+- **.com and .net:** Verisign's own Registry Agreements (.com, 1 Dec 2024; .net, 1 Jul 2023), Appendix 3 (Zone File Access) §1.5.
+- **New gTLDs** (.app, .dev, .live, .studio, .tech, .online, .site, .store, .xyz): ICANN base Registry Agreement, Specification 4 §2.1.5.
+- **.org, .info and .biz:** not separately verified.
+
+Both texts allow use for lawful purposes, provided that:
 - the user takes reasonable steps to protect the zone data against unauthorized access, use and disclosure;
 - it is not used for marketing to anyone other than the user's existing customers;
 - it is not used for high-volume automated processes that query registry systems;
 - it is not used to interfere with registrants.
 
-`may_display: true` covers displaying individual available-domain names, and lists of available domains derived from zone diffs. These are names that are no longer in the zone, as domainsifter.com shows publicly. It does not cover:
-- redistributing zone file contents (this API never serves them);
-- marketing to registrants;
-- automated querying of registry systems.
+Neither has an express redistribution or publication clause.
+
+`may_display` is `false` at Asset X-Ray's request (2026-10-17): lists of dropped or new domains derived from zone diffs are not displayed. Serving single-domain lookups is fine. Whether to show a per-domain fact a user asked about, or a watchlist alert, is Asset X-Ray's decision under its own review. This API never serves zone file contents.
 
 ## Statuses: unknown is `null`, never `0`
 
