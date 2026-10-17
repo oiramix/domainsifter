@@ -1,0 +1,1306 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DomainSifter read-only API",
+    "version": "1.0.0",
+    "description": "Read-only. Every value carries a source id; unknown is null with a status, never 0. Timestamps derived from the archive have day precision (T00:00:00Z). See docs/api/data-dictionary.md."
+  },
+  "servers": [
+    {
+      "url": "https://api.domainsifter.com"
+    }
+  ],
+  "security": [
+    {
+      "bearer": []
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "not_found",
+                  "bad_request",
+                  "unauthorized",
+                  "rate_limited",
+                  "internal"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Source": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "method",
+          "terms_status",
+          "may_display"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "icann_czds",
+              "icann_czds_domain_fact",
+              "registry_rdap",
+              "internet_archive_wayback",
+              "common_crawl_webgraph",
+              "open_page_rank",
+              "crtsh",
+              "domainsifter_content_classifier",
+              "domainsifter_name_ranker"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "scrape",
+              "api",
+              "own_crawl",
+              "licensed_feed",
+              "manual"
+            ]
+          },
+          "terms_status": {
+            "type": "string",
+            "enum": [
+              "permitted",
+              "permitted_with_conditions",
+              "prohibited",
+              "unknown"
+            ]
+          },
+          "may_display": {
+            "type": "boolean"
+          },
+          "collected_from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "Metric": {
+        "type": "object",
+        "required": [
+          "name",
+          "value",
+          "status",
+          "source",
+          "observed_at"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "referring_domains",
+              "open_page_rank",
+              "cert_history"
+            ],
+            "description": "referring_domains: integer, Common Crawl domain graph. open_page_rank: number 0-10. cert_history: boolean, crt.sh."
+          },
+          "value": {
+            "type": [
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "not_checked",
+              "lookup_failed"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "icann_czds",
+              "icann_czds_domain_fact",
+              "registry_rdap",
+              "internet_archive_wayback",
+              "common_crawl_webgraph",
+              "open_page_rank",
+              "crtsh",
+              "domainsifter_content_classifier",
+              "domainsifter_name_ranker",
+              null
+            ],
+            "description": "Source id; see GET /v1/sources for terms_status and may_display."
+          },
+          "observed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Day precision."
+          }
+        }
+      },
+      "Availability": {
+        "type": "object",
+        "required": [
+          "status",
+          "observed_at",
+          "source",
+          "drop_date"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "dropped",
+              "pending_delete",
+              "available",
+              "registered",
+              "auction",
+              "unknown"
+            ],
+            "description": "Only available (RDAP 404) and dropped (zone diff only, before 2026-04-30) occur."
+          },
+          "observed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Day precision."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "icann_czds",
+              "icann_czds_domain_fact",
+              "registry_rdap",
+              "internet_archive_wayback",
+              "common_crawl_webgraph",
+              "open_page_rank",
+              "crtsh",
+              "domainsifter_content_classifier",
+              "domainsifter_name_ranker",
+              null
+            ],
+            "description": "Source id; see GET /v1/sources for terms_status and may_display."
+          },
+          "drop_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Day the domain left its zone (source icann_czds_domain_fact)."
+          }
+        }
+      },
+      "Zone": {
+        "type": "object",
+        "required": [
+          "status",
+          "left_zone_at",
+          "left_zone_count",
+          "first_seen_in_zone_at",
+          "source"
+        ],
+        "description": "Per-domain zone facts (source icann_czds_domain_fact).",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "not_checked"
+            ]
+          },
+          "left_zone_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Most recent day the domain left its gTLD zone."
+          },
+          "left_zone_count": {
+            "type": "integer",
+            "description": "Distinct days DomainSifter saw it leave a zone."
+          },
+          "first_seen_in_zone_at": {
+            "type": "null",
+            "description": "Always null: DomainSifter only sees domains leave a zone and keeps no zone history."
+          },
+          "source": {
+            "type": "string",
+            "const": "icann_czds_domain_fact"
+          }
+        }
+      },
+      "Wayback": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "none_found",
+              "lookup_failed",
+              "not_checked"
+            ]
+          },
+          "snapshots": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "first_year": {
+            "type": "null",
+            "description": "Always null: the first capture is not stored."
+          },
+          "last_year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sample_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Day precision."
+          }
+        }
+      },
+      "NameQuality": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "description": "AI opinion of the domain NAME (source domainsifter_name_ranker).",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "analyzed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Analysis": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "description": "AI opinion; null if never classified. Content verdict from domainsifter_content_classifier.",
+        "properties": {
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "niche": {
+            "type": "null"
+          },
+          "score": {
+            "type": "null",
+            "description": "Always null; the name score is name_quality.score."
+          },
+          "spam_signal": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "low",
+              "high",
+              null
+            ]
+          },
+          "verdict": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "legitimate",
+              "parked",
+              "empty",
+              "toxic",
+              null
+            ]
+          },
+          "analyzed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Day precision."
+          },
+          "name_quality": {
+            "$ref": "#/components/schemas/NameQuality"
+          }
+        }
+      },
+      "Domain": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "tld": {
+            "type": "string"
+          },
+          "first_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "First day DomainSifter recorded the domain (not zone entry)."
+          },
+          "last_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Most recent day DomainSifter recorded the domain."
+          },
+          "availability": {
+            "$ref": "#/components/schemas/Availability"
+          },
+          "zone": {
+            "$ref": "#/components/schemas/Zone"
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Metric"
+            }
+          },
+          "wayback": {
+            "$ref": "#/components/schemas/Wayback"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/Analysis"
+          },
+          "published_on_domainsifter": {
+            "type": "boolean"
+          },
+          "observations_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "Observation": {
+        "type": "object",
+        "required": [
+          "observed_at",
+          "kind",
+          "name",
+          "value",
+          "status",
+          "source"
+        ],
+        "properties": {
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "availability",
+              "metric",
+              "wayback",
+              "analysis"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "enum": [
+              "availability",
+              "left_zone",
+              "referring_domains",
+              "open_page_rank",
+              "cert_history",
+              "snapshots",
+              "content_category",
+              "name_quality"
+            ]
+          },
+          "value": {},
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "none_found",
+              "not_checked",
+              "lookup_failed"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "icann_czds",
+              "icann_czds_domain_fact",
+              "registry_rdap",
+              "internet_archive_wayback",
+              "common_crawl_webgraph",
+              "open_page_rank",
+              "crtsh",
+              "domainsifter_content_classifier",
+              "domainsifter_name_ranker",
+              null
+            ],
+            "description": "Source id; see GET /v1/sources for terms_status and may_display."
+          }
+        }
+      },
+      "Candidate": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "first_seen_at": {
+            "type": "string"
+          },
+          "last_seen_at": {
+            "type": "string"
+          },
+          "availability": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "observed_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Metric"
+            }
+          },
+          "wayback": {
+            "type": "object"
+          },
+          "analysis": {
+            "type": "object",
+            "properties": {
+              "niche": {
+                "type": "null"
+              },
+              "verdict": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Change": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "changed_at": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "added",
+              "updated"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/v1/health": {
+      "get": {
+        "summary": "Freshness and status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "snapshot not loaded yet (code internal)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sources": {
+      "get": {
+        "summary": "Provenance registry",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Source"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "snapshot not loaded yet (code internal)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/openapi.json": {
+      "get": {
+        "summary": "This document",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/domains/{domain}": {
+      "get": {
+        "summary": "One domain",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lowercase ASCII or punycode; Unicode input is converted."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Domain"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not in DomainSifter"
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "snapshot not loaded yet (code internal)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/domains/{domain}/observations": {
+      "get": {
+        "summary": "Observation history, oldest first",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lowercase ASCII or punycode; Unicode input is converted."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Observation"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "snapshot not loaded yet (code internal)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/domains/{domain}/backlinks": {
+      "get": {
+        "summary": "Always 501: no per-link data",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lowercase ASCII or punycode; Unicode input is converted."
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "not implemented"
+          }
+        }
+      }
+    },
+    "/v1/domains/{domain}/referring-domains": {
+      "get": {
+        "summary": "Always 501: counts only, in metrics",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Lowercase ASCII or punycode; Unicode input is converted."
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "not implemented"
+          }
+        }
+      }
+    },
+    "/v1/candidates": {
+      "get": {
+        "summary": "Filterable list (derived from zone diffs: list_source icann_czds)",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tld",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min_referring_domains",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "has_wayback",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "niche",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Not supported: returns 400."
+          },
+          {
+            "name": "first_seen_after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "updated_after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "first_seen_desc",
+                "referring_domains_desc",
+                "wayback_first_year_asc"
+              ],
+              "default": "first_seen_desc"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Candidate"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "list_source": {
+                      "type": "string",
+                      "const": "icann_czds",
+                      "description": "This list is derived from CZDS zone diffs."
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "snapshot not loaded yet (code internal)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/changes": {
+      "get": {
+        "summary": "Incremental sync feed, oldest change first (list_source icann_czds)",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Change"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "list_source": {
+                      "type": "string",
+                      "const": "icann_czds",
+                      "description": "This list is derived from CZDS zone diffs."
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Last-Modified": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bad_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "snapshot not loaded yet (code internal)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

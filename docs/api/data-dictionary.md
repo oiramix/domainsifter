@@ -1,6 +1,6 @@
 # DomainSifter read-only API: data dictionary
 
-**API version:** 1.0.0. **Base URL:** `https://api.domainsifter.com/v1`. **Contract:** `GET /v1/openapi.json`.
+**API version:** 1.0.0. **Base URL:** `https://api.domainsifter.com/v1`. **Contract:** `GET /v1/openapi.json` (a committed copy is `docs/api/openapi.json`).
 
 This answers the Asset X-Ray requirements v1.0 (2026-10-16). Where DomainSifter does not hold what the spec asks for, the API says so with `null` plus a status, or `501`, and this document explains why.
 
@@ -12,6 +12,19 @@ DomainSifter finds domains that disappear from gTLD zone files, confirms with th
 
 **Data per domain:** one event per day it was confirmed available or listed. Each event becomes several observations. Domains are never deleted.
 
+**Field names at a glance:**
+
+| What | Field |
+|---|---|
+| Source ids | see the table under Sources; also the `Source.id` enum in `openapi.json` |
+| Day the domain left its zone (per domain) | `zone.left_zone_at` (timestamp), `availability.drop_date` (date), observations with `name: left_zone` |
+| Day the domain was first seen IN a zone | `zone.first_seen_in_zone_at`: always `null` (not tracked) |
+| First / last day DomainSifter recorded it | `first_seen_at` / `last_seen_at` (not zone entry) |
+| Open PageRank | metric `name: open_page_rank` in `metrics` |
+| Referring-domain count | metric `name: referring_domains` |
+| AI name score (0-100) | `analysis.name_quality.score` (model in `analysis.name_quality.model`) |
+| AI content verdict | `analysis.verdict` (`analysis.score` is always `null`) |
+
 **Freshness:** the snapshot is rebuilt daily at 15:10 UTC, after the daily run. `GET /v1/health` gives `last_ingest_at`.
 
 **Day precision:** timestamps derived from these events have day precision only: `YYYY-MM-DDT00:00:00Z` means "on that UTC day".
@@ -22,7 +35,8 @@ DomainSifter finds domains that disappear from gTLD zone files, confirms with th
 
 | id | method | terms_status | may_display | What it provides |
 |---|---|---|---|---|
-| `icann_czds` | licensed_feed | permitted_with_conditions | false | Domain names that left a gTLD zone between two daily CZDS downloads, and the drop date. See the conditions below. |
+| `icann_czds` | licensed_feed | permitted_with_conditions | false | LISTS of domains that left a gTLD zone between two daily CZDS downloads. Cited by `/v1/candidates` and `/v1/changes` (`list_source`). See the conditions below. |
+| `icann_czds_domain_fact` | licensed_feed | permitted_with_conditions | true | Zone facts about ONE domain on a single-domain lookup: the day(s) it left its zone (`zone`, `availability.drop_date`, observation `left_zone`), and `availability.status: dropped` for records before RDAP checks. |
 | `registry_rdap` | api | unknown | false | Availability: the registry's RDAP server answered 404 (no registration). |
 | `internet_archive_wayback` | api | unknown | false | Wayback snapshot count, year of the latest capture, and the latest archived page title (`sample_title`). |
 | `common_crawl_webgraph` | licensed_feed | permitted_with_conditions | false | Number of distinct domains linking to the domain in a Common Crawl domain-graph release. |
@@ -44,7 +58,7 @@ Both texts allow use for lawful purposes, provided that:
 
 Neither has an express redistribution or publication clause.
 
-`may_display` is `false` at Asset X-Ray's request (2026-10-17): lists of dropped or new domains derived from zone diffs are not displayed. Serving single-domain lookups is fine. Whether to show a per-domain fact a user asked about, or a watchlist alert, is Asset X-Ray's decision under its own review. This API never serves zone file contents.
+At Asset X-Ray's request (2026-10-17) the CZDS data has two source ids. `icann_czds` (lists of dropped or new domains derived from zone diffs) has `may_display: false`. `icann_czds_domain_fact` (zone facts about one domain, on a single-domain lookup) has `may_display: true`. This API never serves zone file contents.
 
 ## Statuses: unknown is `null`, never `0`
 
@@ -84,13 +98,19 @@ Each metric in `/v1/domains/{domain}` is the newest observation with status `ok`
 - `first_seen_at`: the first day DomainSifter saw the domain.
 - `last_seen_at`: the most recent day.
 
+**`zone`** (additive; source `icann_czds_domain_fact`)
+- `left_zone_at`: the most recent day the domain left its gTLD zone.
+- `left_zone_count`: distinct days DomainSifter saw it leave a zone (2 or more means it dropped more than once).
+- `first_seen_in_zone_at`: always `null`. DomainSifter diffs consecutive daily zone files and keeps no zone history, so it never sees a domain enter a zone.
+- `status`: `ok` when a drop day is known, else `not_checked`.
+
 **`availability`**
 - `status`:
   - `available`: RDAP-confirmed.
   - `dropped`: zone diff only. This applies to published records before 2026-04-30, when RDAP validation was not yet in place.
   - `pending_delete`, `auction` and `registered` are never returned: DomainSifter does not track them.
-- `source`: `registry_rdap` or `icann_czds`.
-- `drop_date`: the zone-diff date.
+- `source`: `registry_rdap` or `icann_czds_domain_fact`.
+- `drop_date`: the zone-diff date (source `icann_czds_domain_fact`).
 
 **`wayback`**
 - `first_year`: always `null`. DomainSifter stores the snapshot count and the latest capture, not the first.
@@ -114,10 +134,12 @@ All of this is an AI opinion; show it labelled as such.
 
 **`/v1/domains/{domain}/observations`.** Every observation, oldest first, paginated. Each one has:
 - `kind`: `availability`, `metric`, `wayback` or `analysis`;
-- `name`: as in the tables above, plus `snapshots` (wayback), `content_category` and `name_quality` (analysis);
+- `name`: as in the tables above, plus `left_zone` (availability; value is the drop date), `snapshots` (wayback), `content_category` and `name_quality` (analysis);
 - `value`, `status` and `source`.
 
 **`/v1/domains/{domain}/backlinks` and `/referring-domains`.** Always `501`: there's no per-link data, and referring-domain names are not served. The error body's `code` is `not_found`, since the spec's code list has no `not_implemented`; the HTTP status is the signal.
+
+**List endpoints** (`/v1/candidates`, `/v1/changes`) add `"list_source": "icann_czds"` to every page: the list itself is derived from zone diffs.
 
 **`/v1/candidates`.**
 - Filters: `status`, `tld`, `min_referring_domains` (excludes domains whose count is unknown), `has_wayback`, `first_seen_after`, `updated_after`, `sort`.

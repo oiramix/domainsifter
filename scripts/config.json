@@ -372,12 +372,21 @@
     "sources": [
       {
         "id": "icann_czds",
-        "name": "ICANN CZDS gTLD zone files, daily diff",
+        "name": "ICANN CZDS gTLD zone files, daily diff: LISTS of dropped domains",
         "method": "licensed_feed",
         "terms_status": "permitted_with_conditions",
         "may_display": false,
         "collected_from": "2026-04-26",
-        "notes": "Domain names that disappeared from a gTLD zone file between two daily CZDS downloads, plus their drop date. Zone access terms: .com and .net are Verisign TLDs under their own Registry Agreements (.com, 1 Dec 2024; .net, 1 Jul 2023), Appendix 3 (Zone File Access) section 1.5; the new gTLDs (.app, .dev, .live, .studio, .tech, .online, .site, .store, .xyz) are under the ICANN base Registry Agreement, Specification 4 section 2.1.5; .org, .info and .biz are not separately verified here. Both texts set the same conditions: use for lawful purposes; reasonable steps to protect the zone data against unauthorized access, use and disclosure; no marketing to entities other than the user's existing customers; no high-volume automated processes that query registry systems; no interference with registrants. Neither contains an express redistribution or publication clause. may_display=false at Asset X-Ray's request (2026-10-17): lists of dropped or new domains derived from zone diffs are not to be displayed. Serving single-domain lookups is fine; whether to show a per-domain fact a user asked about, or a watchlist alert, is the consumer's decision under its own review of these terms. This API never serves zone file contents. Operator's reading, not legal advice."
+        "notes": "Cited by LIST endpoints (/v1/candidates, /v1/changes): lists of domains that disappeared from a gTLD zone file between two daily CZDS downloads. Per-domain zone facts cite icann_czds_domain_fact instead. Zone access terms: .com and .net are Verisign TLDs under their own Registry Agreements (.com, 1 Dec 2024; .net, 1 Jul 2023), Appendix 3 (Zone File Access) section 1.5; the new gTLDs (.app, .dev, .live, .studio, .tech, .online, .site, .store, .xyz) are under the ICANN base Registry Agreement, Specification 4 section 2.1.5; .org, .info and .biz are not separately verified here. Both texts set the same conditions: use for lawful purposes; reasonable steps to protect the zone data against unauthorized access, use and disclosure; no marketing to entities other than the user's existing customers; no high-volume automated processes that query registry systems; no interference with registrants. Neither contains an express redistribution or publication clause. may_display=false at Asset X-Ray's request (2026-10-17): lists of dropped or new domains derived from zone diffs are not to be displayed. Serving single-domain lookups is fine; whether to show a per-domain fact a user asked about, or a watchlist alert, is the consumer's decision under its own review of these terms. This API never serves zone file contents. Operator's reading, not legal advice."
+      },
+      {
+        "id": "icann_czds_domain_fact",
+        "name": "ICANN CZDS gTLD zone files, daily diff: per-domain zone facts",
+        "method": "licensed_feed",
+        "terms_status": "permitted_with_conditions",
+        "may_display": true,
+        "collected_from": "2026-04-26",
+        "notes": "Facts about ONE domain, served on single-domain lookups: the day(s) it left its gTLD zone (zone.left_zone_at, availability.drop_date, observation left_zone), and availability status dropped for records that predate RDAP checks. Same zone access terms as icann_czds (see its notes). may_display=true at Asset X-Ray's request (2026-10-17): single-domain zone facts may be displayed; lists derived from zone diffs (icann_czds) may not. DomainSifter never records when a domain ENTERED a zone, so zone.first_seen_in_zone_at is always null. Operator's reading, not legal advice."
       },
       {
         "id": "registry_rdap",

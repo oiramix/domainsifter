@@ -45,6 +45,9 @@ _CONFIG_PATH = _REPO_ROOT / "scripts" / "config.json"
 _DOMAIN_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$")
 _SORTS = ("first_seen_desc", "referring_domains_desc", "wayback_first_year_asc")
 _RELOAD_CHECK_SECONDS = 5.0
+# Lists of domains (candidates, changes) are derived from CZDS zone diffs and
+# cite this source id; per-domain zone facts cite icann_czds_domain_fact.
+ZONE_LIST_SOURCE = "icann_czds"
 
 
 class ApiError(Exception):
@@ -280,7 +283,7 @@ class Api:
         if path == "/v1/sources":
             return self._json({"items": self._sources}, headers)
         if path == "/v1/openapi.json":
-            return self._json(openapi_document(), headers)
+            return self._json(openapi_document([str(x.get("id")) for x in self._sources]), headers)
 
         snapshot = self._snapshot()
         if path == "/v1/candidates":
@@ -384,6 +387,7 @@ class Api:
             (k, v) for k, v in query.items() if k not in ("cursor", "limit")
         )))
         page["items"] = [_compact(d) for d in page["items"]]
+        page["list_source"] = ZONE_LIST_SOURCE
         return page
 
     def _changes(self, snapshot: dict, query: dict[str, list[str]]) -> dict:
@@ -401,6 +405,7 @@ class Api:
             }
             for d in page["items"]
         ]
+        page["list_source"] = ZONE_LIST_SOURCE
         return page
 
     # -- pagination --------------------------------------------------------
@@ -481,14 +486,22 @@ def _compact(doc: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def openapi_document() -> dict:
+def openapi_document(source_ids: list[str] | None = None) -> dict:
+    """The OpenAPI 3.1 contract. `source_ids` (from config api.sources) are
+    listed as the enum of every `source` field, so a consumer can match ids
+    exactly. docs/api/openapi.json is a committed copy; a test keeps it in
+    sync with this function."""
     ref = lambda name: {"$ref": f"#/components/schemas/{name}"}  # noqa: E731
-    nullable = lambda t: {"type": [t, "null"]}  # noqa: E731
+    nullable = lambda t, **kw: {"type": [t, "null"], **kw}  # noqa: E731
+    ts = lambda desc: {"type": ["string", "null"], "format": "date-time", "description": desc}  # noqa: E731
+    ids = list(source_ids or [])
+    source_field = {"type": ["string", "null"], "enum": [*ids, None],
+                    "description": "Source id; see GET /v1/sources for terms_status and may_display."}
     error_responses = {
         "400": {"description": "bad_request", "content": {"application/json": {"schema": ref("Error")}}},
         "401": {"description": "unauthorized", "content": {"application/json": {"schema": ref("Error")}}},
         "429": {"description": "rate_limited (see Retry-After)", "content": {"application/json": {"schema": ref("Error")}}},
-        "503": {"description": "snapshot not loaded yet", "content": {"application/json": {"schema": ref("Error")}}},
+        "503": {"description": "snapshot not loaded yet (code internal)", "content": {"application/json": {"schema": ref("Error")}}},
     }
     page_params = [
         {"name": "cursor", "in": "query", "schema": {"type": "string"}},
@@ -497,31 +510,35 @@ def openapi_document() -> dict:
     domain_param = {"name": "domain", "in": "path", "required": True, "schema": {"type": "string"},
                     "description": "Lowercase ASCII or punycode; Unicode input is converted."}
 
-    def page_of(schema: dict) -> dict:
-        return {"type": "object", "required": ["items", "next_cursor"], "properties": {
-            "items": {"type": "array", "items": schema}, "next_cursor": nullable("string")}}
+    def page_of(schema: dict, *, list_source: bool = False) -> dict:
+        props: dict = {"items": {"type": "array", "items": schema}, "next_cursor": nullable("string")}
+        if list_source:
+            props["list_source"] = {"type": "string", "const": ZONE_LIST_SOURCE,
+                                    "description": "This list is derived from CZDS zone diffs."}
+        return {"type": "object", "required": ["items", "next_cursor"], "properties": props}
 
     def ok(schema: dict, description: str = "OK") -> dict:
         return {"description": description, "content": {"application/json": {"schema": schema}},
-                "headers": {"ETag": {"schema": {"type": "string"}}}}
+                "headers": {"ETag": {"schema": {"type": "string"}},
+                            "Last-Modified": {"schema": {"type": "string"}}}}
 
+    status = {"type": "string", "enum": ["ok", "not_checked", "lookup_failed"]}
     metric = {"type": "object", "required": ["name", "value", "status", "source", "observed_at"], "properties": {
-        "name": {"type": "string", "enum": ["referring_domains", "open_page_rank", "cert_history"]},
+        "name": {"type": "string", "enum": ["referring_domains", "open_page_rank", "cert_history"],
+                 "description": "referring_domains: integer, Common Crawl domain graph. "
+                                "open_page_rank: number 0-10. cert_history: boolean, crt.sh."},
         "value": {"type": ["number", "boolean", "null"]},
-        "status": {"type": "string", "enum": ["ok", "not_checked", "lookup_failed"]},
-        "source": nullable("string"), "observed_at": nullable("string")}}
-    wayback = {"type": "object", "properties": {
-        "status": {"type": "string", "enum": ["ok", "none_found", "lookup_failed", "not_checked"]},
-        "snapshots": nullable("integer"), "first_year": {"type": "null"}, "last_year": nullable("integer"),
-        "sample_title": nullable("string"), "observed_at": nullable("string")}}
+        "status": status,
+        "source": source_field,
+        "observed_at": ts("Day precision.")}}
     return {
         "openapi": "3.1.0",
         "info": {
             "title": "DomainSifter read-only API",
             "version": API_VERSION,
-            "description": "Read-only. Every value carries a source; unknown is null with a status. "
-                           "See the data dictionary for sources and metric names. Timestamps derived "
-                           "from the archive have day precision (T00:00:00Z).",
+            "description": "Read-only. Every value carries a source id; unknown is null with a status, never 0. "
+                           "Timestamps derived from the archive have day precision (T00:00:00Z). "
+                           "See docs/api/data-dictionary.md.",
         },
         "servers": [{"url": "https://api.domainsifter.com"}],
         "security": [{"bearer": []}],
@@ -533,37 +550,66 @@ def openapi_document() -> dict:
                         "code": {"type": "string", "enum": ["not_found", "bad_request", "unauthorized", "rate_limited", "internal"]},
                         "message": {"type": "string"}}}}},
                 "Source": {"type": "object", "required": ["id", "name", "method", "terms_status", "may_display"], "properties": {
-                    "id": {"type": "string"}, "name": {"type": "string"},
+                    "id": {"type": "string", "enum": ids}, "name": {"type": "string"},
                     "method": {"type": "string", "enum": ["scrape", "api", "own_crawl", "licensed_feed", "manual"]},
                     "terms_status": {"type": "string", "enum": ["permitted", "permitted_with_conditions", "prohibited", "unknown"]},
                     "may_display": {"type": "boolean"}, "collected_from": nullable("string"), "notes": {"type": "string"}}},
                 "Metric": metric,
-                "Wayback": wayback,
-                "Analysis": {"type": ["object", "null"], "properties": {
+                "Availability": {"type": "object", "required": ["status", "observed_at", "source", "drop_date"], "properties": {
+                    "status": {"type": "string", "enum": ["dropped", "pending_delete", "available", "registered", "auction", "unknown"],
+                               "description": "Only available (RDAP 404) and dropped (zone diff only, before 2026-04-30) occur."},
+                    "observed_at": ts("Day precision."),
+                    "source": source_field,
+                    "drop_date": nullable("string", format="date",
+                                          description="Day the domain left its zone (source icann_czds_domain_fact).")}},
+                "Zone": {"type": "object", "required": ["status", "left_zone_at", "left_zone_count", "first_seen_in_zone_at", "source"],
+                         "description": "Per-domain zone facts (source icann_czds_domain_fact).", "properties": {
+                    "status": {"type": "string", "enum": ["ok", "not_checked"]},
+                    "left_zone_at": ts("Most recent day the domain left its gTLD zone."),
+                    "left_zone_count": {"type": "integer", "description": "Distinct days DomainSifter saw it leave a zone."},
+                    "first_seen_in_zone_at": {"type": "null",
+                                              "description": "Always null: DomainSifter only sees domains leave a zone and keeps no zone history."},
+                    "source": {"type": "string", "const": "icann_czds_domain_fact"}}},
+                "Wayback": {"type": "object", "properties": {
+                    "status": {"type": "string", "enum": ["ok", "none_found", "lookup_failed", "not_checked"]},
+                    "snapshots": nullable("integer"),
+                    "first_year": {"type": "null", "description": "Always null: the first capture is not stored."},
+                    "last_year": nullable("integer"), "sample_title": nullable("string"), "observed_at": ts("Day precision.")}},
+                "NameQuality": {"type": ["object", "null"], "description": "AI opinion of the domain NAME (source domainsifter_name_ranker).",
+                                "properties": {"model": {"type": "string"},
+                                               "score": {"type": "integer", "minimum": 0, "maximum": 100},
+                                               "analyzed_at": {"type": "string", "format": "date-time"}}},
+                "Analysis": {"type": ["object", "null"], "description": "AI opinion; null if never classified. "
+                             "Content verdict from domainsifter_content_classifier.", "properties": {
                     "model": nullable("string"), "prompt_version": nullable("string"), "niche": {"type": "null"},
-                    "score": {"type": "null"}, "spam_signal": {"type": ["string", "null"], "enum": ["low", "high", None]},
+                    "score": {"type": "null", "description": "Always null; the name score is name_quality.score."},
+                    "spam_signal": {"type": ["string", "null"], "enum": ["low", "high", None]},
                     "verdict": {"type": ["string", "null"], "enum": ["legitimate", "parked", "empty", "toxic", None]},
-                    "analyzed_at": nullable("string"),
-                    "name_quality": {"type": ["object", "null"], "properties": {
-                        "model": {"type": "string"}, "score": {"type": "integer"}, "analyzed_at": {"type": "string"}}}}},
+                    "analyzed_at": ts("Day precision."),
+                    "name_quality": ref("NameQuality")}},
                 "Domain": {"type": "object", "properties": {
                     "domain": {"type": "string"}, "tld": {"type": "string"},
-                    "first_seen_at": {"type": "string"}, "last_seen_at": {"type": "string"},
-                    "availability": {"type": "object", "properties": {
-                        "status": {"type": "string", "enum": ["dropped", "pending_delete", "available", "registered", "auction", "unknown"]},
-                        "observed_at": nullable("string"), "source": nullable("string"), "drop_date": nullable("string")}},
+                    "first_seen_at": ts("First day DomainSifter recorded the domain (not zone entry)."),
+                    "last_seen_at": ts("Most recent day DomainSifter recorded the domain."),
+                    "availability": ref("Availability"),
+                    "zone": ref("Zone"),
                     "metrics": {"type": "array", "items": ref("Metric")},
                     "wayback": ref("Wayback"), "analysis": ref("Analysis"),
                     "published_on_domainsifter": {"type": "boolean"},
                     "observations_count": {"type": "integer"}}},
                 "Observation": {"type": "object", "required": ["observed_at", "kind", "name", "value", "status", "source"], "properties": {
-                    "observed_at": {"type": "string"},
+                    "observed_at": {"type": "string", "format": "date-time"},
                     "kind": {"type": "string", "enum": ["availability", "metric", "wayback", "analysis"]},
-                    "name": {"type": "string"}, "value": {}, "status": {"type": "string"}, "source": {"type": "string"}}},
+                    "name": {"type": "string", "enum": ["availability", "left_zone", "referring_domains", "open_page_rank",
+                                                         "cert_history", "snapshots", "content_category", "name_quality"]},
+                    "value": {}, "status": {"type": "string", "enum": ["ok", "none_found", "not_checked", "lookup_failed"]},
+                    "source": source_field}},
                 "Candidate": {"type": "object", "properties": {
                     "domain": {"type": "string"}, "first_seen_at": {"type": "string"}, "last_seen_at": {"type": "string"},
-                    "availability": {"type": "object"}, "metrics": {"type": "array", "items": ref("Metric")},
-                    "wayback": {"type": "object"}, "analysis": {"type": "object"}}},
+                    "availability": {"type": "object", "properties": {"status": {"type": "string"}, "observed_at": nullable("string")}},
+                    "metrics": {"type": "array", "items": ref("Metric")},
+                    "wayback": {"type": "object"},
+                    "analysis": {"type": "object", "properties": {"niche": {"type": "null"}, "verdict": nullable("string")}}}},
                 "Change": {"type": "object", "properties": {
                     "domain": {"type": "string"}, "changed_at": {"type": "string"},
                     "change": {"type": "string", "enum": ["added", "updated"]}}},
@@ -582,7 +628,7 @@ def openapi_document() -> dict:
                 "parameters": [domain_param], "responses": {"501": {"description": "not implemented"}}}},
             "/v1/domains/{domain}/referring-domains": {"get": {"summary": "Always 501: counts only, in metrics",
                 "parameters": [domain_param], "responses": {"501": {"description": "not implemented"}}}},
-            "/v1/candidates": {"get": {"summary": "Filterable list", "parameters": [
+            "/v1/candidates": {"get": {"summary": "Filterable list (derived from zone diffs: list_source icann_czds)", "parameters": [
                 {"name": "status", "in": "query", "schema": {"type": "string"}},
                 {"name": "tld", "in": "query", "schema": {"type": "string"}},
                 {"name": "min_referring_domains", "in": "query", "schema": {"type": "integer", "minimum": 0}},
@@ -591,10 +637,10 @@ def openapi_document() -> dict:
                 {"name": "first_seen_after", "in": "query", "schema": {"type": "string"}},
                 {"name": "updated_after", "in": "query", "schema": {"type": "string"}},
                 {"name": "sort", "in": "query", "schema": {"type": "string", "enum": list(_SORTS), "default": "first_seen_desc"}},
-                *page_params], "responses": {"200": ok(page_of(ref("Candidate"))), **error_responses}}},
-            "/v1/changes": {"get": {"summary": "Incremental sync feed, oldest change first", "parameters": [
+                *page_params], "responses": {"200": ok(page_of(ref("Candidate"), list_source=True)), **error_responses}}},
+            "/v1/changes": {"get": {"summary": "Incremental sync feed, oldest change first (list_source icann_czds)", "parameters": [
                 {"name": "since", "in": "query", "required": True, "schema": {"type": "string"}}, *page_params],
-                "responses": {"200": ok(page_of(ref("Change"))), **error_responses}}},
+                "responses": {"200": ok(page_of(ref("Change"), list_source=True)), **error_responses}}},
         },
     }
 
@@ -636,9 +682,16 @@ def load_tokens(raw: str | None) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s", stream=sys.stdout)
+    argv = sys.argv[1:] if argv is None else argv
     config = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
     api_cfg = config.get("api", {}) or {}
+    if argv == ["--openapi"]:
+        # Regenerates docs/api/openapi.json:
+        #   python -m scripts.api_server --openapi > docs/api/openapi.json
+        ids = [str(s.get("id")) for s in api_cfg.get("sources", []) or []]
+        sys.stdout.write(json.dumps(openapi_document(ids), indent=2, ensure_ascii=False) + "\n")
+        return 0
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s", stream=sys.stdout)
     tokens = load_tokens(os.environ.get("DOMAINSIFTER_API_TOKENS"))
     if not tokens:
         logger.error("DOMAINSIFTER_API_TOKENS is empty; refusing to start an unauthenticated API")

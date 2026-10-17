@@ -184,7 +184,7 @@ def test_domain_lookup(setup):
     assert status == 200
     assert body["domain"] == "marketglow.com"
     assert "observations" not in body
-    assert body["observations_count"] == 14
+    assert body["observations_count"] == 16
     assert body["wayback"]["sample_title"] == "Marketglow candles"
     rd = next(m for m in body["metrics"] if m["name"] == "referring_domains")
     assert rd["value"] == 44 and rd["observed_at"] == "2026-10-02T00:00:00Z"
@@ -216,7 +216,7 @@ def test_observations_paginate_oldest_first(setup):
     assert status == 200 and len(page1["items"]) == 10 and page1["next_cursor"]
     assert page1["items"][0]["observed_at"] == "2026-09-20T00:00:00Z"
     page2 = call(api, f"/v1/domains/marketglow.com/observations?limit=10&cursor={page1['next_cursor']}")[1]
-    assert len(page2["items"]) == 4 and page2["next_cursor"] is None
+    assert len(page2["items"]) == 6 and page2["next_cursor"] is None
     assert {o["kind"] for o in page1["items"] + page2["items"]} == {"availability", "metric", "wayback", "analysis"}
 
 
@@ -339,3 +339,69 @@ def test_http_round_trip(setup):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---------------------------------------------------------------------------
+# Zone facts vs. zone lists (Asset X-Ray feedback, 2026-10-17)
+# ---------------------------------------------------------------------------
+
+
+def test_zone_sources_are_split_lists_hidden_single_facts_shown(setup):
+    api, *_ = setup
+    items = {s["id"]: s for s in call(api, "/v1/sources")[1]["items"]}
+    assert items["icann_czds"]["may_display"] is False
+    assert items["icann_czds_domain_fact"]["may_display"] is True
+    assert items["icann_czds_domain_fact"]["terms_status"] == "permitted_with_conditions"
+
+
+def test_domain_carries_zone_facts_with_their_own_source(setup):
+    api, *_ = setup
+    body = call(api, "/v1/domains/marketglow.com")[1]
+    assert body["zone"] == {
+        "status": "ok", "left_zone_at": "2026-10-02T00:00:00Z", "left_zone_count": 2,
+        "first_seen_in_zone_at": None, "source": "icann_czds_domain_fact",
+    }
+    assert body["availability"]["drop_date"] == "2026-10-02"
+    obs = call(api, "/v1/domains/marketglow.com/observations?limit=100")[1]["items"]
+    left = [o for o in obs if o["name"] == "left_zone"]
+    assert [o["value"] for o in left] == ["2026-09-20", "2026-10-02"]
+    assert {o["source"] for o in left} == {"icann_czds_domain_fact"}
+    # no per-domain observation cites the LIST source
+    assert all(o["source"] != "icann_czds" for o in obs)
+
+
+def test_list_endpoints_cite_the_list_source(setup):
+    api, *_ = setup
+    assert call(api, "/v1/candidates")[1]["list_source"] == "icann_czds"
+    assert call(api, "/v1/changes?since=2026-01-01")[1]["list_source"] == "icann_czds"
+
+
+def test_health_reports_both_zone_sources(setup):
+    api, *_ = setup
+    by_id = {s["id"]: s["last_run_at"] for s in call(api, "/v1/health")[1]["data"]["sources"]}
+    assert by_id["icann_czds"] == by_id["icann_czds_domain_fact"] == "2026-10-11T00:00:00Z"
+
+
+def test_openapi_names_every_field_asset_xray_asked_about(setup):
+    api, *_ = setup
+    doc = call(api, "/v1/openapi.json")[1]
+    schemas = doc["components"]["schemas"]
+    ids = [s["id"] for s in REAL_CONFIG["api"]["sources"]]
+    assert schemas["Source"]["properties"]["id"]["enum"] == ids
+    assert "open_page_rank" in schemas["Metric"]["properties"]["name"]["enum"]
+    assert set(schemas["Zone"]["properties"]) == {
+        "status", "left_zone_at", "left_zone_count", "first_seen_in_zone_at", "source"}
+    assert schemas["Domain"]["properties"]["zone"] == {"$ref": "#/components/schemas/Zone"}
+    assert schemas["Analysis"]["properties"]["name_quality"] == {"$ref": "#/components/schemas/NameQuality"}
+    assert schemas["NameQuality"]["properties"]["score"]["maximum"] == 100
+    assert "left_zone" in schemas["Observation"]["properties"]["name"]["enum"]
+
+
+def test_committed_openapi_copy_matches_the_code():
+    """docs/api/openapi.json is what gets sent to Asset X-Ray before the
+    tunnel is live. Regenerate with:
+        python -m scripts.api_server --openapi > docs/api/openapi.json"""
+    committed = json.loads((Path(api_server.__file__).parent.parent / "docs" / "api" / "openapi.json")
+                           .read_text(encoding="utf-8"))
+    ids = [s["id"] for s in REAL_CONFIG["api"]["sources"]]
+    assert committed == json.loads(json.dumps(api_server.openapi_document(ids)))

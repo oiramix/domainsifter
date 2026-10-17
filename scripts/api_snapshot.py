@@ -48,6 +48,12 @@ ARCHIVE_PREFIX = "state/domain_archive/"
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CONFIG_PATH = _REPO_ROOT / "scripts" / "config.json"
 
+# Per-domain zone facts (the day a domain left a zone) vs. lists derived from
+# zone diffs: Asset X-Ray may display the first but not the second, so they
+# are separate source ids (2026-10-17). List endpoints cite ZONE_LIST_SOURCE.
+ZONE_FACT_SOURCE = "icann_czds_domain_fact"
+ZONE_LIST_SOURCE = "icann_czds"
+
 # The classifier's real verdicts; "unknown" is its failure value.
 _CATEGORIES = ("legitimate", "parked", "empty", "toxic")
 _SPAM_SIGNAL = {"toxic": "high", "legitimate": "low", "parked": "low", "empty": "low"}
@@ -146,7 +152,19 @@ def _availability_obs(ev: dict, observed_at: str, rdap_since: str) -> dict:
         "name": "availability",
         "value": "available" if rdap else "dropped",
         "status": "ok",
-        "source": "registry_rdap" if rdap else "icann_czds",
+        "source": "registry_rdap" if rdap else ZONE_FACT_SOURCE,
+    }
+
+
+def _left_zone_obs(drop_date: str) -> dict:
+    """One observation per distinct day the domain left its zone."""
+    return {
+        "observed_at": _ts(drop_date),
+        "kind": "availability",
+        "name": "left_zone",
+        "value": drop_date,
+        "status": "ok",
+        "source": ZONE_FACT_SOURCE,
     }
 
 
@@ -237,6 +255,9 @@ def build_domain(domain: str, events: list[dict], excerpt: Any, config: dict) ->
         return None
 
     observations = [o for ev in days for o in _observations(ev, rdap_since)]
+    drop_dates = sorted({str(ev["drop_date"]) for ev in days if _ts(ev.get("drop_date"))})
+    observations.extend(_left_zone_obs(d) for d in drop_dates)
+    observations.sort(key=lambda o: o["observed_at"])
     first, last = days[0], days[-1]
     avail = _latest(observations, "availability", "availability")
 
@@ -279,7 +300,17 @@ def build_domain(domain: str, events: list[dict], excerpt: Any, config: dict) ->
             "status": avail["value"] if avail else "unknown",
             "observed_at": avail["observed_at"] if avail else None,
             "source": avail["source"] if avail else None,
-            "drop_date": next((ev.get("drop_date") for ev in reversed(days) if ev.get("drop_date")), None),
+            "drop_date": drop_dates[-1] if drop_dates else None,
+        },
+        # Additive. DomainSifter only sees domains LEAVE a zone (it diffs
+        # consecutive daily zone files and keeps no zone history), so
+        # first_seen_in_zone_at is always null.
+        "zone": {
+            "status": "ok" if drop_dates else "not_checked",
+            "left_zone_at": _ts(drop_dates[-1]) if drop_dates else None,
+            "left_zone_count": len(drop_dates),
+            "first_seen_in_zone_at": None,
+            "source": ZONE_FACT_SOURCE,
         },
         "metrics": [_metric(observations, n) for n in ("referring_domains", "open_page_rank", "cert_history")],
         "wayback": {

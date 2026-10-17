@@ -51,7 +51,9 @@ def test_full_live_record_shapes_every_block():
         "name_quality": {"model": "claude-haiku-4-5", "score": 81, "analyzed_at": "2026-09-22T00:00:00Z"},
     }
     assert doc["published_on_domainsifter"] is True
-    assert doc["observations_count"] == len(doc["observations"]) == 7
+    assert doc["observations_count"] == len(doc["observations"]) == 8
+    assert doc["zone"] == {"status": "ok", "left_zone_at": "2026-09-22T00:00:00Z", "left_zone_count": 1,
+                           "first_seen_in_zone_at": None, "source": "icann_czds_domain_fact"}
 
 
 def test_unknown_is_null_with_status_and_zero_stays_zero():
@@ -92,7 +94,7 @@ def test_metric_keeps_last_good_value_with_its_own_date():
 def test_pre_rdap_backfill_is_dropped_from_zone_diff_only():
     doc = api_snapshot.build_domain("marketglow.com", [_ev("2026-04-28", source="backfill")], None, CONFIG)
     assert doc["availability"]["status"] == "dropped"
-    assert doc["availability"]["source"] == "icann_czds"
+    assert doc["availability"]["source"] == "icann_czds_domain_fact"
     later = api_snapshot.build_domain("marketglow.com", [_ev("2026-05-02", source="backfill")], None, CONFIG)
     assert later["availability"]["source"] == "registry_rdap"
 
@@ -103,7 +105,7 @@ def test_live_beats_backfill_on_the_same_day():
         _ev("2026-06-02", source="live", cc_source_domain_count=9),
     ], None, CONFIG)
     assert _metric(doc, "referring_domains")["value"] == 9
-    assert doc["observations_count"] == 7
+    assert doc["observations_count"] == 8
 
 
 def test_unknown_category_gives_no_verdict_and_toxic_is_high_spam():
