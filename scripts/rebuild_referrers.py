@@ -34,29 +34,45 @@ WHAT IT DOES
 2. Counts every drop's linking domains from that SAME release's derived
    SQLite (cc_apex), so counts and referrer lists come from one graph. Logs
    the distribution over `rebuild.distribution_buckets`.
-3. Abuse filters only, on drops with count >= `rebuild.min_cc_domains`:
-   the toxic denylist (R2), the rejected-keyword lists (same matchers as
-   filter.py), and spam_signatures over any stored Wayback excerpt and over
+3. Abuse filters only, on every drop in the graph: the toxic denylist (R2),
+   the rejected-keyword lists (same matchers as filter.py), the rebuild-only
+   gambling terms in `rebuild.extra_rejected_terms` (the daily lists are
+   untouched), and spam_signatures over any stored Wayback excerpt and over
    the name split into words. No length, brandability or phase2 filters.
-4. RDAP-checks the survivors, highest count first, at most
-   `rebuild.max_rdap_checks` within `rebuild.rdap_budget_seconds`, through
-   pipeline.validate_availability: the same rdap enricher, per-host buckets
-   and throttles as the daily run, but a strike limit of 1 (a host stops on
-   its first 429). Any 429/403 is listed in the summary with its Retry-After
-   and logged as an "RDAP REBUILD PUSHBACK" WARNING saying whether the
-   cooldown outlasts the next daily run. Keeps only available ones.
-5. Downloads the release's raw vertices + edges from R2 into a temp dir and
-   lets DuckDB STREAM them: one pass over vertices for the candidates' ids,
-   one pass over edges keeping only edges into those ids, one more pass over
-   vertices to name the referrers. The graph is never loaded into memory;
-   DuckDB's memory limit is cc_refresh's. Nothing is downloaded when no
-   candidate is available.
-6. Writes `rebuild.output_path` (default
-   scripts/state/rebuild_referrers_latest.jsonl), one line per available apex:
+4. Picks the RDAP checks (2026-10-18 revision, after count-ranked top-50s
+   filled with link networks and gambling sites two days running):
+   - candidates with count >= `rebuild.min_cc_domains`;
+   - `rebuild.cluster_min_size` or more with the EXACT same count are one link
+     network: one is kept, the cluster is logged;
+   - `rebuild.max_rdap_checks` is split into equal shares over
+     `rebuild.rdap_bands` (20-49, 50-99, 100-499, 500+), highest count first
+     within a band, unused shares passed to the other bands.
+   RDAP runs through pipeline.validate_availability: the same rdap enricher,
+   per-host buckets and throttles as the daily run, but a strike limit of 1.
+   Any 429/403 is listed in the summary with its Retry-After and logged as
+   an "RDAP REBUILD PUSHBACK" WARNING saying whether the cooldown outlasts
+   the next daily run.
+5. Buckets every checked domain by lifecycle, because leaving the zone is
+   usually the START of expiry, not release: available (404), redemption,
+   pending_delete, registrar_hold_or_grace, active, unknown. Each gets an
+   expected release date where the RDAP events allow (a deletion event, else
+   last changed + `rebuild.lifecycle_days`). Every row, with status values,
+   registrar, expiration and events, goes to `rebuild.rdap_output_path`.
+6. For every candidate in available, pending_delete or redemption, downloads
+   the release's raw vertices + edges from R2 into a temp dir and lets DuckDB
+   STREAM them: one pass over vertices for the candidates' ids, one pass over
+   edges keeping only edges into those ids, one more pass over vertices to
+   name the referrers. The graph is never loaded into memory; DuckDB's
+   memory limit is cc_refresh's. Nothing is downloaded when there is no
+   candidate. Writes `rebuild.output_path` (default
+   scripts/state/rebuild_referrers_latest.jsonl), one line per candidate:
 
        {"name": "marketglow.com", "cc_source_domain_count": 27,
-        "release": "cc-main-2026-jul-aug-sep", "referrers_total": 27,
-        "referrers": ["tideblock.org", ...]}
+        "release": "cc-main-2026-jul-aug-sep", "bucket": "redemption",
+        "registrar": "...", "rdap_status": [...], "expiration_date": "...",
+        "last_changed": "...", "expected_release_date": "2026-11-14",
+        "expected_release_basis": "last_changed+35d",
+        "referrers_total": 27, "referrers": ["tideblock.org", ...]}
 
    `referrers` holds up to `rebuild.max_referrers`, the referring domains
    with the most hosts (CC num_hosts, a size proxy) first. Platforms such as
@@ -78,6 +94,7 @@ Exit codes: 0 done (including "nothing to do"), 1 failed,
 from __future__ import annotations
 
 import argparse
+import contextlib
 import copy
 import json
 import logging
@@ -85,8 +102,9 @@ import re
 import sqlite3
 import sys
 import tempfile
+import threading
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -195,6 +213,31 @@ def _name_as_excerpt(name: str) -> dict:
     return {"title": " ".join(w for w in re.split(r"[^a-z]+", name.lower()) if w)}
 
 
+def matched_extra_term(name: str, config: dict) -> str | None:
+    """Rebuild-only gambling terms (`rebuild.extra_rejected_terms`); the daily
+    keyword lists are not touched.
+
+    `substrings` match anywhere in the apex label (merkurslots, bingoloft).
+    `tokens` match only a whole token as filter.py splits names, on dots,
+    hyphens and digit/letter boundaries: so "wins" catches voodoo-wins.org
+    but not twins.org or voodoowins.org, and "bet" catches bet-365.com but
+    not alphabet.com.
+    """
+    from scripts import filter as filter_mod
+
+    terms = _rebuild_config(config).get("extra_rejected_terms") or {}
+    apex = name.split(".", 1)[0].lower()
+    for term in terms.get("substrings", []) or []:
+        if term and term.lower() in apex:
+            return term.lower()
+    coarse, fine = filter_mod._tokenize(name)
+    tokens = coarse | fine
+    for term in terms.get("tokens", []) or []:
+        if term and term.lower() in tokens:
+            return term.lower()
+    return None
+
+
 def abuse_reason(
     name: str,
     config: dict,
@@ -216,6 +259,8 @@ def abuse_reason(
         name, config.get("rejected_keyword_substrings", []) or [],
     ):
         return "rejected_keyword"
+    if matched_extra_term(name, config):
+        return "extra_rejected_term"
     stored = excerpts.get(name)
     if isinstance(stored, dict) and scan_excerpt(stored, config):
         return "spam_signature_excerpt"
@@ -269,8 +314,195 @@ def choose_release(retained: list[str], config: dict) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Selection: collapse link networks, then pick the RDAP checks by band
+# ---------------------------------------------------------------------------
+
+
+def collapse_clusters(cands: dict[str, int], min_size: int) -> tuple[dict[str, int], list[dict]]:
+    """Treat `min_size`+ candidates with the EXACT same count as one link
+    network: keep the first by name, drop the rest. Returns (kept, clusters),
+    clusters largest first. On 2026-10-18, 38 kadin*.org domains sat at
+    1,549 and filled most of the count-ranked top 50."""
+    by_count: dict[int, list[str]] = {}
+    for name, count in cands.items():
+        by_count.setdefault(count, []).append(name)
+    kept: dict[str, int] = {}
+    clusters: list[dict] = []
+    for count, members in by_count.items():
+        members.sort()
+        if min_size > 0 and len(members) >= min_size:
+            kept[members[0]] = count
+            clusters.append({
+                "cc_source_domain_count": count, "size": len(members),
+                "kept": members[0], "sample": members[:5],
+            })
+        else:
+            kept.update({m: count for m in members})
+    clusters.sort(key=lambda c: (-c["size"], -c["cc_source_domain_count"]))
+    return kept, clusters
+
+
+def _band_label(low: int, high: int | None) -> str:
+    return f"{low}+" if high is None else f"{low}-{high}"
+
+
+def select_by_band(
+    cands: dict[str, int],
+    bands: list[list[int | None]],
+    cap: int,
+) -> tuple[list[str], dict[str, dict[str, int]]]:
+    """Equal shares of `cap` per band, highest count first within a band.
+
+    A band with fewer candidates than its share gives the unused slots to the
+    other bands, round-robin in band order, so the full cap is used whenever
+    there are enough candidates. Returns (names in band order, per-band
+    {eligible, selected})."""
+    members: list[list[str]] = []
+    for low, high in bands:
+        in_band = [n for n, c in cands.items() if c >= int(low) and (high is None or c <= int(high))]
+        members.append(sorted(in_band, key=lambda n: (-cands[n], n)))
+    if not members or cap <= 0:
+        return [], {}
+    base, extra = divmod(cap, len(members))
+    take = [min(len(m), base + (1 if i < extra else 0)) for i, m in enumerate(members)]
+    leftover = cap - sum(take)
+    while leftover > 0:
+        progressed = False
+        for i, m in enumerate(members):
+            if leftover and take[i] < len(m):
+                take[i] += 1
+                leftover -= 1
+                progressed = True
+        if not progressed:
+            break
+    selected = [n for i, m in enumerate(members) for n in m[:take[i]]]
+    stats = {
+        _band_label(*band): {"eligible": len(members[i]), "selected": take[i]}
+        for i, band in enumerate(bands)
+    }
+    return selected, stats
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle: what "left the zone" turned into
+# ---------------------------------------------------------------------------
+
+CANDIDATE_BUCKETS = ("available", "pending_delete", "redemption")
+
+
+def _norm_status(values: list[str]) -> set[str]:
+    """RDAP 'pending delete' and EPP 'pendingDelete' both -> 'pendingdelete'."""
+    return {str(v).replace(" ", "").replace("_", "").lower() for v in values or []}
+
+
+def _event_dates(events: Any) -> dict[str, str]:
+    """{eventAction: YYYY-MM-DD}, first occurrence of each action. Accepts raw
+    RDAP events (eventAction/eventDate) and stored ones (action/date)."""
+    out: dict[str, str] = {}
+    for ev in events if isinstance(events, list) else []:
+        if not isinstance(ev, dict):
+            continue
+        action = ev.get("eventAction") or ev.get("action")
+        when = ev.get("eventDate") or ev.get("date")
+        if isinstance(action, str) and isinstance(when, str) and len(when) >= 10:
+            out.setdefault(action.lower(), when[:10])
+    return out
+
+
+def classify_lifecycle(result: dict, today: date, config: dict) -> dict:
+    """Bucket one RDAP result and estimate when the domain is released.
+
+    Buckets: available (RDAP 404); redemption (redemption period or pending
+    restore); pending_delete; registrar_hold_or_grace (client/server hold,
+    auto-renew period, or expired but still held by the registrar, the usual
+    window for registrar auctions); active; unknown (no RDAP answer).
+
+    Expected release: a "deletion" event when the registry publishes one;
+    otherwise "last changed" + rebuild.lifecycle_days (5 days pendingDelete;
+    30 + 5 from redemption), on the assumption that the last change was
+    entry into that status. Basis is returned with every date.
+    """
+    days = _rebuild_config(config).get("lifecycle_days") or {}
+    pending_days = int(days.get("pending_delete", 5))
+    redemption_days = int(days.get("redemption", 30))
+    status = _norm_status(result.get("rdap_status") or [])
+    events = _event_dates(result.get("events"))
+    expiration = result.get("rdap_expiration") or events.get("expiration")
+
+    if result.get("is_available") is True:
+        bucket = "available"
+    elif result.get("is_available") is None:
+        bucket = "unknown"
+    elif status & {"redemptionperiod", "pendingrestore"}:
+        bucket = "redemption"
+    elif "pendingdelete" in status:
+        bucket = "pending_delete"
+    elif status & {"clienthold", "serverhold", "autorenewperiod"} or (
+        isinstance(expiration, str) and expiration[:10] < today.isoformat()
+    ):
+        bucket = "registrar_hold_or_grace"
+    else:
+        bucket = "active"
+
+    release: str | None = None
+    basis: str | None = None
+    if bucket == "available":
+        release, basis = today.isoformat(), "rdap_404"
+    elif bucket in ("pending_delete", "redemption"):
+        if "deletion" in events:
+            release, basis = events["deletion"], "deletion_event"
+        elif "last changed" in events:
+            add = pending_days + (redemption_days if bucket == "redemption" else 0)
+            release = (date.fromisoformat(events["last changed"]) + timedelta(days=add)).isoformat()
+            basis = f"last_changed+{add}d"
+        else:
+            basis = "no_dated_event"
+    return {
+        "bucket": bucket,
+        "expected_release_date": release,
+        "expected_release_basis": basis,
+        "last_changed": events.get("last changed"),
+        "expiration_date": expiration[:10] if isinstance(expiration, str) else None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # RDAP
 # ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _capture_rdap_records():
+    """Keep the JSON body of every RDAP 200 during the rebuild pass.
+
+    rdap.check_availability returns status, registrar and expiration but not
+    the events list, and rdap.py is daily-pipeline code this branch must not
+    change. So the pass wraps rdap._rdap_get, the one function that does the
+    HTTP GET (looked up at call time), and restores it afterwards. Throttling,
+    429 handling and the request itself are untouched."""
+    from scripts.enrichment import rdap
+
+    records: dict[str, dict] = {}
+    lock = threading.Lock()
+    original = rdap._rdap_get
+
+    def capturing(url, rdap_host, timeout, config):
+        resp = original(url, rdap_host, timeout, config)
+        if getattr(resp, "status_code", None) == 200:
+            try:
+                body = resp.json()
+            except ValueError:
+                body = None
+            if isinstance(body, dict):
+                with lock:
+                    records[url.rstrip("/").rsplit("/", 1)[-1].lower()] = body
+        return resp
+
+    rdap._rdap_get = capturing
+    try:
+        yield records
+    finally:
+        rdap._rdap_get = original
 
 
 class _RateLimitCapture(logging.Handler):
@@ -325,9 +557,28 @@ def check_available(names: list[str], config: dict, budget_seconds: float) -> di
     breaker_logger = logging.getLogger("scripts.enrichment._circuit_breaker")
     breaker_logger.addHandler(capture)
     try:
-        available = pipeline.validate_availability(candidates, rdap_config)
+        with _capture_rdap_records() as records:
+            available = pipeline.validate_availability(candidates, rdap_config)
     finally:
         breaker_logger.removeHandler(capture)
+
+    # Every checked domain's full result: what the enricher returned plus the
+    # events list from the raw record (registered domains only).
+    results: dict[str, dict] = {}
+    for c in candidates:
+        raw = records.get(c["name"]) or {}
+        results[c["name"]] = {
+            "is_available": c.get("is_available"),
+            "rdap_http": c.get("rdap_http"),
+            "rdap_status": c.get("rdap_status") or [],
+            "registrar": c.get("previous_registrar"),
+            "rdap_expiration": c.get("rdap_expiration"),
+            "events": [
+                {"action": ev.get("eventAction"), "date": str(ev.get("eventDate"))[:10]}
+                for ev in raw.get("events", []) or []
+                if isinstance(ev, dict) and ev.get("eventAction") and ev.get("eventDate")
+            ],
+        }
 
     rate_limited = list(capture.events)
     seen = {e["host"] for e in rate_limited}
@@ -342,6 +593,7 @@ def check_available(names: list[str], config: dict, budget_seconds: float) -> di
         "not_available": sum(1 for c in candidates if c.get("is_available") is False),
         "unknown": sum(1 for c in candidates if c.get("is_available") is None),
         "rate_limited": rate_limited,
+        "results": results,
     }
 
 
@@ -579,37 +831,80 @@ def run(
         summary["abuse_rejections"], summary["abuse_pass_at_least"],
     )
 
-    # 4. RDAP, highest count first, capped
-    gated = sorted(
-        (n for n, c in passed.items() if c >= min_cc_domains),
-        key=lambda n: (-passed[n], n),
-    )
-    to_check = gated[:max_rdap]
+    # 4. collapse link networks, then pick the RDAP checks by count band
+    gated = {n: c for n, c in passed.items() if c >= min_cc_domains}
     summary["rdap_gated"] = len(gated)
+    kept, clusters = collapse_clusters(gated, int(rcfg.get("cluster_min_size", 3)))
+    summary["clusters_collapsed"] = len(clusters)
+    summary["cluster_members_dropped"] = len(gated) - len(kept)
+    summary["clusters"] = [
+        {k: c[k] for k in ("cc_source_domain_count", "size", "kept")} for c in clusters
+    ]
+    for c in clusters:
+        logger.info(
+            "Cluster: %d candidates share cc_source_domain_count=%d; kept %s (e.g. %s)",
+            c["size"], c["cc_source_domain_count"], c["kept"], ", ".join(c["sample"]),
+        )
+    bands = rcfg.get("rdap_bands") or [[20, 49], [50, 99], [100, 499], [500, None]]
+    to_check, band_stats = select_by_band(kept, bands, max_rdap)
+    summary["rdap_bands"] = band_stats
     summary["rdap_checked"] = len(to_check)
-    summary["rdap_not_checked_cap"] = len(gated) - len(to_check)
+    summary["rdap_not_checked_cap"] = len(kept) - len(to_check)
     logger.info(
-        "RDAP: %d candidates with >= %d linking domains passed the abuse filters; "
-        "checking %d (cap %d, budget %.0fs)",
-        len(gated), min_cc_domains, len(to_check), max_rdap, rdap_budget,
+        "RDAP: %d gated, %d after collapsing %d cluster(s); checking %d by band %s "
+        "(cap %d, budget %.0fs)",
+        len(gated), len(kept), len(clusters), len(to_check), band_stats, max_rdap, rdap_budget,
     )
     rdap = (rdap_fn or check_available)(to_check, config, rdap_budget) if to_check else {
-        "available": [], "not_available": 0, "unknown": 0,
+        "available": [], "not_available": 0, "unknown": 0, "results": {},
     }
-    available = sorted(rdap["available"], key=lambda n: (-passed[n], n))
-    summary["rdap_available"] = len(available)
+    summary["rdap_available"] = len(rdap["available"])
     summary["rdap_not_available"] = rdap["not_available"]
     summary["rdap_unknown"] = rdap["unknown"]
     summary["rdap_rate_limited"] = rdap.get("rate_limited", [])
     if summary["rdap_rate_limited"]:
         _warn_rate_limited(summary["rdap_rate_limited"], config)
 
-    # 5-6. referrers
-    if not available:
+    # 5. lifecycle bucket and expected release date for every checked domain
+    today = datetime.now(timezone.utc).date()
+    rdap_rows: list[dict] = []
+    for name in to_check:
+        result = (rdap.get("results") or {}).get(name) or {
+            "is_available": True if name in rdap["available"] else None,
+        }
+        life = classify_lifecycle(result, today, config)
+        rdap_rows.append({
+            "name": name,
+            "cc_source_domain_count": kept[name],
+            "band": next((label for label, (low, high) in zip(band_stats, bands)
+                          if kept[name] >= int(low) and (high is None or kept[name] <= int(high))), None),
+            **life,
+            "rdap_status": result.get("rdap_status") or [],
+            "registrar": result.get("registrar"),
+            "events": result.get("events") or [],
+        })
+    buckets_count: dict[str, int] = {}
+    for row in rdap_rows:
+        buckets_count[row["bucket"]] = buckets_count.get(row["bucket"], 0) + 1
+    summary["rdap_buckets"] = dict(sorted(buckets_count.items()))
+    rdap_output = output_path.with_name(Path(str(rcfg.get(
+        "rdap_output_path", "scripts/state/rebuild_rdap_latest.jsonl"))).name)
+    _write_output(rdap_output, rdap_rows)
+    logger.info("RDAP lifecycle buckets %s; full results written to %s", summary["rdap_buckets"], rdap_output)
+
+    candidates = sorted(
+        (r for r in rdap_rows if r["bucket"] in CANDIDATE_BUCKETS),
+        key=lambda r: (CANDIDATE_BUCKETS.index(r["bucket"]), -r["cc_source_domain_count"], r["name"]),
+    )
+    summary["candidates"] = len(candidates)
+
+    # 6. referrers for every candidate (available, pending_delete, redemption)
+    if not candidates:
         _write_output(output_path, [])
         summary["temp_disk_gib"] = 0.0
         _log_summary(summary, started)
-        logger.info("No available candidate; wrote an empty %s and skipped the raw download", output_path)
+        logger.info("No candidate in %s; wrote an empty %s and skipped the raw download",
+                    "/".join(CANDIDATE_BUCKETS), output_path)
         return 0
 
     sizes = {
@@ -634,21 +929,30 @@ def run(
             "Downloaded raw %s (%.2f GiB) in %.1fs",
             release, sum(sizes.values()) / 1024**3, time.monotonic() - download_started,
         )
-        found = find_referrers(paths["vertices"], paths["edges"], available, max_referrers)
+        found = find_referrers(
+            paths["vertices"], paths["edges"], [r["name"] for r in candidates], max_referrers,
+        )
 
     out = []
-    for name in available:
-        total, refs = found.get(name, (0, []))
+    for row in candidates:
+        total, refs = found.get(row["name"], (0, []))
         out.append({
-            "name": name,
-            "cc_source_domain_count": passed[name],
+            "name": row["name"],
+            "cc_source_domain_count": row["cc_source_domain_count"],
             "release": release,
+            "bucket": row["bucket"],
+            "registrar": row["registrar"],
+            "rdap_status": row["rdap_status"],
+            "expiration_date": row["expiration_date"],
+            "last_changed": row["last_changed"],
+            "expected_release_date": row["expected_release_date"],
+            "expected_release_basis": row["expected_release_basis"],
             "referrers_total": total,
             "referrers": refs,
         })
     _write_output(output_path, out)
     summary["written"] = len(out)
-    logger.info("Wrote %d apex(es) to %s", len(out), output_path)
+    logger.info("Wrote %d candidate(s) to %s", len(out), output_path)
     _log_summary(summary, started)
     return 0
 
