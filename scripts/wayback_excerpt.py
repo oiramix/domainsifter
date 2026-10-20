@@ -16,7 +16,9 @@ Public surface (one function):
     fetch_excerpt(domain, target_date) -> dict | None
 
 Flow:
-    1. Wayback Availability API → closest snapshot URL + timestamp.
+    1. Wayback Availability API → closest snapshot URL + timestamp; if it
+       has nothing or is throttled, the CDX API (added 2026-10-20, when the
+       Availability API answered 429 to everyone for days).
     2. Fetch the snapshot HTML.
     3. Parse with BeautifulSoup ('html.parser', stdlib — no lxml dep).
     4. Extract title, meta description, h1[:3], h2[:5]. Cap each
@@ -43,6 +45,8 @@ logger = logging.getLogger(__name__)
 USER_AGENT = "DomainSifter archive-generator/1.0 (+https://domainsifter.com)"
 AVAILABILITY_API_URL = "https://archive.org/wayback/available"
 AVAILABILITY_TIMEOUT_SECONDS = 10
+CDX_API_URL = "https://web.archive.org/cdx/search/cdx"
+CDX_TIMEOUT_SECONDS = 30
 SNAPSHOT_TIMEOUT_SECONDS = 15
 TITLE_MAX_CHARS = 200
 META_DESCRIPTION_MAX_CHARS = 200
@@ -77,6 +81,15 @@ def _truncate(value: str | None, max_chars: int) -> str | None:
 def _fetch_availability(domain: str, target_date: str) -> dict | None:
     """Hit the Availability API. Returns parsed JSON or None on any failure
     (network, non-200, non-JSON)."""
+    return _availability_lookup(domain, target_date)[1]
+
+
+def _availability_lookup(domain: str, target_date: str) -> tuple[int | None, dict | None]:
+    """(HTTP status or None on a network error, parsed JSON or None).
+
+    The status lets _lookup_closest_snapshot tell "throttled" (429) from
+    "answered, no snapshot", so a throttled API is not asked twice per
+    domain."""
     try:
         # An EMPTY `timestamp=` is not "no timestamp": since at least
         # 2026-09-27 archive.org answers `?url=x&timestamp=` with HTTP 500,
@@ -94,17 +107,66 @@ def _fetch_availability(domain: str, target_date: str) -> dict | None:
         )
     except requests.RequestException as exc:
         logger.debug("Availability API error for %s: %s", domain, exc)
-        return None
+        return None, None
     if resp.status_code != 200:
         logger.debug(
             "Availability API non-200 for %s: HTTP %d",
             domain, resp.status_code,
         )
-        return None
+        return resp.status_code, None
     try:
-        return resp.json()
+        return 200, resp.json()
     except ValueError:
+        return 200, None
+
+
+def _lookup_cdx_snapshot(domain: str, target_date: str) -> dict | None:
+    """Closest HTML capture with HTTP 200 from the CDX API, shaped like the
+    Availability API's `closest` dict (url, timestamp, available, status).
+
+    The fallback added 2026-10-20: from about 2026-10-17 archive.org's
+    Availability API answered 429 to every uncached lookup, from any IP and
+    any User-Agent, while the CDX API and the snapshot pages kept working.
+    Every excerpt fetch failed, every candidate was `unknown`, and the held
+    queue rightly published nothing new for two days.
+
+    With a target date, CDX sorts by distance to it (closest=, sort=closest);
+    without one, it takes the newest capture (limit=-1). Never raises."""
+    params: list[tuple[str, str]] = [
+        ("url", domain),
+        ("filter", "statuscode:200"),
+        ("filter", "mimetype:text/html"),
+        ("fl", "timestamp,original"),
+    ]
+    stamp = _normalize_date_for_availability(target_date or "")
+    if stamp:
+        params += [("closest", stamp), ("sort", "closest"), ("limit", "1")]
+    else:
+        params.append(("limit", "-1"))
+    try:
+        resp = requests.get(
+            CDX_API_URL,
+            params=params,
+            headers={"User-Agent": USER_AGENT},
+            timeout=CDX_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as exc:
+        logger.debug("CDX lookup error for %s: %s", domain, exc)
         return None
+    if resp.status_code != 200:
+        logger.debug("CDX lookup non-200 for %s: HTTP %d", domain, resp.status_code)
+        return None
+    for line in (resp.text or "").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and len(parts[0]) == 14 and parts[0].isdigit():
+            timestamp, original = parts
+            return {
+                "status": "200",
+                "available": True,
+                "url": f"https://web.archive.org/web/{timestamp}/{original}",
+                "timestamp": timestamp,
+            }
+    return None
 
 
 def _lookup_closest_snapshot(domain: str, target_date: str) -> dict | None:
@@ -122,15 +184,28 @@ def _lookup_closest_snapshot(domain: str, target_date: str) -> dict | None:
     the one nearest our date. For screening that is acceptable — the
     alternative is no evidence at all. It costs one extra request only when
     the dated lookup has already failed, and never when it succeeded.
-    Never raises.
+
+    If the Availability API still has nothing, or is throttling (429, in
+    which case the undated retry is skipped), the CDX API is asked instead
+    (2026-10-20; see _lookup_cdx_snapshot). Never raises.
     """
-    closest = _extract_closest_snapshot(_fetch_availability(domain, target_date))
-    if closest or not (target_date or "").strip():
-        return closest
-    closest = _extract_closest_snapshot(_fetch_availability(domain, ""))
+    status, payload = _availability_lookup(domain, target_date)
+    closest = _extract_closest_snapshot(payload)
     if closest:
-        logger.debug("Availability: dated lookup empty for %s; undated retry found %s",
-                     domain, closest.get("timestamp"))
+        return closest
+    if status != 429 and (target_date or "").strip():
+        status, payload = _availability_lookup(domain, "")
+        closest = _extract_closest_snapshot(payload)
+        if closest:
+            logger.debug("Availability: dated lookup empty for %s; undated retry found %s",
+                         domain, closest.get("timestamp"))
+            return closest
+    closest = _lookup_cdx_snapshot(domain, target_date)
+    if closest:
+        logger.info(
+            "Wayback lookup for %s answered by CDX (Availability API %s); capture %s",
+            domain, f"HTTP {status}" if status else "unreachable", closest["timestamp"],
+        )
     return closest
 
 

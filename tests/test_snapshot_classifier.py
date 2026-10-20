@@ -1109,6 +1109,10 @@ def _stub_bundle(monkeypatch, html_by_name: dict) -> list[str]:
         return value
 
     monkeypatch.setattr(we, "_fetch_availability", _availability)
+    # The lookup reads (status, payload) from _availability_lookup since
+    # the 2026-10-20 CDX fallback; stub both, and keep CDX offline.
+    monkeypatch.setattr(we, "_availability_lookup", lambda d, t: (200, _availability(d, t)))
+    monkeypatch.setattr(we, "_lookup_cdx_snapshot", lambda d, t: None)
     monkeypatch.setattr(we, "_extract_closest_snapshot", _closest)
     monkeypatch.setattr(we, "_fetch_snapshot_html", _html)
     return calls
@@ -1653,6 +1657,7 @@ class TestParkedMarkerDetection:
             raise RuntimeError("availability exploded")
 
         monkeypatch.setattr(we, "_fetch_availability", _boom)
+        monkeypatch.setattr(we, "_availability_lookup", _boom)
         records = _records("marketglow.com")
 
         with caplog.at_level("WARNING"):

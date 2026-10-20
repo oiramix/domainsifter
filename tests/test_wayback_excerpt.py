@@ -345,40 +345,44 @@ def test_fetch_excerpt_only_meta_description_still_returned(monkeypatch):
 
 def test_fetch_excerpt_returns_none_when_availability_empty(monkeypatch):
     _install_get_sequence(monkeypatch, [
-        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
-        # only when BOTH fail is there genuinely no excerpt.
+        # Dated lookup fails, the 2026-09-27 undated retry fails, and the
+        # 2026-10-20 CDX fallback finds nothing: only then is there no excerpt.
         _resp(200, json_data={"archived_snapshots": {}}),
         _resp(200, json_data={"archived_snapshots": {}}),
+        _resp(200, text=""),  # CDX: no capture
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
 
 def test_fetch_excerpt_returns_none_when_available_false(monkeypatch):
     _install_get_sequence(monkeypatch, [
-        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
-        # only when BOTH fail is there genuinely no excerpt.
+        # Dated lookup fails, the 2026-09-27 undated retry fails, and the
+        # 2026-10-20 CDX fallback finds nothing: only then is there no excerpt.
         _resp(200, json_data=_avail_payload(available=False)),
         _resp(200, json_data=_avail_payload(available=False)),
+        _resp(200, text=""),  # CDX: no capture
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
 
 def test_fetch_excerpt_returns_none_when_availability_404(monkeypatch):
     _install_get_sequence(monkeypatch, [
-        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
-        # only when BOTH fail is there genuinely no excerpt.
+        # Dated lookup fails, the 2026-09-27 undated retry fails, and the
+        # 2026-10-20 CDX fallback finds nothing: only then is there no excerpt.
         _resp(404, text="not found"),
         _resp(404, text="not found"),
+        _resp(200, text=""),  # CDX: no capture
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
 
 def test_fetch_excerpt_returns_none_when_availability_timeout(monkeypatch):
     _install_get_sequence(monkeypatch, [
-        # Dated lookup fails, then the 2026-09-27 undated retry fails too;
-        # only when BOTH fail is there genuinely no excerpt.
+        # Dated lookup fails, the 2026-09-27 undated retry fails, and the
+        # 2026-10-20 CDX fallback finds nothing: only then is there no excerpt.
         requests.Timeout("avail"),
         requests.Timeout("avail"),
+        _resp(200, text=""),  # CDX: no capture
     ])
     assert we.fetch_excerpt("ex.com", "2025-12-15") is None
 
@@ -495,12 +499,14 @@ def test_lookup_does_not_retry_when_dated_succeeds(monkeypatch):
     assert len(calls) == 1
 
 
-def test_lookup_without_date_makes_one_request(monkeypatch):
+def test_lookup_without_date_makes_no_undated_retry(monkeypatch):
+    """No date: one Availability request (no undated retry, it would be the
+    same request), then the CDX fallback."""
     calls = []
     monkeypatch.setattr(we.requests, "get",
-                        lambda url, params=None, **kw: calls.append(params) or _resp(json_data=_EMPTY))
+                        lambda url, params=None, **kw: calls.append(url) or _resp(json_data=_EMPTY))
     assert we._lookup_closest_snapshot("tideblock.io", "") is None
-    assert len(calls) == 1
+    assert calls == [we.AVAILABILITY_API_URL, we.CDX_API_URL]
 
 
 def test_lookup_never_raises_when_both_fail(monkeypatch):
@@ -521,3 +527,99 @@ def test_fetch_excerpt_uses_undated_fallback(monkeypatch):
     monkeypatch.setattr(we.requests, "get", fake)
     exc = we.fetch_excerpt("tideblock.io", "2025-09-26")
     assert exc and exc["title"] == "Tide Block Studio"
+
+
+# ---------------------------------------------------------------------------
+# CDX fallback (2026-10-20): the Availability API answered 429 to everyone
+# ---------------------------------------------------------------------------
+
+_TIDE_HTML = b"<html><head><title>Tide Block Studio</title></head><body><h1>Pottery</h1></body></html>"
+
+
+def _recording_get(monkeypatch, responses):
+    """Like _install_get_sequence, but also records (url, params)."""
+    calls = []
+    queue = list(responses)
+
+    def fake_get(url, params=None, **kwargs):
+        calls.append((url, params))
+        item = queue.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    monkeypatch.setattr(we.requests, "get", fake_get)
+    return calls
+
+
+def test_throttled_availability_goes_straight_to_cdx(monkeypatch):
+    calls = _recording_get(monkeypatch, [
+        _resp(429, text="Too Many Requests"),
+        _resp(200, text="20250713170412 http://tideblock.io/\n"),
+        _resp(200, content=_TIDE_HTML),
+    ])
+    out = we.fetch_excerpt("tideblock.io", "2025-12-15")
+
+    assert out["title"] == "Tide Block Studio"
+    assert out["snapshot_timestamp"] == "20250713170412"
+    assert out["snapshot_url"] == "https://web.archive.org/web/20250713170412/http://tideblock.io/"
+    # 429 -> no undated retry against the throttled API; CDX, then the page
+    assert [c[0] for c in calls] == [we.AVAILABILITY_API_URL, we.CDX_API_URL, out["snapshot_url"]]
+    cdx_params = calls[1][1]
+    assert ("closest", "20251215") in cdx_params and ("sort", "closest") in cdx_params
+    assert ("filter", "statuscode:200") in cdx_params and ("filter", "mimetype:text/html") in cdx_params
+
+
+def test_empty_availability_tries_undated_then_cdx(monkeypatch):
+    calls = _recording_get(monkeypatch, [
+        _resp(200, json_data={"archived_snapshots": {}}),
+        _resp(200, json_data={"archived_snapshots": {}}),
+        _resp(200, text="20240102030405 https://tideblock.io/\n"),
+        _resp(200, content=_TIDE_HTML),
+    ])
+    assert we.fetch_excerpt("tideblock.io", "2025-12-15")["snapshot_timestamp"] == "20240102030405"
+    assert [c[0] for c in calls][:3] == [we.AVAILABILITY_API_URL, we.AVAILABILITY_API_URL, we.CDX_API_URL]
+
+
+def test_cdx_without_date_takes_the_newest_capture(monkeypatch):
+    calls = _recording_get(monkeypatch, [_resp(200, text="20260210080624 https://tideblock.io/\n")])
+    snap = we._lookup_cdx_snapshot("tideblock.io", "")
+    assert snap == {"status": "200", "available": True, "timestamp": "20260210080624",
+                    "url": "https://web.archive.org/web/20260210080624/https://tideblock.io/"}
+    assert ("limit", "-1") in calls[0][1]
+    assert not any(k == "closest" for k, _ in calls[0][1])
+
+
+@pytest.mark.parametrize("response", [
+    _resp(200, text=""),                       # no capture
+    _resp(200, text="garbage line\n2025 x\n"),  # malformed
+    _resp(503, text="Service Unavailable"),
+    requests.ConnectionError("down"),
+])
+def test_cdx_failures_return_none(monkeypatch, response):
+    _recording_get(monkeypatch, [response])
+    assert we._lookup_cdx_snapshot("tideblock.io", "2025-12-15") is None
+
+
+def test_healthy_availability_never_calls_cdx(monkeypatch):
+    calls = _recording_get(monkeypatch, [
+        _resp(200, json_data=_avail_payload(url="http://web.archive.org/web/20251215120000/http://tideblock.io/")),
+        _resp(200, content=_TIDE_HTML),
+    ])
+    assert we.fetch_excerpt("tideblock.io", "2025-12-15")["title"] == "Tide Block Studio"
+    assert we.CDX_API_URL not in [c[0] for c in calls]
+
+
+def test_classifier_raw_markup_path_uses_the_cdx_fallback(monkeypatch):
+    """The parked-page path composes the same lookup, so it recovers too."""
+    from scripts import snapshot_classifier as sc
+
+    parked = b'<html><head></head><body data-adblockkey="x">Buy this domain</body></html>'
+    _recording_get(monkeypatch, [
+        _resp(429, text="Too Many Requests"),
+        _resp(200, text="20250713170412 http://tideblock.io/\n"),
+        _resp(200, content=parked),
+    ])
+    excerpt, html = sc._fetch_snapshot_bundle("tideblock.io", "2025-12-15")
+    assert excerpt is None
+    assert "data-adblockkey" in html
