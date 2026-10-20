@@ -2954,3 +2954,21 @@ Mario asked for an API that his other project, Asset X-Ray, can read. Their spec
 **Next:**
 - Mario creates the tunnel and pastes its token on the server, then the service is started.
 - The API token goes to Asset X-Ray through Mario.
+
+---
+
+## 2026-10-20 — Two days with no new domains: archive.org's Availability API throttled everyone
+
+**Symptom.** On 2026-10-19 and 2026-10-20 the site published 0 new domains, while a new subscriber had just joined. RDAP, OpenPageRank and the LLM all worked; 62 and 103 domains were confirmed available.
+
+**Cause.** From about 2026-10-17, `https://archive.org/wayback/available` answers HTTP 429 to every uncached lookup, from any IP and User-Agent. This was verified from the OVH box and from a separate network. The CDX API and the snapshot pages kept working.
+- `wayback_excerpt` could not find a snapshot, so the content classifier had no evidence: 62/62 `unknown` on 10-19 and 88/88 on 10-20.
+- The held queue (2026-10-03) correctly refused to publish unscreened domains: 0 published, 35 held domains expired on 10-20.
+
+**Fix (commit 100ee0f).** `_lookup_closest_snapshot` falls back to the CDX API for the HTTP-200 HTML capture closest to the target date. A 429 skips the undated Availability retry. Both `fetch_excerpt` and the classifier's parked-page path use it.
+- Live check on 8 held domains: 5 found by CDX. 2 gave a usable excerpt; 3 were tiny pages with no title or headings, unknown before the outage too. The other 3 have no Wayback captures at all.
+- Each CDX-answered lookup logs `Wayback lookup for X answered by CDX (Availability API HTTP 429)`.
+
+**Watch on 2026-10-21.** The classifier line should show real verdicts again, and the held queue should show `released > 0`.
+
+**Lesson.** The held queue did its job: nothing unscreened went out. But an outage of one external endpoint stopped publishing for two days with no alarm. The daily email showed an all-`unknown` classifier, but did not name archive.org.
