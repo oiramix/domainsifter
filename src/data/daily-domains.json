@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-11-20T13:06:42Z",
-  "domain_count": 232,
-  "today_count": 21,
-  "carryover_count": 211,
+  "generated_at": "2026-11-21T13:01:20Z",
+  "domain_count": 225,
+  "today_count": 10,
+  "carryover_count": 215,
   "domains": [
     {
       "name": "harbourlightmotel.com",
@@ -32,8 +32,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:35:50Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -71,8 +71,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:12:55Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -110,8 +110,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:19Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -174,8 +174,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:01:28Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -213,8 +213,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T09:59:15Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -252,8 +252,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:01:51Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -316,8 +316,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:01:11Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -380,8 +380,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:03:34Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -419,8 +419,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:05:12Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -429,6 +429,45 @@
       "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "all american print patriotic"
+    },
+    {
+      "name": "winwithmarketing.com",
+      "tld": "com",
+      "dropped_date": "2026-11-21",
+      "wayback_snapshots": 717,
+      "wayback_last_snapshot": "2025-08-08",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 54,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dwinwithmarketing.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=winwithmarketing.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=winwithmarketing.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T11:45:28Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear benefit obvious service"
     },
     {
       "name": "westwoodsfurniture.com",
@@ -458,8 +497,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:04:50Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -522,8 +561,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:05:08Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -586,8 +625,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:37:36Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -596,6 +635,70 @@
       "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "clear fitness health service concept"
+    },
+    {
+      "name": "seniorcomfortservices.com",
+      "tld": "com",
+      "dropped_date": "2026-11-21",
+      "wayback_snapshots": 1015,
+      "wayback_last_snapshot": "2025-02-21",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 53,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dseniorcomfortservices.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=seniorcomfortservices.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=seniorcomfortservices.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T11:38:21Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": null
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear senior care service"
     },
     {
       "name": "africanmineralslimited.com",
@@ -625,8 +728,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:04:44Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -689,8 +792,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:03:57Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -753,8 +856,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:01:14Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -817,8 +920,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:04:57Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -856,8 +959,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:44:35Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -895,8 +998,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:04:50Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": 183,
       "cc_backlink_history": [
         {
@@ -959,8 +1062,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:06:13Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -998,8 +1101,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:15Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1037,8 +1140,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:42Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1076,8 +1179,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:01:33Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1140,8 +1243,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:01:13Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1179,8 +1282,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:04:37Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1191,11 +1294,11 @@
       "phase2_reason": "wine brand poetic clear"
     },
     {
-      "name": "insightmarketing.org",
-      "tld": "org",
-      "dropped_date": "2026-11-19",
-      "wayback_snapshots": 340,
-      "wayback_last_snapshot": "2025-07-19",
+      "name": "documentionline.com",
+      "tld": "com",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 307,
+      "wayback_last_snapshot": "2025-07-11",
       "open_page_rank": 0.0,
       "cert_history": true,
       "previous_registrar": null,
@@ -1203,31 +1306,31 @@
       "registrars": [
         {
           "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dinsightmarketing.org"
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddocumentionline.com"
         },
         {
           "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=insightmarketing.org&rid=36a0644du"
+          "url": "https://www.namesilo.com/domain/search-domains?query=documentionline.com&rid=36a0644du"
         },
         {
           "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=insightmarketing.org&rscreg=domainsifter"
+          "url": "https://www.dynadot.com/domain/search?domain=documentionline.com&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:05:26Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
+      "availability_verified_at": "2026-11-21T10:07:16Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
       "days_listed": 0,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear professional service"
+      "phase2_reason": "clear document service, slightly generic"
     },
     {
       "name": "premiercollisioncenterinc.com",
@@ -1257,8 +1360,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:06:17Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1267,45 +1370,6 @@
       "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "clear auto service focus"
-    },
-    {
-      "name": "visionaryhosting.net",
-      "tld": "net",
-      "dropped_date": "2026-11-19",
-      "wayback_snapshots": 340,
-      "wayback_last_snapshot": "2022-09-07",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 50,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dvisionaryhosting.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=visionaryhosting.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=visionaryhosting.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:06:30Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear web hosting brand"
     },
     {
       "name": "alterationsbystella.com",
@@ -1335,8 +1399,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:21Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1374,8 +1438,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T11:37:49Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1413,8 +1477,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:01:54Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1423,6 +1487,45 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "wellness brand, clearly positive"
+    },
+    {
+      "name": "insightmarketing.org",
+      "tld": "org",
+      "dropped_date": "2026-11-19",
+      "wayback_snapshots": 340,
+      "wayback_last_snapshot": "2025-07-19",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 50,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dinsightmarketing.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=insightmarketing.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=insightmarketing.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-20T10:05:26Z",
+      "first_seen_date": "2026-11-20",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear professional service"
     },
     {
       "name": "creativemonster.net",
@@ -1452,8 +1555,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:01:30Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 14,
       "cc_backlink_history": [
         {
@@ -1516,8 +1619,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:03:39Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1553,6 +1656,70 @@
       "phase2_reason": "carpentry trade, gregory surname"
     },
     {
+      "name": "millennium-construction.com",
+      "tld": "com",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 3260,
+      "wayback_last_snapshot": "2026-02-03",
+      "open_page_rank": 0.6,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 49,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmillennium-construction.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=millennium-construction.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=millennium-construction.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T10:07:39Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": 12,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": 12
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 12
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 9
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 10
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 9
+        }
+      ],
+      "verdict": "Promising",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "millennium construction clear, builder brand"
+    },
+    {
       "name": "cabooseartgallery.com",
       "tld": "com",
       "dropped_date": "2026-11-20",
@@ -1580,8 +1747,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:23:00Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1644,8 +1811,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:03:41Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1683,8 +1850,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:03:39Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1722,8 +1889,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:05:17Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1761,8 +1928,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:55:11Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1800,8 +1967,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:03:14Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -1864,8 +2031,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-08T10:00:59Z",
       "first_seen_date": "2026-11-08",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 12,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1903,8 +2070,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:22Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -1913,45 +2080,6 @@
       "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "retail nostalgia, location brand"
-    },
-    {
-      "name": "sammartialartacademy.org",
-      "tld": "org",
-      "dropped_date": "2026-11-19",
-      "wayback_snapshots": 215,
-      "wayback_last_snapshot": "2016-05-16",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 47,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsammartialartacademy.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=sammartialartacademy.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=sammartialartacademy.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:05:23Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear martial arts training nonprofit"
     },
     {
       "name": "concretecontractorparkcity.com",
@@ -1981,8 +2109,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:38:15Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2020,8 +2148,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:14:37Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 26,
       "cc_backlink_history": [
         {
@@ -2084,8 +2212,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:00:00Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2123,8 +2251,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:09Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2162,8 +2290,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:03:14Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2201,8 +2329,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:04:53Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": 4,
       "cc_backlink_history": [
         {
@@ -2265,8 +2393,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:05:20Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -2329,8 +2457,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:04:17Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2368,8 +2496,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:37:40Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2407,8 +2535,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:37:50Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": 5,
       "cc_backlink_history": [
         {
@@ -2444,6 +2572,109 @@
       "phase2_reason": "construction, professional"
     },
     {
+      "name": "sammartialartacademy.org",
+      "tld": "org",
+      "dropped_date": "2026-11-19",
+      "wayback_snapshots": 215,
+      "wayback_last_snapshot": "2016-05-16",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 47,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsammartialartacademy.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=sammartialartacademy.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=sammartialartacademy.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-20T10:05:23Z",
+      "first_seen_date": "2026-11-20",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear martial arts training nonprofit"
+    },
+    {
+      "name": "rockinbakeracademy.org",
+      "tld": "org",
+      "dropped_date": "2026-11-19",
+      "wayback_snapshots": 1656,
+      "wayback_last_snapshot": "2021-02-18",
+      "open_page_rank": 0.37,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 46,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Drockinbakeracademy.org"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=rockinbakeracademy.org&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=rockinbakeracademy.org&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T10:06:09Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 4
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 3
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 3
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear music baking education brand"
+    },
+    {
       "name": "gardeningandplanting.com",
       "tld": "com",
       "dropped_date": "2026-11-14",
@@ -2471,8 +2702,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:04:14Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 3,
       "cc_backlink_history": [
         {
@@ -2535,8 +2766,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:05:04Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -2599,8 +2830,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:03:22Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -2663,8 +2894,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:04:11Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": 3,
       "cc_backlink_history": [
         {
@@ -2727,8 +2958,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T11:34:03Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -2791,8 +3022,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:31Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2830,8 +3061,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:05:15Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 5,
       "cc_backlink_history": [
         {
@@ -2894,8 +3125,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:04:10Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -2958,8 +3189,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:00:42Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -2997,8 +3228,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:05:30Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3061,8 +3292,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:03:54Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -3125,8 +3356,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:29Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3164,8 +3395,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:01:26Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3176,11 +3407,11 @@
       "phase2_reason": "location plus healthcare, professional"
     },
     {
-      "name": "classicdentallab.net",
+      "name": "hendersonfurniture.net",
       "tld": "net",
       "dropped_date": "2026-11-20",
-      "wayback_snapshots": 1570,
-      "wayback_last_snapshot": "2026-11-17",
+      "wayback_snapshots": 2246,
+      "wayback_last_snapshot": "2026-05-10",
       "open_page_rank": 0.09,
       "cert_history": true,
       "previous_registrar": null,
@@ -3188,22 +3419,86 @@
       "registrars": [
         {
           "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dclassicdentallab.net"
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dhendersonfurniture.net"
         },
         {
           "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=classicdentallab.net&rid=36a0644du"
+          "url": "https://www.namesilo.com/domain/search-domains?query=hendersonfurniture.net&rid=36a0644du"
         },
         {
           "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=classicdentallab.net&rscreg=domainsifter"
+          "url": "https://www.dynadot.com/domain/search?domain=hendersonfurniture.net&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:25:07Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
+      "availability_verified_at": "2026-11-21T10:07:27Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "proper name furniture retailer"
+    },
+    {
+      "name": "simpleanalyticsinc.com",
+      "tld": "com",
+      "dropped_date": "2026-11-21",
+      "wayback_snapshots": 1078,
+      "wayback_last_snapshot": "2024-12-09",
+      "open_page_rank": 0.24,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 44,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dsimpleanalyticsinc.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=simpleanalyticsinc.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=simpleanalyticsinc.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T11:03:51Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
       "days_listed": 0,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
@@ -3217,75 +3512,11 @@
         },
         {
           "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 3
+          "source_domain_count": null
         },
         {
           "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 6
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 7
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 4
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear healthcare service transparent"
-    },
-    {
-      "name": "greenentertainment.net",
-      "tld": "net",
-      "dropped_date": "2026-11-20",
-      "wayback_snapshots": 1365,
-      "wayback_last_snapshot": "2026-01-16",
-      "open_page_rank": 0.21,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 44,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgreenentertainment.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=greenentertainment.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=greenentertainment.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:34:51Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 2
+          "source_domain_count": null
         },
         {
           "release": "cc-main-2026-apr-may-jun",
@@ -3299,9 +3530,9 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear sustainable entertainment brand"
+      "phase2_reason": "clear analytics software brand"
     },
     {
       "name": "compassionleaders.com",
@@ -3331,8 +3562,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:04:53Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": 5,
       "cc_backlink_history": [
         {
@@ -3395,8 +3626,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:46:39Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3434,8 +3665,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:58:28Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -3498,8 +3729,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:47Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3537,8 +3768,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:05:22Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3601,8 +3832,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:05:06Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -3665,8 +3896,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:05:40Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -3704,8 +3935,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:53:44Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -3768,8 +3999,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:01:43Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3832,8 +4063,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:37:45Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3896,8 +4127,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:38:12Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3933,11 +4164,11 @@
       "phase2_reason": "design studio brand memorable"
     },
     {
-      "name": "johnandersonlegal.com",
-      "tld": "com",
-      "dropped_date": "2026-11-03",
-      "wayback_snapshots": 976,
-      "wayback_last_snapshot": "2024-08-15",
+      "name": "classicdentallab.net",
+      "tld": "net",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 1570,
+      "wayback_last_snapshot": "2026-11-17",
       "open_page_rank": 0.09,
       "cert_history": true,
       "previous_registrar": null,
@@ -3945,23 +4176,23 @@
       "registrars": [
         {
           "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Djohnandersonlegal.com"
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dclassicdentallab.net"
         },
         {
           "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=johnandersonlegal.com&rid=36a0644du"
+          "url": "https://www.namesilo.com/domain/search-domains?query=classicdentallab.net&rid=36a0644du"
         },
         {
           "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=johnandersonlegal.com&rscreg=domainsifter"
+          "url": "https://www.dynadot.com/domain/search?domain=classicdentallab.net&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:10Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
+      "availability_verified_at": "2026-11-20T10:25:07Z",
+      "first_seen_date": "2026-11-20",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -3970,15 +4201,79 @@
         },
         {
           "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 1
+          "source_domain_count": null
         },
         {
           "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 1
+          "source_domain_count": 3
         },
         {
           "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": null
+          "source_domain_count": 6
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 7
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 4
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear healthcare service transparent"
+    },
+    {
+      "name": "greenentertainment.net",
+      "tld": "net",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 1365,
+      "wayback_last_snapshot": "2026-01-16",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 44,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dgreenentertainment.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=greenentertainment.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=greenentertainment.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-20T10:34:51Z",
+      "first_seen_date": "2026-11-20",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
         },
         {
           "release": "cc-main-2026-apr-may-jun",
@@ -3992,9 +4287,9 @@
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
+      "snapshot_category": "empty",
       "snapshot_classifier_version": "v3",
-      "phase2_reason": "law firm brand, personal attorney name"
+      "phase2_reason": "clear sustainable entertainment brand"
     },
     {
       "name": "insearchofsunrise.net",
@@ -4024,8 +4319,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:00:46Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4088,8 +4383,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:14Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4152,8 +4447,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:04:09Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -4189,70 +4484,6 @@
       "phase2_reason": "clear craft education brand"
     },
     {
-      "name": "ontimeconstruction.net",
-      "tld": "net",
-      "dropped_date": "2026-11-20",
-      "wayback_snapshots": 823,
-      "wayback_last_snapshot": "2026-02-12",
-      "open_page_rank": 0.09,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 43,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dontimeconstruction.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=ontimeconstruction.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=ontimeconstruction.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:13:58Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 1
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear construction service descriptor"
-    },
-    {
       "name": "sweetmommastreats.com",
       "tld": "com",
       "dropped_date": "2026-11-19",
@@ -4280,8 +4511,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:09:53Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4344,8 +4575,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:02Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -4383,8 +4614,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:02:16Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4447,8 +4678,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:02:07Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4511,8 +4742,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:01:03Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4575,8 +4806,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:04:17Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -4614,8 +4845,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:04:21Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4678,8 +4909,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T11:19:09Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -4742,8 +4973,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T11:11:04Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -4781,8 +5012,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:02:58Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -4845,8 +5076,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:03:42Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -4909,8 +5140,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:02:49Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -4946,45 +5177,6 @@
       "phase2_reason": null
     },
     {
-      "name": "traditionredefined.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 2386,
-      "wayback_last_snapshot": "2023-11-07",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 43,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dtraditionredefined.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=traditionredefined.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=traditionredefined.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:03:08Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "philosophical, branding potential"
-    },
-    {
       "name": "theuncommonground.org",
       "tld": "org",
       "dropped_date": "2026-11-15",
@@ -5012,8 +5204,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T09:59:06Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5051,8 +5243,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-08T10:00:39Z",
       "first_seen_date": "2026-11-08",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 12,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 13,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -5115,8 +5307,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:01:51Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -5152,6 +5344,70 @@
       "phase2_reason": null
     },
     {
+      "name": "ontimeconstruction.net",
+      "tld": "net",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 823,
+      "wayback_last_snapshot": "2026-02-12",
+      "open_page_rank": 0.09,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 43,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dontimeconstruction.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=ontimeconstruction.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=ontimeconstruction.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-20T10:13:58Z",
+      "first_seen_date": "2026-11-20",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
+      "cc_source_domain_count": 1,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 1
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear construction service descriptor"
+    },
+    {
       "name": "ladanceconnection.net",
       "tld": "net",
       "dropped_date": "2026-11-14",
@@ -5179,8 +5435,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:04:23Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5189,6 +5445,70 @@
       "snapshot_category": "empty",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "dance studio clear niche"
+    },
+    {
+      "name": "dorinsconstruction.com",
+      "tld": "com",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 59,
+      "wayback_last_snapshot": "2022-01-17",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 42,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ddorinsconstruction.com"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=dorinsconstruction.com&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=dorinsconstruction.com&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T10:07:20Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": null
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": null
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "empty",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "surname construction readable brand"
     },
     {
       "name": "prestigeconcreteinc.com",
@@ -5218,8 +5538,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:48:46Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -5282,8 +5602,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:06:34Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -5346,8 +5666,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:02:47Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -5410,8 +5730,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:05:43Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5449,8 +5769,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:21:04Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -5513,8 +5833,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:00Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5552,8 +5872,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:00:30Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -5616,8 +5936,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:05:16Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -5680,8 +6000,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:57:10Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5719,8 +6039,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:03:07Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5729,84 +6049,6 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": null
-    },
-    {
-      "name": "actionmetalrecycling.com",
-      "tld": "com",
-      "dropped_date": "2026-11-03",
-      "wayback_snapshots": 2030,
-      "wayback_last_snapshot": "2025-02-11",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 42,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dactionmetalrecycling.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=actionmetalrecycling.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=actionmetalrecycling.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:18Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "recycling service descriptor"
-    },
-    {
-      "name": "leeinsuranceconcepts.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 1146,
-      "wayback_last_snapshot": "2023-12-08",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 42,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dleeinsuranceconcepts.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=leeinsuranceconcepts.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=leeinsuranceconcepts.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:03:48Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "insurance clear, lee proper noun weak"
     },
     {
       "name": "gracecrossingacademy.net",
@@ -5836,8 +6078,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:19:06Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5846,6 +6088,70 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "school brand, professional"
+    },
+    {
+      "name": "cantinastudio.net",
+      "tld": "net",
+      "dropped_date": "2026-11-21",
+      "wayback_snapshots": 167,
+      "wayback_last_snapshot": "2026-06-06",
+      "open_page_rank": 0.21,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 41,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcantinastudio.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=cantinastudio.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=cantinastudio.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-21T12:01:51Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
+      "cc_source_domain_count": 2,
+      "cc_backlink_history": [
+        {
+          "release": "cc-main-2026-aug-sep-oct",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jul-aug-sep",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-jun-jul-aug",
+          "source_domain_count": 2
+        },
+        {
+          "release": "cc-main-2026-may-jun-jul",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-apr-may-jun",
+          "source_domain_count": 1
+        },
+        {
+          "release": "cc-main-2026-mar-apr-may",
+          "source_domain_count": 2
+        }
+      ],
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "legitimate",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear studio brand, good length"
     },
     {
       "name": "edisonandpartners.com",
@@ -5875,8 +6181,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:28:56Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -5939,8 +6245,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:05:16Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -5978,8 +6284,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:48:30Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 9,
       "cc_backlink_history": [
         {
@@ -6042,8 +6348,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T11:51:41Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -6106,8 +6412,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:00:16Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -6170,8 +6476,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:04:00Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -6234,8 +6540,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:04:45Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -6298,8 +6604,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T11:03:47Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -6337,8 +6643,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:02:44Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -6376,8 +6682,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-08T10:01:27Z",
       "first_seen_date": "2026-11-08",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 12,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -6415,8 +6721,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T11:25:47Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -6454,8 +6760,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:24:50Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -6518,8 +6824,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:06:28Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -6582,8 +6888,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:00:05Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -6646,8 +6952,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:03:54Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -6710,8 +7016,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:05:12Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -6774,8 +7080,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:04:04Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -6838,8 +7144,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:03:53Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -6877,8 +7183,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T11:57:49Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -6941,8 +7247,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T11:29:00Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -6980,8 +7286,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:02:18Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7019,8 +7325,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:03:22Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -7083,8 +7389,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:03:18Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -7147,8 +7453,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:00:45Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -7211,8 +7517,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:04:25Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -7275,8 +7581,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:04:33Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7314,8 +7620,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:05:33Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7353,8 +7659,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-08T10:00:40Z",
       "first_seen_date": "2026-11-08",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 12,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7392,8 +7698,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T09:59:03Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -7456,8 +7762,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:01:17Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7495,8 +7801,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T11:02:22Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7534,8 +7840,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:51Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7573,8 +7879,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:00:37Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7612,8 +7918,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:00:34Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -7676,8 +7982,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:03:46Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7715,8 +8021,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:45:51Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7754,8 +8060,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:03:30Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7793,8 +8099,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:39:15Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -7830,70 +8136,6 @@
       "phase2_reason": "real words news streaming clear"
     },
     {
-      "name": "artclasswineglass.com",
-      "tld": "com",
-      "dropped_date": "2026-11-03",
-      "wayback_snapshots": 11650,
-      "wayback_last_snapshot": "2025-11-13",
-      "open_page_rank": 0.36,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 38,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dartclasswineglass.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=artclasswineglass.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=artclasswineglass.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:29Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 5,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 5
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 5
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 7
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 9
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 8
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "wine education brand, art class plus glass"
-    },
-    {
       "name": "straightedgeonline.org",
       "tld": "org",
       "dropped_date": "2026-11-17",
@@ -7921,8 +8163,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:02:37Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -7960,8 +8202,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T09:59:01Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": 3,
       "cc_backlink_history": [
         {
@@ -8024,8 +8266,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T10:59:26Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": 3,
       "cc_backlink_history": [
         {
@@ -8088,8 +8330,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:39Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -8152,8 +8394,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:43:05Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 4,
       "cc_backlink_history": [
         {
@@ -8216,8 +8458,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:11Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8255,8 +8497,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T11:46:02Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 5,
       "cc_backlink_history": [
         {
@@ -8319,8 +8561,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:08:07Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -8383,8 +8625,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:04:35Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8422,8 +8664,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:00:55Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -8486,8 +8728,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:05:04Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8525,8 +8767,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:09:35Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8564,8 +8806,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:03:26Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -8628,8 +8870,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:00:45Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8667,8 +8909,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T11:31:24Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8706,8 +8948,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:05:35Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -8770,8 +9012,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:05:39Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -8809,8 +9051,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:03:09Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -8873,8 +9115,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T11:07:31Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -8937,8 +9179,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:02:52Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -9001,8 +9243,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-08T10:01:23Z",
       "first_seen_date": "2026-11-08",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 12,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -9065,8 +9307,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:37:16Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -9102,109 +9344,6 @@
       "phase2_reason": "art gallery cooperative clear"
     },
     {
-      "name": "baycitypropertyservice.com",
-      "tld": "com",
-      "dropped_date": "2026-11-03",
-      "wayback_snapshots": 1207,
-      "wayback_last_snapshot": "2026-05-27",
-      "open_page_rank": 0.24,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 36,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dbaycitypropertyservice.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=baycitypropertyservice.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=baycitypropertyservice.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:02Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 5,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 5
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 5
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 3
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 3
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 3
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "bay city property service clear"
-    },
-    {
-      "name": "crockersfinewines.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 270,
-      "wayback_last_snapshot": "2019-11-14",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 36,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcrockersfinewines.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=crockersfinewines.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=crockersfinewines.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:49Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "wine shop name clear"
-    },
-    {
       "name": "secretgardenproject.org",
       "tld": "org",
       "dropped_date": "2026-11-05",
@@ -9232,8 +9371,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-08T10:00:23Z",
       "first_seen_date": "2026-11-08",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 12,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 13,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -9271,8 +9410,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:01:30Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -9335,8 +9474,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T11:03:53Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -9374,8 +9513,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:05:01Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -9411,45 +9550,6 @@
       "phase2_reason": "floral commerce, clear"
     },
     {
-      "name": "colossalventures.net",
-      "tld": "net",
-      "dropped_date": "2026-11-20",
-      "wayback_snapshots": 9,
-      "wayback_last_snapshot": "2025-07-17",
-      "open_page_rank": 0.0,
-      "cert_history": true,
-      "previous_registrar": null,
-      "score": 35,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcolossalventures.net"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=colossalventures.net&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=colossalventures.net&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-20T10:25:35Z",
-      "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "clear scale adventure brand"
-    },
-    {
       "name": "reasonpromotions.com",
       "tld": "com",
       "dropped_date": "2026-11-20",
@@ -9477,8 +9577,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T11:13:11Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -9516,8 +9616,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:28:23Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -9555,8 +9655,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:10Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -9594,8 +9694,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-14T10:04:07Z",
       "first_seen_date": "2026-11-14",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 6,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 7,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -9633,8 +9733,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:03:39Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -9697,8 +9797,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:25:45Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -9761,8 +9861,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:04:33Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -9825,8 +9925,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:01:46Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -9862,109 +9962,6 @@
       "phase2_reason": "consulting service descriptor"
     },
     {
-      "name": "radianceplatinum.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 212,
-      "wayback_last_snapshot": "2025-07-29",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 35,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dradianceplatinum.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=radianceplatinum.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=radianceplatinum.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:01:02Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "luxury spa brand"
-    },
-    {
-      "name": "itsabouttimetheater.org",
-      "tld": "org",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 1520,
-      "wayback_last_snapshot": "2025-04-27",
-      "open_page_rank": 0.36,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 35,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Ditsabouttimetheater.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=itsabouttimetheater.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=itsabouttimetheater.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:04Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 2,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 1
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "theater company, pun brand"
-    },
-    {
       "name": "focussolutions.site",
       "tld": "site",
       "dropped_date": "2026-11-09",
@@ -9992,8 +9989,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-10T10:02:16Z",
       "first_seen_date": "2026-11-10",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 10,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 11,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -10002,6 +9999,45 @@
       "snapshot_category": "legitimate",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "business service, readable"
+    },
+    {
+      "name": "colossalventures.net",
+      "tld": "net",
+      "dropped_date": "2026-11-20",
+      "wayback_snapshots": 9,
+      "wayback_last_snapshot": "2025-07-17",
+      "open_page_rank": 0.0,
+      "cert_history": true,
+      "previous_registrar": null,
+      "score": 35,
+      "registrars": [
+        {
+          "name": "Namecheap",
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcolossalventures.net"
+        },
+        {
+          "name": "NameSilo",
+          "url": "https://www.namesilo.com/domain/search-domains?query=colossalventures.net&rid=36a0644du"
+        },
+        {
+          "name": "Dynadot",
+          "url": "https://www.dynadot.com/domain/search?domain=colossalventures.net&rscreg=domainsifter"
+        }
+      ],
+      "rdap_status": [],
+      "rdap_expiration": null,
+      "availability_verified_at": "2026-11-20T10:25:35Z",
+      "first_seen_date": "2026-11-20",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
+      "cc_source_domain_count": null,
+      "cc_backlink_history": null,
+      "verdict": "Caution",
+      "wayback_unknown": null,
+      "wayback_unknown_attempts": null,
+      "snapshot_category": "parked",
+      "snapshot_classifier_version": "v3",
+      "phase2_reason": "clear scale adventure brand"
     },
     {
       "name": "arlington-appliance-repair.com",
@@ -10031,8 +10067,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:29:07Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -10070,8 +10106,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:06Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -10134,8 +10170,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:47:15Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -10198,8 +10234,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:54:36Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -10237,8 +10273,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:55Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -10301,8 +10337,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-16T10:00:59Z",
       "first_seen_date": "2026-11-16",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 4,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 5,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -10340,8 +10376,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:04:29Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -10350,109 +10386,6 @@
       "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "rental location clear"
-    },
-    {
-      "name": "ilovelittleberry.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 1864,
-      "wayback_last_snapshot": "2025-04-26",
-      "open_page_rank": 0.09,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 34,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dilovelittleberry.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=ilovelittleberry.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=ilovelittleberry.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:03:45Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": null
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": null
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": null
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 1
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "consumer brand playful"
-    },
-    {
-      "name": "redcedarelectric.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 165,
-      "wayback_last_snapshot": "2024-06-25",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 34,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dredcedarelectric.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=redcedarelectric.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=redcedarelectric.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:01:06Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "electrical service obvious"
     },
     {
       "name": "goodwillglobetrotting.org",
@@ -10482,8 +10415,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:02:42Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -10519,70 +10452,6 @@
       "phase2_reason": "phrase-based nonprofit branding"
     },
     {
-      "name": "centerstagedesign.org",
-      "tld": "org",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 3343,
-      "wayback_last_snapshot": "2023-04-13",
-      "open_page_rank": 0.2,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 34,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dcenterstagedesign.org"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=centerstagedesign.org&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=centerstagedesign.org&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:01Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 1
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "idiomatic phrase, design clear"
-    },
-    {
       "name": "iprintondemand.net",
       "tld": "net",
       "dropped_date": "2026-11-16",
@@ -10610,8 +10479,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T10:01:57Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -10674,8 +10543,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:34Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -10738,8 +10607,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:44Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 2,
       "cc_backlink_history": [
         {
@@ -10802,8 +10671,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:19Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 4,
       "cc_backlink_history": [
         {
@@ -10866,8 +10735,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:06:01Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -10930,8 +10799,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:06:06Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -10969,8 +10838,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:03:49Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11008,8 +10877,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-11T10:03:56Z",
       "first_seen_date": "2026-11-11",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 9,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 10,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11047,8 +10916,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-07T09:39:55Z",
       "first_seen_date": "2026-11-07",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 13,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 14,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11059,68 +10928,43 @@
       "phase2_reason": "brand name venture compound"
     },
     {
-      "name": "bluelagoonrealestate.com",
+      "name": "essentialwellnessrichland.com",
       "tld": "com",
-      "dropped_date": "2026-11-03",
-      "wayback_snapshots": 199,
-      "wayback_last_snapshot": "2024-12-18",
+      "dropped_date": "2026-11-19",
+      "wayback_snapshots": 1178,
+      "wayback_last_snapshot": "2026-11-17",
       "open_page_rank": 0.0,
-      "cert_history": null,
+      "cert_history": false,
       "previous_registrar": null,
-      "score": 33,
+      "score": 32,
       "registrars": [
         {
           "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dbluelagoonrealestate.com"
+          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dessentialwellnessrichland.com"
         },
         {
           "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=bluelagoonrealestate.com&rid=36a0644du"
+          "url": "https://www.namesilo.com/domain/search-domains?query=essentialwellnessrichland.com&rid=36a0644du"
         },
         {
           "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=bluelagoonrealestate.com&rscreg=domainsifter"
+          "url": "https://www.dynadot.com/domain/search?domain=essentialwellnessrichland.com&rscreg=domainsifter"
         }
       ],
       "rdap_status": [],
       "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:22Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
+      "availability_verified_at": "2026-11-21T10:06:51Z",
+      "first_seen_date": "2026-11-21",
+      "last_validated_date": "2026-11-21",
+      "days_listed": 0,
       "cc_source_domain_count": null,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": null
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 3
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 5
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 6
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 5
-        }
-      ],
+      "cc_backlink_history": null,
       "verdict": "Caution",
       "wayback_unknown": null,
       "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
+      "snapshot_category": "parked",
       "snapshot_classifier_version": "v3",
-      "phase2_reason": "real estate brand memorable"
+      "phase2_reason": "clear wellness focus, location"
     },
     {
       "name": "bostonclassictours.com",
@@ -11150,8 +10994,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:30:12Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -11214,8 +11058,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:06:21Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11253,8 +11097,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:27Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11292,8 +11136,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:00:26Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11331,8 +11175,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:12:21Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11370,8 +11214,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:04:13Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11380,109 +11224,6 @@
       "snapshot_category": "empty",
       "snapshot_classifier_version": "v3",
       "phase2_reason": "clear farm or organic food brand"
-    },
-    {
-      "name": "moonlight-dancing.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 114,
-      "wayback_last_snapshot": "2014-12-23",
-      "open_page_rank": 0.0,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 32,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dmoonlight-dancing.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=moonlight-dancing.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=moonlight-dancing.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:00:57Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": null,
-      "cc_backlink_history": null,
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "empty",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "romantic phrase, evocative brand"
-    },
-    {
-      "name": "networkeronline.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 586,
-      "wayback_last_snapshot": "2025-09-22",
-      "open_page_rank": 0.09,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 32,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dnetworkeronline.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=networkeronline.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=networkeronline.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:03:19Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 1
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "legitimate",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "networking service readable"
     },
     {
       "name": "reneedaysconstructioninc.site",
@@ -11512,8 +11253,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:01:36Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11551,8 +11292,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-20T11:02:50Z",
       "first_seen_date": "2026-11-20",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 0,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 1,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -11615,8 +11356,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-15T10:03:58Z",
       "first_seen_date": "2026-11-15",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 5,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 6,
       "cc_source_domain_count": null,
       "cc_backlink_history": [
         {
@@ -11679,8 +11420,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-13T10:04:52Z",
       "first_seen_date": "2026-11-13",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 7,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 8,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11718,8 +11459,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:33:53Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11757,8 +11498,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-19T10:02:04Z",
       "first_seen_date": "2026-11-19",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 1,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 2,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -11821,8 +11562,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-09T10:04:53Z",
       "first_seen_date": "2026-11-09",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 11,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 12,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11860,8 +11601,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:04:14Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": 0,
       "cc_backlink_history": [
         {
@@ -11924,8 +11665,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-18T10:03:03Z",
       "first_seen_date": "2026-11-18",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 2,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 3,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -11963,8 +11704,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-12T10:03:34Z",
       "first_seen_date": "2026-11-12",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 8,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 9,
       "cc_source_domain_count": 1,
       "cc_backlink_history": [
         {
@@ -12000,70 +11741,6 @@
       "phase2_reason": "local dental practice clear, specific"
     },
     {
-      "name": "activelocations.com",
-      "tld": "com",
-      "dropped_date": "2026-11-04",
-      "wayback_snapshots": 322,
-      "wayback_last_snapshot": "2025-04-01",
-      "open_page_rank": 0.09,
-      "cert_history": null,
-      "previous_registrar": null,
-      "score": 30,
-      "registrars": [
-        {
-          "name": "Namecheap",
-          "url": "https://namecheap.pxf.io/WO655J?u=https%3A%2F%2Fwww.namecheap.com%2Fdomains%2Fregistration%2Fresults%2F%3Fdomain%3Dactivelocations.com"
-        },
-        {
-          "name": "NameSilo",
-          "url": "https://www.namesilo.com/domain/search-domains?query=activelocations.com&rid=36a0644du"
-        },
-        {
-          "name": "Dynadot",
-          "url": "https://www.dynadot.com/domain/search?domain=activelocations.com&rscreg=domainsifter"
-        }
-      ],
-      "rdap_status": [],
-      "rdap_expiration": null,
-      "availability_verified_at": "2026-11-06T10:01:21Z",
-      "first_seen_date": "2026-11-06",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 14,
-      "cc_source_domain_count": 1,
-      "cc_backlink_history": [
-        {
-          "release": "cc-main-2026-aug-sep-oct",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-jul-aug-sep",
-          "source_domain_count": null
-        },
-        {
-          "release": "cc-main-2026-jun-jul-aug",
-          "source_domain_count": 1
-        },
-        {
-          "release": "cc-main-2026-may-jun-jul",
-          "source_domain_count": 2
-        },
-        {
-          "release": "cc-main-2026-apr-may-jun",
-          "source_domain_count": 4
-        },
-        {
-          "release": "cc-main-2026-mar-apr-may",
-          "source_domain_count": 5
-        }
-      ],
-      "verdict": "Caution",
-      "wayback_unknown": null,
-      "wayback_unknown_attempts": null,
-      "snapshot_category": "parked",
-      "snapshot_classifier_version": "v3",
-      "phase2_reason": "real estate services obvious"
-    },
-    {
       "name": "interviewtracker.net",
       "tld": "net",
       "dropped_date": "2026-11-14",
@@ -12091,8 +11768,8 @@
       "rdap_expiration": null,
       "availability_verified_at": "2026-11-17T09:59:10Z",
       "first_seen_date": "2026-11-17",
-      "last_validated_date": "2026-11-20",
-      "days_listed": 3,
+      "last_validated_date": "2026-11-21",
+      "days_listed": 4,
       "cc_source_domain_count": null,
       "cc_backlink_history": null,
       "verdict": "Caution",
@@ -12103,6 +11780,6 @@
       "phase2_reason": "software service clear memorable"
     }
   ],
-  "total_drops_scanned": 228560,
-  "total_candidates_evaluated": 2660
+  "total_drops_scanned": 244045,
+  "total_candidates_evaluated": 2675
 }
